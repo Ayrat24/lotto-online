@@ -1,0 +1,55 @@
+@page "{id:long}/Tickets"
+@model MiniApp.Pages.Admin.Users.TicketsModel
+@{
+    ViewData["Title"] = "User tickets";
+}
+
+<h1>User tickets</h1>
+
+<div class="mb-3">
+    <a class="btn btn-sm btn-outline-secondary" asp-page="/Admin/Users/Index">Back to users</a>
+</div>
+
+@if (Model.SelectedUser is null)
+{
+    <div class="alert alert-warning">User not found.</div>
+    return;
+}
+
+<div class="card mb-3">
+    <div class="card-body">
+        <div><strong>User Id:</strong> @Model.SelectedUser.Id</div>
+        <div><strong>TelegramUserId:</strong> @Model.SelectedUser.TelegramUserId</div>
+        <div><strong>Created:</strong> @Model.SelectedUser.CreatedAtUtc</div>
+        <div><strong>Last seen:</strong> @Model.SelectedUser.LastSeenAtUtc</div>
+    </div>
+</div>
+
+<h2>Tickets (@Model.Tickets.Count)</h2>
+
+@if (Model.Tickets.Count == 0)
+{
+    <div class="muted">No tickets yet.</div>
+}
+else
+{
+    <table class="table table-striped mt-3">
+        <thead>
+        <tr>
+            <th>Id</th>
+            <th>Numbers</th>
+            <th>Purchased (UTC)</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var t in Model.Tickets)
+        {
+            <tr>
+                <td>@t.Id</td>
+                <td><code>@t.Numbers</code></td>
+                <td>@t.PurchasedAtUtc</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}

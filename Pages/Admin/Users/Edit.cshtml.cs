@@ -17,7 +17,7 @@ public sealed class EditModel : PageModel
         _db = db;
     }
 
-    public MiniAppUser? User { get; private set; }
+    public MiniAppUser? SelectedUser { get; private set; }
 
     [BindProperty]
     public long TelegramUserId { get; set; }
@@ -27,11 +27,11 @@ public sealed class EditModel : PageModel
 
     public async Task OnGetAsync(long id)
     {
-        User = await _db.Users.SingleOrDefaultAsync(x => x.Id == id);
-        if (User is null) return;
+        SelectedUser = await _db.Users.SingleOrDefaultAsync(x => x.Id == id);
+        if (SelectedUser is null) return;
 
-        TelegramUserId = User.TelegramUserId;
-        LastSeenAtUtc = User.LastSeenAtUtc;
+        TelegramUserId = SelectedUser.TelegramUserId;
+        LastSeenAtUtc = SelectedUser.LastSeenAtUtc;
     }
 
     public async Task<IActionResult> OnPostAsync(long id)
@@ -46,4 +46,3 @@ public sealed class EditModel : PageModel
         return RedirectToPage("/Admin/Users/Index");
     }
 }
-

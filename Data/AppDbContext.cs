@@ -9,6 +9,7 @@ public sealed class AppDbContext : DbContext
     }
 
     public DbSet<MiniAppUser> Users => Set<MiniAppUser>();
+    public DbSet<Ticket> Tickets => Set<Ticket>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -25,6 +26,21 @@ public sealed class AppDbContext : DbContext
             b.Property(x => x.CreatedAtUtc).IsRequired();
             b.Property(x => x.LastSeenAtUtc).IsRequired();
         });
+
+        modelBuilder.Entity<Ticket>(b =>
+        {
+            b.ToTable("tickets");
+            b.HasKey(x => x.Id);
+
+            b.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasIndex(x => new { x.UserId, x.PurchasedAtUtc });
+
+            b.Property(x => x.Numbers).HasMaxLength(64).IsRequired();
+            b.Property(x => x.PurchasedAtUtc).IsRequired();
+        });
     }
 }
-

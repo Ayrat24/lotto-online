@@ -25,10 +25,12 @@
             <td>@u.CreatedAtUtc</td>
             <td>@u.LastSeenAtUtc</td>
             <td>
-                <a class="btn btn-sm btn-outline-primary" asp-page="/Admin/Users/Edit" asp-route-id="@u.Id">Edit</a>
+                <div class="btn-group" role="group">
+                    <a class="btn btn-sm btn-outline-primary" asp-page="/Admin/Users/Edit" asp-route-id="@u.Id">Edit</a>
+                    <a class="btn btn-sm btn-outline-success" asp-page="/Admin/Users/Tickets" asp-route-id="@u.Id">Tickets</a>
+                </div>
             </td>
         </tr>
     }
     </tbody>
 </table>
-

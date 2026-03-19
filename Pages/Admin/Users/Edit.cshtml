@@ -6,7 +6,7 @@
 
 <h1>Edit user</h1>
 
-@if (Model.User is null)
+@if (Model.SelectedUser is null)
 {
     <div class="alert alert-warning">User not found.</div>
 }
@@ -15,7 +15,7 @@ else
     <form method="post" class="mt-3">
         <div class="mb-3">
             <label class="form-label">Id</label>
-            <input class="form-control" value="@Model.User.Id" disabled />
+            <input class="form-control" value="@Model.SelectedUser.Id" disabled />
         </div>
 
         <div class="mb-3">
@@ -25,7 +25,7 @@ else
 
         <div class="mb-3">
             <label class="form-label">CreatedAtUtc</label>
-            <input class="form-control" value="@Model.User.CreatedAtUtc" disabled />
+            <input class="form-control" value="@Model.SelectedUser.CreatedAtUtc" disabled />
         </div>
 
         <div class="mb-3">
@@ -37,4 +37,3 @@ else
         <a class="btn btn-secondary" asp-page="/Admin/Users/Index">Back</a>
     </form>
 }
-

@@ -13,13 +13,23 @@
 </head>
 <body>
   <main class="container">
-    <h1>Hello from my Telegram Mini App</h1>
+    <h1>Lotto Mini App</h1>
     <p id="info" class="muted"></p>
 
-    <button id="closeBtn" type="button">Close</button>
+    <section class="mt-3">
+      <button id="purchaseTicketBtn" type="button">Purchase Ticket</button>
+      <p id="purchaseStatus" class="muted" style="margin-top: 0.75rem;"></p>
+    </section>
+
+    <section class="mt-3">
+      <h2 style="margin-top: 1.5rem;">Your tickets</h2>
+      <div id="ticketsEmpty" class="muted">No tickets yet.</div>
+      <ul id="ticketsList"></ul>
+    </section>
+
+    <button id="closeBtn" type="button" style="margin-top: 1.5rem;">Close</button>
   </main>
 
   <script src="/js/miniapp.js"></script>
 </body>
 </html>
-
