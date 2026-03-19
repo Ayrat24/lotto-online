@@ -136,22 +136,28 @@ button:disabled {
 
 .ticket-numbers {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
+  overflow: hidden;
 }
 
 .ball {
-  width: 40px;
+  /* Rectangular number chip */
+  width: calc((100% - 5 * 8px) / 6);
   height: 40px;
-  border-radius: 999px;
+  border-radius: 10px;
   display: grid;
   place-items: center;
   font-weight: 950;
+  font-variant-numeric: tabular-nums;
   background:
-    radial-gradient(circle at 30% 30%, #ffffff, rgba(244, 211, 94, 0.55) 55%, rgba(238, 150, 75, 0.45) 100%);
+    linear-gradient(180deg, #ffffff, rgba(244, 211, 94, 0.60));
   border: 2px solid rgba(8, 61, 119, 0.18);
   color: #083d77;
-  box-shadow: 0 8px 16px rgba(8, 61, 119, 0.12);
+  box-shadow: 0 8px 16px rgba(8, 61, 119, 0.10);
+
+  /* Avoid shrinking text; instead chips shrink evenly */
+  min-width: 0;
 }
 
 /* Smooth appear animation for new tickets */
