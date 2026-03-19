@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Preflight: check required secrets
+      - name: "Preflight: check required secrets"
         shell: bash
         env:
           DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
@@ -30,7 +30,7 @@ jobs:
             fi
           done
 
-      - name: Deploy over SSH (git pull + docker compose restart)
+      - name: "Deploy over SSH (git pull + docker compose restart)"
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DROPLET_HOST }}
