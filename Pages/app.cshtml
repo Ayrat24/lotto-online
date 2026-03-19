@@ -1,33 +1,39 @@
 @page
 @{ Layout = null; }
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="robots" content="noindex, nofollow" />
-  <title>Mini App</title>
+  <title>Lotto Mini App</title>
 
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link rel="stylesheet" href="/css/miniapp.css" />
 </head>
 <body>
-  <main class="container">
-    <h1>Lotto Mini App</h1>
-    <p id="info" class="muted"></p>
+  <main class="container stack">
+    <header>
+      <h1>Lotto</h1>
+      <p id="info" class="muted"></p>
+    </header>
 
-    <section class="mt-3">
-      <button id="purchaseTicketBtn" type="button">Purchase Ticket</button>
-      <p id="purchaseStatus" class="muted" style="margin-top: 0.75rem;"></p>
+    <section class="card stack">
+      <div class="row">
+        <button id="purchaseTicketBtn" type="button">Purchase Ticket</button>
+        <button id="closeBtn" type="button" class="secondary">Close</button>
+      </div>
+      <div id="purchaseStatus" class="muted"></div>
     </section>
 
-    <section class="mt-3">
-      <h2 style="margin-top: 1.5rem;">Your tickets</h2>
+    <section class="card">
+      <div class="ticket-header">
+        <div class="ticket-title">Your tickets</div>
+        <div id="ticketsCount" class="ticket-meta"></div>
+      </div>
       <div id="ticketsEmpty" class="muted">No tickets yet.</div>
       <ul id="ticketsList"></ul>
     </section>
-
-    <button id="closeBtn" type="button" style="margin-top: 1.5rem;">Close</button>
   </main>
 
   <script src="/js/miniapp.js"></script>
