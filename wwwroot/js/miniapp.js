@@ -1,5 +1,4 @@
 (function () {
-  var infoEl = document.getElementById('info');
   var purchaseBtn = document.getElementById('purchaseTicketBtn');
   var purchaseStatusEl = document.getElementById('purchaseStatus');
   var ticketsListEl = document.getElementById('ticketsList');
@@ -94,27 +93,19 @@
     if (ticketsListEl.firstChild) ticketsListEl.insertBefore(el, ticketsListEl.firstChild);
     else ticketsListEl.appendChild(el);
 
-    // update count
     var current = ticketsListEl.children ? ticketsListEl.children.length : null;
     if (typeof current === 'number') setTicketsCount(current);
   }
 
-  // Always try to load backend-controlled text
-  fetch('/api/text')
-    .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
-    .then(function (data) {
-      if (data && typeof data.text === 'string') {
-        infoEl.textContent = data.text;
-      }
-    })
-    .catch(function (err) {
-      console.warn('Failed to load /api/text', err);
-    });
+  function postJson(url, payload, extraHeaders) {
+    var headers = { 'Content-Type': 'application/json' };
+    if (extraHeaders) {
+      Object.keys(extraHeaders).forEach(function (k) { headers[k] = extraHeaders[k]; });
+    }
 
-  function postJson(url, payload) {
     return fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: headers,
       body: JSON.stringify(payload)
     }).then(function (r) {
       if (!r.ok) return r.json().catch(function () { return null; }).then(function (b) {
@@ -126,49 +117,68 @@
   }
 
   var initData = null;
+  var devTelegramUserId = null;
+
+  function getOrCreateDevTelegramUserId() {
+    try {
+      var key = 'miniapp.devTelegramUserId';
+      var existing = localStorage.getItem(key);
+      if (existing && /^\d+$/.test(existing)) return existing;
+
+      var n = Math.floor(100000000 + Math.random() * 900000000);
+      localStorage.setItem(key, String(n));
+      return String(n);
+    } catch (e) {
+      return String(Math.floor(100000000 + Math.random() * 900000000));
+    }
+  }
+
+  function getDevHeadersIfNeeded() {
+    if (initData) return null;
+    if (!devTelegramUserId) return null;
+    return { 'X-Dev-TelegramUserId': devTelegramUserId };
+  }
 
   function refreshTickets() {
-    if (!initData) return;
-    return postJson('/api/tickets/list', { initData: initData })
+    if (!initData && !devTelegramUserId) return;
+    return postJson('/api/tickets/list', { initData: initData || '' }, getDevHeadersIfNeeded())
       .then(function (res) {
         if (res && res.ok) setTickets(res.tickets);
       })
       .catch(function (err) {
         console.warn('Failed to list tickets', err);
+        setPurchaseStatus(err.message);
       });
   }
 
   function purchaseTicket() {
-    if (!initData) {
-      setPurchaseStatus('Open this page inside Telegram to purchase tickets.');
-      return;
-    }
+    if (!initData && !devTelegramUserId) return;
 
-    purchaseBtn.disabled = true;
-    setPurchaseStatus('Purchasing...');
+    if (purchaseBtn) purchaseBtn.disabled = true;
+    setPurchaseStatus('...');
 
-    postJson('/api/tickets/purchase', { initData: initData })
+    postJson('/api/tickets/purchase', { initData: initData || '' }, getDevHeadersIfNeeded())
       .then(function (res) {
         if (res && res.ok && res.ticket) {
-          setPurchaseStatus('Ticket purchased');
+          setPurchaseStatus('');
           prependTicket(res.ticket);
         } else {
           setPurchaseStatus('Purchase failed.');
         }
       })
       .catch(function (err) {
-        setPurchaseStatus('Purchase failed: ' + err.message);
+        setPurchaseStatus(err.message);
       })
       .finally(function () {
-        purchaseBtn.disabled = false;
+        if (purchaseBtn) purchaseBtn.disabled = false;
       });
   }
 
   if (purchaseBtn) purchaseBtn.addEventListener('click', purchaseTicket);
 
   if (!window.Telegram || !Telegram.WebApp) {
-    setTickets([]);
-    setPurchaseStatus('Tip: open inside Telegram to authenticate and purchase tickets.');
+    devTelegramUserId = getOrCreateDevTelegramUserId();
+    refreshTickets();
     return;
   }
 
@@ -182,14 +192,10 @@
         .then(function () { return refreshTickets(); })
         .catch(function (err) {
           console.warn('Failed to auth with Telegram initData', err);
-          setPurchaseStatus('Auth failed: ' + err.message);
+          setPurchaseStatus(err.message);
         });
     }
   } catch (e) {
     console.warn('Telegram auth initData error', e);
   }
-
-  document.getElementById('closeBtn').addEventListener('click', function () {
-    Telegram.WebApp.close();
-  });
 })();
