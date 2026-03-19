@@ -13,7 +13,7 @@
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": true,
-      "launchUrl": "bot/setWebhook",
+      "launchUrl": "Admin",
       "applicationUrl": "http://localhost:5284",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
@@ -23,7 +23,7 @@
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": true,
-      "launchUrl": "bot/setWebhook",
+      "launchUrl": "Admin",
       "applicationUrl": "http://localhost:5284",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
@@ -32,7 +32,7 @@
     "IIS Express": {
       "commandName": "IISExpress",
       "launchBrowser": true,
-      "launchUrl": "bot/setWebhook",
+      "launchUrl": "Admin",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }

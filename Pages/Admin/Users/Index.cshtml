@@ -1,0 +1,34 @@
+@page
+@model MiniApp.Pages.Admin.Users.IndexModel
+@{
+    ViewData["Title"] = "Users";
+}
+
+<h1>Users</h1>
+
+<table class="table table-striped mt-3">
+    <thead>
+    <tr>
+        <th>Id</th>
+        <th>TelegramUserId</th>
+        <th>Created (UTC)</th>
+        <th>Last seen (UTC)</th>
+        <th></th>
+    </tr>
+    </thead>
+    <tbody>
+    @foreach (var u in Model.Users)
+    {
+        <tr>
+            <td>@u.Id</td>
+            <td>@u.TelegramUserId</td>
+            <td>@u.CreatedAtUtc</td>
+            <td>@u.LastSeenAtUtc</td>
+            <td>
+                <a class="btn btn-sm btn-outline-primary" asp-page="/Admin/Users/Edit" asp-route-id="@u.Id">Edit</a>
+            </td>
+        </tr>
+    }
+    </tbody>
+</table>
+

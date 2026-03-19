@@ -1,5 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
+using MiniApp.Admin;
+using MiniApp.Data;
+using MiniApp.Features.Auth;
+using MiniApp.Features.Users;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Polling;
@@ -23,6 +27,12 @@ var miniAppText = builder.Configuration["MiniApp:Text"] ?? "(No MiniApp:Text con
 // ===== Services =====
 builder.Services.AddRazorPages();
 
+// Admin panel (cookie auth)
+builder.Services.AddAdminArea(builder.Configuration);
+
+// PostgreSQL + EF Core (modular)
+builder.Services.AddPostgresDatabase(builder.Configuration);
+
 builder.Services
     .AddHttpClient("tg")
     .RemoveAllLoggers()
@@ -43,6 +53,14 @@ if (string.Equals(botMode, "Polling", StringComparison.OrdinalIgnoreCase))
 
 var app = builder.Build();
 
+// Optional: auto-apply migrations on startup in Development.
+// (You can disable by setting Database:AutoMigrate=false)
+var autoMigrate = app.Configuration.GetValue("Database:AutoMigrate", app.Environment.IsDevelopment());
+if (autoMigrate)
+{
+    await app.ApplyMigrationsAsync();
+}
+
 // ===== Middleware =====
 if (!app.Environment.IsDevelopment())
 {
@@ -59,15 +77,19 @@ var provider = new FileExtensionContentTypeProvider
 app.UseStaticFiles(new StaticFileOptions { ContentTypeProvider = provider });
 
 app.UseRouting();
+
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapRazorPages();
 
-// ===== Backend API for the mini app text =====
+// ===== Mini app backend APIs =====
 app.MapGet("/api/text", () => Results.Ok(new { text = miniAppText }));
+app.MapUsersEndpoints();
+app.MapTelegramAuthEndpoints();
 
-// Small health check
-app.MapGet("/", () => Results.Redirect("/Index"));
+// Small health check / default landing page
+app.MapGet("/", () => Results.Redirect("/Admin"));
 
 // ===== Telegram bot endpoints =====
 static bool IsValidPublicHttpsBaseUrl(string? url)

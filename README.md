@@ -28,3 +28,49 @@ _(typically from [Stripe in TEST mode](https://telegrambots.github.io/book/4/pay
 
 Sending WebAppData to bot (button "Send time to bot") works only when opening the webapp via a ReplyKeyboardButton
 _(try using the second "Hello World!" button)_
+
+## PostgreSQL (Docker) local setup
+
+This project includes a `docker-compose.yml` that starts a local PostgreSQL instance.
+
+### 1) Start PostgreSQL
+
+```cmd
+cd /d E:\Projects\lotto\MiniApp
+docker compose up -d
+```
+
+Postgres will be exposed on `localhost:5432`.
+
+Default credentials in `docker-compose.yml`:
+- database: `miniapp`
+- user: `miniapp`
+- password: `miniapp`
+
+### 2) Point the app to PostgreSQL (User Secrets)
+
+```cmd
+cd /d E:\Projects\lotto\MiniApp
+dotnet user-secrets set "Database:ConnectionString" "Host=localhost;Port=5432;Database=miniapp;Username=miniapp;Password=miniapp"
+```
+
+### 3) Create/update schema (EF Core migrations)
+
+```cmd
+cd /d E:\Projects\lotto\MiniApp
+dotnet ef migrations add InitialCreate
+dotnet ef database update
+```
+
+### 4) Stop PostgreSQL
+
+```cmd
+cd /d E:\Projects\lotto\MiniApp
+docker compose down
+```
+
+If you want to delete the DB data completely:
+
+```cmd
+docker compose down -v
+```
