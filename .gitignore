@@ -1,0 +1,121 @@
+# Visual Studio / .NET Core common ignores
+## Build Folders
+/bin/
+/obj/
+out/
+publish/
+
+## Visual Studio files
+*.user
+*.suo
+*.userosscache
+*.userprefs
+*.sln.docstates
+.vs/
+
+## Rider
+.idea/
+.idea/*
+*.sln.iml
+.Rider*/
+
+## VS Code
+.vscode/
+
+## NuGet
+*.nupkg
+**/packages/
+.nuget/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+## ASP.NET Scaffolding
+ScaffoldingReadMe.txt
+
+## Dotnet publish outputs
+*.Publish.xml
+
+## Debug/Release
+*_i.c
+*_p.c
+*_h.h
+*.ilk
+*.meta
+*.obj
+*.pch
+*.pdb
+*.ipdb
+*.pgd
+*.rsp
+*.sbr
+*.tlb
+*.tli
+*.tlh
+*.tmp
+*.tmp_proj
+*.log
+
+## Rider / ReSharper caches
+_ReSharper*/
+*.[Rr]e[Ss]harper*
+*.DotSettings.user
+
+## OS generated files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Icon?
+
+# npm / node
+node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Coverage
+coverage/
+*.lcov
+
+# Test output
+TestResults/
+
+# Package directories
+**/bin/
+**/obj/
+
+# User secrets (may contain sensitive keys)
+secrets.json
+
+# Rider caches and local settings
+.idea/
+*.sublime-workspace
+
+# Ignore publish output and self-contained runtimes
+publish/
+*.exe
+*.dll
+*.runtimeconfig.json
+
+# Ignore generated files
+*.g.cs
+*.g.i.cs
+
+# Git credential files
+.env.local
+.env
+.env.*.local
+
+# Other
+.vagrant/
+*.pyc
+
+# Optional: ignore local appsettings files that may contain secrets
+# Uncomment if you want to keep local settings out of the repo
+# appsettings.*.Local.json
+# appsettings.Development.json
+
