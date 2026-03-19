@@ -182,6 +182,14 @@
     return;
   }
 
+  // Ensure Telegram top panel/header uses our colors (Telegram may otherwise use its own theme/system defaults)
+  try {
+    Telegram.WebApp.setHeaderColor('#083d77');
+    Telegram.WebApp.setBackgroundColor('#083d77');
+  } catch (e) {
+    // Some clients/versions may not support these API calls.
+  }
+
   Telegram.WebApp.ready();
   Telegram.WebApp.expand();
 
