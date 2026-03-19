@@ -25,9 +25,16 @@
             <td>@u.CreatedAtUtc</td>
             <td>@u.LastSeenAtUtc</td>
             <td>
-                <div class="btn-group" role="group">
-                    <a class="btn btn-sm btn-outline-primary" asp-page="/Admin/Users/Edit" asp-route-id="@u.Id">Edit</a>
-                    <a class="btn btn-sm btn-outline-success" asp-page="/Admin/Users/Tickets" asp-route-id="@u.Id">Tickets</a>
+                <div class="d-flex gap-2">
+                    <div class="btn-group" role="group">
+                        <a class="btn btn-sm btn-outline-primary" asp-page="/Admin/Users/Edit" asp-route-id="@u.Id">Edit</a>
+                        <a class="btn btn-sm btn-outline-success" asp-page="/Admin/Users/Tickets" asp-route-id="@u.Id">Tickets</a>
+                    </div>
+
+                    <form method="post" asp-page-handler="Delete" asp-route-id="@u.Id" onsubmit="return confirm('Delete this user and ALL their tickets?');">
+                        @Html.AntiForgeryToken()
+                        <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                    </form>
                 </div>
             </td>
         </tr>

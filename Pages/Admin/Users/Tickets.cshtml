@@ -39,6 +39,7 @@ else
             <th>Id</th>
             <th>Numbers</th>
             <th>Purchased (UTC)</th>
+            <th></th>
         </tr>
         </thead>
         <tbody>
@@ -48,6 +49,13 @@ else
                 <td>@t.Id</td>
                 <td><code>@t.Numbers</code></td>
                 <td>@t.PurchasedAtUtc</td>
+                <td class="text-end">
+                    <form method="post" asp-page-handler="DeleteTicket" asp-route-id="@Model.SelectedUser.Id" asp-route-ticketId="@t.Id"
+                          onsubmit="return confirm('Delete this ticket?');">
+                        @Html.AntiForgeryToken()
+                        <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                    </form>
+                </td>
             </tr>
         }
         </tbody>

@@ -34,4 +34,16 @@ public sealed class TicketsModel : PageModel
 
         return Page();
     }
+
+    public async Task<IActionResult> OnPostDeleteTicketAsync(long id, long ticketId, CancellationToken ct)
+    {
+        var t = await _db.Tickets.SingleOrDefaultAsync(x => x.Id == ticketId && x.UserId == id, ct);
+        if (t is not null)
+        {
+            _db.Tickets.Remove(t);
+            await _db.SaveChangesAsync(ct);
+        }
+
+        return RedirectToPage(new { id });
+    }
 }

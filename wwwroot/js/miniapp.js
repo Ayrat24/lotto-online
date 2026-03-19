@@ -184,14 +184,23 @@
 
   // Ensure Telegram top panel/header uses our colors (Telegram may otherwise use its own theme/system defaults)
   try {
-    Telegram.WebApp.setHeaderColor('#083d77');
-    Telegram.WebApp.setBackgroundColor('#083d77');
+    // Use sandy-brown to match page background and card gradient
+    Telegram.WebApp.setHeaderColor('#ee964b');
+    Telegram.WebApp.setBackgroundColor('#ee964b');
   } catch (e) {
     // Some clients/versions may not support these API calls.
   }
 
   Telegram.WebApp.ready();
   Telegram.WebApp.expand();
+
+  // Repeat color set after ready() for clients that require it
+  try {
+    Telegram.WebApp.setHeaderColor('#ee964b');
+    Telegram.WebApp.setBackgroundColor('#ee964b');
+  } catch (e) {
+    // ignore
+  }
 
   try {
     initData = Telegram.WebApp.initData;
