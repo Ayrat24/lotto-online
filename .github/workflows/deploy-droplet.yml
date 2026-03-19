@@ -1,0 +1,56 @@
+name: Deploy to droplet
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+concurrency:
+  group: deploy-droplet
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy over SSH (git pull + docker compose restart)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+
+            APP_DIR="${DEPLOY_APP_DIR:-/opt/miniapp}"
+            PORT="${HEALTHCHECK_PORT:-8080}"
+            BRANCH="${{ github.ref_name }}"
+
+            cd "$APP_DIR"
+
+            echo "==> Pulling latest code (branch: $BRANCH)"
+            git fetch --all --prune
+
+            # Ensure branch exists locally; if not, create it tracking origin.
+            if git show-ref --verify --quiet "refs/heads/$BRANCH"; then
+              git checkout "$BRANCH"
+            else
+              git checkout -b "$BRANCH" "origin/$BRANCH" || true
+            fi
+
+            # If the branch still can't be checked out (e.g. protected setup), fall back.
+            git checkout "$BRANCH" 2>/dev/null || git checkout main 2>/dev/null || git checkout master
+
+            git pull --ff-only origin "$BRANCH" 2>/dev/null || git pull --ff-only
+
+            echo "==> Building and restarting containers"
+            docker compose -f docker-compose.app.yml up -d --build --remove-orphans
+
+            echo "==> Status"
+            docker compose -f docker-compose.app.yml ps
+
+            echo "==> Smoke check"
+            curl -fsS -o /dev/null "http://127.0.0.1:${PORT}/" || (docker compose -f docker-compose.app.yml logs --tail 200 app && exit 1)
