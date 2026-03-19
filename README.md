@@ -74,3 +74,44 @@ If you want to delete the DB data completely:
 ```cmd
 docker compose down -v
 ```
+
+## Run the full stack with Docker (App + PostgreSQL)
+
+This repo includes:
+- `Dockerfile` (builds the ASP.NET app)
+- `docker-compose.app.yml` (runs **app + Postgres**)
+
+### 1) Create a `.env` file (recommended)
+
+Create `E:\Projects\lotto\MiniApp\.env` with:
+
+```env
+BOT_TOKEN=put-your-telegram-bot-token-here
+BOT_WEBAPP_URL=https://your-public-https-domain
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=change-me
+```
+
+### 2) Start
+
+```cmd
+cd /d E:\Projects\lotto\MiniApp
+docker compose -f docker-compose.app.yml up -d --build
+```
+
+Then open:
+- App: http://localhost:8080/
+- Admin panel: http://localhost:8080/Admin (will redirect to /Admin/Login)
+
+### 3) Stop
+
+```cmd
+cd /d E:\Projects\lotto\MiniApp
+docker compose -f docker-compose.app.yml down
+```
+
+To wipe DB data:
+
+```cmd
+docker compose -f docker-compose.app.yml down -v
+```
