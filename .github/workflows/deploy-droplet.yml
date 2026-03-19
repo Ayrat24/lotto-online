@@ -15,6 +15,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Preflight: check required secrets
+        shell: bash
+        env:
+          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
+          DROPLET_USER: ${{ secrets.DROPLET_USER }}
+          DROPLET_SSH_KEY: ${{ secrets.DROPLET_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          for v in DROPLET_HOST DROPLET_USER DROPLET_SSH_KEY; do
+            if [ -z "${!v:-}" ]; then
+              echo "::error::$v is not set. Add it in GitHub: Settings → Secrets and variables → Actions."
+              exit 1
+            fi
+          done
+
       - name: Deploy over SSH (git pull + docker compose restart)
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -41,7 +56,7 @@ jobs:
               git checkout -b "$BRANCH" "origin/$BRANCH" || true
             fi
 
-            # If the branch still can't be checked out (e.g. protected setup), fall back.
+            # If the branch still can't be checked out, fall back.
             git checkout "$BRANCH" 2>/dev/null || git checkout main 2>/dev/null || git checkout master
 
             git pull --ff-only origin "$BRANCH" 2>/dev/null || git pull --ff-only
@@ -52,5 +67,24 @@ jobs:
             echo "==> Status"
             docker compose -f docker-compose.app.yml ps
 
-            echo "==> Smoke check"
-            curl -fsS -o /dev/null "http://127.0.0.1:${PORT}/" || (docker compose -f docker-compose.app.yml logs --tail 200 app && exit 1)
+            echo "==> Waiting for app to become ready"
+            READY=0
+            for i in $(seq 1 30); do
+              if curl -fsS -o /dev/null "http://127.0.0.1:${PORT}/"; then
+                READY=1
+                break
+              fi
+              echo "  not ready yet ($i/30), sleeping 2s..."
+              sleep 2
+            done
+
+            if [ "$READY" -ne 1 ]; then
+              echo "::error::App did not become ready on http://127.0.0.1:${PORT}/"
+              echo "==> Recent app logs"
+              docker compose -f docker-compose.app.yml logs --tail 200 app || true
+              echo "==> Container status"
+              docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" || true
+              exit 1
+            fi
+
+            echo "==> Smoke check OK"
