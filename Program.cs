@@ -54,9 +54,6 @@ if (string.Equals(botMode, "Polling", StringComparison.OrdinalIgnoreCase))
     builder.Services.AddHostedService<TelegramPollingService>();
 }
 
-// SignalR for live draw updates
-builder.Services.AddSignalR();
-
 var app = builder.Build();
 
 // Auto-apply EF Core migrations on startup.
@@ -103,9 +100,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapRazorPages();
-
-// SignalR hubs
-app.MapHub<DrawsHub>(DrawsHub.HubPath);
 
 // ===== Mini app backend APIs =====
 app.MapGet("/api/text", () => Results.Ok(new { text = miniAppText }));

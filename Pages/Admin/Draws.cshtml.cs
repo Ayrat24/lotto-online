@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.SignalR;
 using MiniApp.Admin;
 using MiniApp.Data;
 using MiniApp.Features.Draws;
@@ -13,12 +12,10 @@ namespace MiniApp.Pages.Admin;
 public sealed class DrawsModel : PageModel
 {
     private readonly AppDbContext db;
-    private readonly IHubContext<DrawsHub> hub;
 
-    public DrawsModel(AppDbContext db, IHubContext<DrawsHub> hub)
+    public DrawsModel(AppDbContext db)
     {
         this.db = db;
-        this.hub = hub;
     }
 
     public IReadOnlyList<DrawDto> Draws { get; private set; } = Array.Empty<DrawDto>();
@@ -42,9 +39,6 @@ public sealed class DrawsModel : PageModel
 
         db.Draws.Add(draw);
         await db.SaveChangesAsync(ct);
-
-        var dto = new DrawDto(draw.Id, draw.Numbers, draw.CreatedAtUtc);
-        await hub.Clients.All.SendAsync("draw_created", new { draw = dto }, ct);
 
         StatusMessage = $"Started draw #{draw.Id} ({draw.Numbers}).";
         await LoadAsync(ct);

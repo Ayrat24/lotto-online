@@ -6,6 +6,9 @@
   var timelineEmptyEl = document.getElementById('timelineEmpty');
   var timelineStatusEl = document.getElementById('timelineStatus');
 
+  // Track a recently purchased ticket id to highlight it briefly.
+  var highlightTicketId = null;
+
   function setPurchaseStatus(text) {
     if (purchaseStatusEl) purchaseStatusEl.textContent = text || '';
   }
@@ -84,6 +87,16 @@
   function createTicketEl(ticket) {
     var el = document.createElement('div');
     el.className = 'ticket';
+
+    // Highlight freshly purchased ticket
+    if (highlightTicketId && ticket && ticket.id === highlightTicketId) {
+      el.classList.add('enter');
+      el.classList.add('highlight');
+      // auto-remove highlight after a short period
+      setTimeout(function () {
+        try { el.classList.remove('highlight'); } catch (e) { }
+      }, 1500);
+    }
 
     var header = document.createElement('div');
     header.className = 'ticket-header';
@@ -207,6 +220,16 @@
       });
   }
 
+  function startTimelinePolling() {
+    // Polling is used for draw updates (SignalR removed).
+    try {
+      setInterval(function () {
+        refreshTimeline();
+      }, 4000);
+    } catch (e) {
+    }
+  }
+
   function purchaseTicket() {
     if (!initData && !devTelegramUserId) return;
 
@@ -216,6 +239,8 @@
     postJson('/api/tickets/purchase', { initData: initData || '' }, getDevHeadersIfNeeded())
       .then(function (res) {
         if (res && res.ok && res.ticket) {
+          // mark ticket for highlight on next render
+          highlightTicketId = res.ticket.id;
           setPurchaseStatus('');
           return refreshTimeline();
         }
@@ -230,68 +255,6 @@
       });
   }
 
-  // Live draw updates via SignalR
-  var drawsConnection = null;
-  var drawsConnectionStarting = false;
-
-  function startDrawsSignalR() {
-    if (drawsConnection || drawsConnectionStarting) return;
-
-    function connect() {
-      if (!window.signalR || !window.signalR.HubConnectionBuilder) {
-        console.warn('SignalR client not available');
-        return;
-      }
-
-      try {
-        drawsConnectionStarting = true;
-        drawsConnection = new signalR.HubConnectionBuilder()
-          .withUrl('/hubs/draws')
-          .withAutomaticReconnect()
-          .build();
-
-        // Fired right after connect (server catch-up) and on reconnect (via onreconnected below).
-        drawsConnection.on('draws_connected', function () {
-          refreshTimeline();
-        });
-
-        drawsConnection.on('draw_created', function () {
-          // When admin creates a draw, refresh groups so winning numbers appear instantly.
-          refreshTimeline();
-        });
-
-        drawsConnection.onreconnected(function () {
-          // Ensure we re-sync after reconnect.
-          refreshTimeline();
-        });
-
-        drawsConnection.start()
-          .catch(function (err) {
-            console.warn('SignalR connection failed', err);
-            drawsConnection = null;
-          })
-          .finally(function () {
-            drawsConnectionStarting = false;
-          });
-      } catch (e) {
-        drawsConnectionStarting = false;
-        drawsConnection = null;
-        console.warn('SignalR init failed', e);
-      }
-    }
-
-    // If our loader promise exists, wait so we don't race window.signalR.
-    if (window.__signalRReady && typeof window.__signalRReady.then === 'function') {
-      window.__signalRReady.then(function (ok) {
-        if (!ok) return;
-        connect();
-      });
-      return;
-    }
-
-    connect();
-  }
-
   if (purchaseBtn) purchaseBtn.addEventListener('click', purchaseTicket);
 
   // Disable purchase button since purchases are not implemented now
@@ -303,12 +266,12 @@
   if (!window.Telegram || !Telegram.WebApp) {
     devTelegramUserId = getOrCreateDevTelegramUserId();
     refreshTimeline();
-    startDrawsSignalR();
+    startTimelinePolling();
     return;
   }
 
-  // Start SignalR as early as possible.
-  startDrawsSignalR();
+  // Start polling early.
+  startTimelinePolling();
 
   try {
     Telegram.WebApp.setHeaderColor('#ee964b');
