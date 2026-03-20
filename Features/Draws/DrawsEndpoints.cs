@@ -17,15 +17,6 @@ public static class DrawsEndpoints
         {
             var nextId = (await db.Draws.MaxAsync(x => (long?)x.Id, ct) ?? 0) + 1;
 
-            var existing = await db.Draws.SingleOrDefaultAsync(x => x.Id == nextId, ct);
-            if (existing is not null)
-            {
-                existing.Numbers = GenerateDrawNumbers();
-                existing.CreatedAtUtc = DateTimeOffset.UtcNow;
-                await db.SaveChangesAsync(ct);
-                return Results.Ok(new { ok = true, draw = new DrawDto(existing.Id, existing.Numbers, existing.CreatedAtUtc) });
-            }
-
             var draw = new Draw
             {
                 Id = nextId,
@@ -75,56 +66,41 @@ public static class DrawsEndpoints
 
             var u = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.TelegramUserId == telegramUserId!.Value, ct);
             if (u is null)
-                return Results.Ok(new { ok = true, groups = Array.Empty<DrawGroupDto>() });
+                return Results.Ok(new { ok = true, groups = Array.Empty<DrawGroupDto>(), nextDrawId = 1L });
 
-            // We show all draw groups that the user has tickets for, plus the upcoming next draw group.
-            var userDrawIds = await db.Tickets
+            // Tickets grouped by their assigned drawId.
+            var tickets = await db.Tickets
                 .Where(x => x.UserId == u.Id)
-                .Select(x => x.DrawId)
-                .Distinct()
+                .OrderByDescending(x => x.PurchasedAtUtc)
+                .Select(x => new TicketForDrawDto(x.Id, x.DrawId, x.Numbers, x.PurchasedAtUtc))
+                .AsNoTracking()
                 .ToListAsync(ct);
 
-            var maxDrawId = userDrawIds.Count == 0 ? 0 : userDrawIds.Max();
+            var drawIds = tickets.Select(x => x.DrawId).Distinct().ToArray();
 
-            // Upcoming draw id is always (max existing draw id in system + 1), so tickets always go there.
-            var nextDrawId = (await db.Draws.MaxAsync(x => (long?)x.Id, ct) ?? 0) + 1;
-
-            // Ensure the upcoming group is present if user has any tickets or if there are draws already.
-            if (!userDrawIds.Contains(nextDrawId))
-                userDrawIds.Add(nextDrawId);
-
-            // load draws that already happened for these ids
+            // Fetch only draws that actually exist (admin-created) for those ids.
             var draws = await db.Draws
-                .Where(d => userDrawIds.Contains(d.Id))
+                .Where(d => drawIds.Contains(d.Id))
                 .Select(d => new DrawDto(d.Id, d.Numbers, d.CreatedAtUtc))
                 .AsNoTracking()
                 .ToListAsync(ct);
 
             var drawsById = draws.ToDictionary(d => d.Id, d => d);
 
-            var tickets = await db.Tickets
-                .Where(x => x.UserId == u.Id && userDrawIds.Contains(x.DrawId))
-                .OrderByDescending(x => x.PurchasedAtUtc)
-                .Select(x => new TicketForDrawDto(x.Id, x.DrawId, x.Numbers, x.PurchasedAtUtc))
-                .AsNoTracking()
-                .ToListAsync(ct);
-
             var ticketsByDraw = tickets
                 .GroupBy(t => t.DrawId)
                 .ToDictionary(g => g.Key, g => (IReadOnlyList<TicketForDrawDto>)g.OrderByDescending(x => x.PurchasedAtUtc).ToList());
 
-            var groupIds = userDrawIds.Distinct().OrderByDescending(x => x).ToArray();
+            var groupIds = ticketsByDraw.Keys.OrderByDescending(x => x).ToArray();
             var groups = new List<DrawGroupDto>(groupIds.Length);
 
             foreach (var drawId in groupIds)
             {
                 drawsById.TryGetValue(drawId, out var draw);
-                ticketsByDraw.TryGetValue(drawId, out var groupTickets);
-                groupTickets ??= Array.Empty<TicketForDrawDto>();
-
-                groups.Add(new DrawGroupDto(drawId, draw, groupTickets));
+                groups.Add(new DrawGroupDto(drawId, draw, ticketsByDraw[drawId]));
             }
 
+            var nextDrawId = (await db.Draws.MaxAsync(x => (long?)x.Id, ct) ?? 0) + 1;
             return Results.Ok(new { ok = true, groups, nextDrawId });
         });
 

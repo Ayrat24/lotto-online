@@ -93,22 +93,9 @@ public static class TicketsEndpoints
 
             var u = await users.TouchUserAsync(telegramUserId, ct);
 
-            // Tickets are assigned to the next draw id. If no draws yet, next draw id is 1.
+            // Tickets are assigned to the next draw number.
+            // Draws are created only by admin, so we base "next" on existing draws.
             var nextDrawId = (await db.Draws.MaxAsync(x => (long?)x.Id, ct) ?? 0) + 1;
-
-            // Ensure FK target exists: create an "upcoming" placeholder draw row.
-            // Admin can later run the draw for this id by updating this row.
-            var exists = await db.Draws.AsNoTracking().AnyAsync(x => x.Id == nextDrawId, ct);
-            if (!exists)
-            {
-                db.Draws.Add(new Draw
-                {
-                    Id = nextDrawId,
-                    Numbers = "",
-                    CreatedAtUtc = DateTimeOffset.UtcNow
-                });
-                await db.SaveChangesAsync(ct);
-            }
 
             var numbers = GenerateTicketNumbers();
             var ticket = new Ticket

@@ -51,14 +51,10 @@ public sealed class AppDbContext : DbContext
                 .HasForeignKey(x => x.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            b.HasOne(x => x.Draw)
-                .WithMany()
-                .HasForeignKey(x => x.DrawId)
-                .OnDelete(DeleteBehavior.Restrict);
-
             b.HasIndex(x => new { x.UserId, x.PurchasedAtUtc });
             b.HasIndex(x => new { x.DrawId, x.PurchasedAtUtc });
 
+            b.Property(x => x.DrawId).IsRequired();
             b.Property(x => x.Numbers).HasMaxLength(64).IsRequired();
             b.Property(x => x.PurchasedAtUtc).IsRequired();
         });
