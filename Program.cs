@@ -253,19 +253,34 @@ static class BotUpdateHandler
                 cancellationToken: ct);
         }
 
-        // /start: ensure user exists, and if number isn't stored -> ask for it.
+        async Task AskForContactAsync()
+        {
+            var keyboard = new ReplyKeyboardMarkup(new[]
+            {
+                new[] { KeyboardButton.WithRequestContact("Share my contact") }
+            })
+            {
+                ResizeKeyboard = true,
+                OneTimeKeyboard = true,
+                InputFieldPlaceholder = "Tap the button to share your phone number"
+            };
+
+            await bot.SendMessage(
+                chatId: update.Message.Chat,
+                text: "Please share your contact to continue.",
+                replyMarkup: keyboard,
+                cancellationToken: ct);
+        }
+
+        // /start: ensure user exists, and if number isn't stored -> ask for contact.
         if (string.Equals(text, "/start", StringComparison.OrdinalIgnoreCase))
         {
             var user = await userService.TouchUserAsync(telegramUserId.Value, ct);
 
             if (string.IsNullOrWhiteSpace(user.Number))
             {
-                await bot.SendMessage(
-                    chatId: update.Message.Chat,
-                    text: "Welcome! Please send your number (e.g. +123456789).",
-                    cancellationToken: ct);
-
                 AwaitingNumber[telegramUserId.Value] = 0;
+                await AskForContactAsync();
                 return;
             }
 
@@ -278,18 +293,35 @@ static class BotUpdateHandler
             return;
         }
 
-        // If we're awaiting a number, validate + store it.
+        // If we're awaiting a number/contact, accept Contact (preferred) or typed text.
         if (AwaitingNumber.TryRemove(telegramUserId.Value, out _))
         {
-            var normalized = TryNormalizeNumber(text);
+            string? candidate = null;
+
+            // Prefer contact share.
+            if (update.Message.Contact?.PhoneNumber is { Length: > 0 } phone)
+            {
+                // Telegram may send without '+', normalize will handle.
+                candidate = phone;
+            }
+            else
+            {
+                candidate = text;
+            }
+
+            var normalized = TryNormalizeNumber(candidate);
             if (normalized is null)
             {
+                // Keep waiting.
+                AwaitingNumber[telegramUserId.Value] = 0;
+
                 await bot.SendMessage(
                     chatId: update.Message.Chat,
-                    text: "That doesn't look like a valid number. Please send it again (digits, optional leading +).",
+                    text: "I couldn't read a valid phone number. Please tap 'Share my contact' or send the number as text (digits, optional leading +).",
+                    replyMarkup: new ReplyKeyboardRemove(),
                     cancellationToken: ct);
 
-                AwaitingNumber[telegramUserId.Value] = 0;
+                await AskForContactAsync();
                 return;
             }
 
@@ -297,7 +329,8 @@ static class BotUpdateHandler
 
             await bot.SendMessage(
                 chatId: update.Message.Chat,
-                text: "Thank you! Your number has been saved.",
+                text: "Thanks! Saved.",
+                replyMarkup: new ReplyKeyboardRemove(),
                 cancellationToken: ct);
 
             await SendOpenWebAppButtonAsync();
