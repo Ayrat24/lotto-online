@@ -6,6 +6,7 @@ using MiniApp.Features.Auth;
 using MiniApp.Features.Draws;
 using MiniApp.Features.Tickets;
 using MiniApp.Features.Users;
+using MiniApp.Features.Timeline;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Polling;
@@ -53,6 +54,9 @@ if (string.Equals(botMode, "Polling", StringComparison.OrdinalIgnoreCase))
     builder.Services.AddHostedService<TelegramPollingService>();
 }
 
+// SignalR for live draw updates
+builder.Services.AddSignalR();
+
 var app = builder.Build();
 
 // Optional: auto-apply migrations on startup in Development.
@@ -85,12 +89,16 @@ app.UseAuthorization();
 
 app.MapRazorPages();
 
+// SignalR hubs
+app.MapHub<DrawsHub>(DrawsHub.HubPath);
+
 // ===== Mini app backend APIs =====
 app.MapGet("/api/text", () => Results.Ok(new { text = miniAppText }));
 app.MapUsersEndpoints();
 app.MapTelegramAuthEndpoints();
 app.MapTicketsEndpoints();
 app.MapDrawsEndpoints();
+app.MapTimelineEndpoints();
 
 // Small health check / default landing page
 app.MapGet("/", () => Results.Redirect("/Admin"));

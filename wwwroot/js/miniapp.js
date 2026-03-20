@@ -230,11 +230,41 @@
       });
   }
 
+  // Live draw updates via SignalR
+  function startDrawsSignalR() {
+    if (!window.signalR || !window.signalR.HubConnectionBuilder) return;
+
+    try {
+      var connection = new signalR.HubConnectionBuilder()
+        .withUrl('/hubs/draws')
+        .withAutomaticReconnect()
+        .build();
+
+      connection.on('draw_created', function () {
+        // When admin creates a draw, refresh groups so winning numbers appear instantly.
+        refreshTimeline();
+      });
+
+      connection.start().catch(function (err) {
+        console.warn('SignalR connection failed', err);
+      });
+    } catch (e) {
+      console.warn('SignalR init failed', e);
+    }
+  }
+
   if (purchaseBtn) purchaseBtn.addEventListener('click', purchaseTicket);
+
+  // Disable purchase button since purchases are not implemented now
+  if (purchaseBtn) {
+    purchaseBtn.disabled = false;
+    purchaseBtn.title = '';
+  }
 
   if (!window.Telegram || !Telegram.WebApp) {
     devTelegramUserId = getOrCreateDevTelegramUserId();
     refreshTimeline();
+    startDrawsSignalR();
     return;
   }
 
@@ -248,16 +278,11 @@
   Telegram.WebApp.expand();
 
   try {
-    Telegram.WebApp.setHeaderColor('#ee964b');
-    Telegram.WebApp.setBackgroundColor('#ee964b');
-  } catch (e) {
-  }
-
-  try {
     initData = Telegram.WebApp.initData;
     if (initData && initData.length > 0) {
       postJson('/api/auth/telegram', { initData: initData })
         .then(function () { return refreshTimeline(); })
+        .then(function () { startDrawsSignalR(); })
         .catch(function (err) {
           console.warn('Failed to auth with Telegram initData', err);
           setPurchaseStatus(err.message);

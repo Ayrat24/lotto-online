@@ -1,0 +1,21 @@
+@page
+@model MiniApp.Pages.Admin.DangerZoneModel
+@{
+    ViewData["Title"] = "Danger zone";
+}
+
+<h1>Danger zone</h1>
+
+<div class="alert alert-warning">
+    <strong>Warning:</strong> Actions on this page are destructive and irreversible.
+</div>
+
+<form method="post" asp-page-handler="DropAllTables" onsubmit="return confirm('DROP ALL TABLES? This will delete ALL data. Are you absolutely sure?');">
+    @Html.AntiForgeryToken()
+    <button type="submit" class="btn btn-danger">Drop all tables</button>
+</form>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <div class="alert alert-info mt-3">@Model.StatusMessage</div>
+}
