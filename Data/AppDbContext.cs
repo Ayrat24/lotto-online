@@ -33,6 +33,8 @@ public sealed class AppDbContext : DbContext
             b.ToTable("draws");
             b.HasKey(x => x.Id);
 
+            b.Property(x => x.Id).ValueGeneratedNever();
+
             b.HasIndex(x => x.CreatedAtUtc);
 
             b.Property(x => x.Numbers).HasMaxLength(64).IsRequired();

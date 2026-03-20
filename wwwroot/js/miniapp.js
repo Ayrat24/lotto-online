@@ -45,47 +45,45 @@
     return numbersWrap;
   }
 
-  function createDrawEl(draw) {
-    var li = document.createElement('li');
-    li.className = 'timeline-item draw-item';
-
-    var card = document.createElement('div');
-    card.className = 'ticket draw';
-
+  function createDrawHeaderEl(drawId, draw) {
     var header = document.createElement('div');
-    header.className = 'ticket-header';
+    header.className = 'draw-header';
+
+    var top = document.createElement('div');
+    top.className = 'draw-header-top';
 
     var title = document.createElement('div');
-    title.className = 'ticket-title';
-    title.textContent = 'Draw #' + draw.id;
+    title.className = 'draw-header-title';
+    title.textContent = 'Draw #' + drawId;
 
     var meta = document.createElement('div');
-    meta.className = 'ticket-meta';
-    meta.textContent = formatUtc(draw.createdAtUtc);
+    meta.className = 'draw-header-meta';
+    meta.textContent = draw ? formatUtc(draw.createdAtUtc) : 'upcoming';
 
-    header.appendChild(title);
-    header.appendChild(meta);
+    top.appendChild(title);
+    top.appendChild(meta);
 
-    card.appendChild(header);
+    header.appendChild(top);
 
-    var label = document.createElement('div');
-    label.className = 'muted';
-    label.style.marginBottom = '10px';
-    label.textContent = 'Winning numbers';
+    if (draw && draw.numbers) {
+      var label = document.createElement('div');
+      label.className = 'draw-header-label';
+      label.textContent = 'Winning numbers';
+      header.appendChild(label);
+      header.appendChild(createNumbersRow(draw.numbers));
+    } else {
+      var label2 = document.createElement('div');
+      label2.className = 'draw-header-label';
+      label2.textContent = 'Tickets for the next draw';
+      header.appendChild(label2);
+    }
 
-    card.appendChild(label);
-    card.appendChild(createNumbersRow(draw.numbers));
-
-    li.appendChild(card);
-    return li;
+    return header;
   }
 
-  function createTicketEl(ticket, withEnterAnimation) {
-    var li = document.createElement('li');
-    li.className = 'timeline-item ticket-item' + (withEnterAnimation ? ' enter' : '');
-
-    var wrap = document.createElement('div');
-    wrap.className = 'ticket';
+  function createTicketEl(ticket) {
+    var el = document.createElement('div');
+    el.className = 'ticket';
 
     var header = document.createElement('div');
     header.className = 'ticket-header';
@@ -101,29 +99,53 @@
     header.appendChild(title);
     header.appendChild(meta);
 
-    wrap.appendChild(header);
-    wrap.appendChild(createNumbersRow(ticket.numbers));
+    el.appendChild(header);
+    el.appendChild(createNumbersRow(ticket.numbers));
 
-    li.appendChild(wrap);
+    return el;
+  }
+
+  function createGroupEl(group) {
+    var li = document.createElement('li');
+    li.className = 'timeline-group';
+
+    var container = document.createElement('div');
+    container.className = 'draw-group';
+
+    container.appendChild(createDrawHeaderEl(group.drawId, group.draw));
+
+    var tickets = group.tickets || [];
+    if (tickets.length === 0) {
+      var empty = document.createElement('div');
+      empty.className = 'muted';
+      empty.style.padding = '10px 2px 2px';
+      empty.textContent = 'No tickets.';
+      container.appendChild(empty);
+    } else {
+      var ticketsWrap = document.createElement('div');
+      ticketsWrap.className = 'draw-group-tickets';
+      tickets.forEach(function (t) { ticketsWrap.appendChild(createTicketEl(t)); });
+      container.appendChild(ticketsWrap);
+    }
+
+    li.appendChild(container);
     return li;
   }
 
-  function setTimeline(items) {
+  function setGroups(groups) {
     if (!timelineListEl || !timelineEmptyEl) return;
 
     timelineListEl.innerHTML = '';
 
-    var list = items || [];
+    var list = groups || [];
     if (list.length === 0) {
       timelineEmptyEl.style.display = '';
       return;
     }
 
     timelineEmptyEl.style.display = 'none';
-    list.forEach(function (it) {
-      if (!it) return;
-      if (it.type === 'draw' && it.draw) timelineListEl.appendChild(createDrawEl(it.draw));
-      else if (it.type === 'ticket' && it.ticket) timelineListEl.appendChild(createTicketEl(it.ticket, false));
+    list.forEach(function (g) {
+      timelineListEl.appendChild(createGroupEl(g));
     });
   }
 
@@ -175,7 +197,7 @@
     return postJson('/api/timeline', { initData: initData || '' }, getDevHeadersIfNeeded())
       .then(function (res) {
         if (res && res.ok) {
-          setTimeline(res.items);
+          setGroups(res.groups);
           setTimelineStatus('');
         }
       })
@@ -195,7 +217,6 @@
       .then(function (res) {
         if (res && res.ok && res.ticket) {
           setPurchaseStatus('');
-          // Refresh so the ticket appears under the correct draw header.
           return refreshTimeline();
         }
 

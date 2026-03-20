@@ -93,28 +93,14 @@ public static class TicketsEndpoints
 
             var u = await users.TouchUserAsync(telegramUserId, ct);
 
-            // Tickets are always bound to the latest draw ("next draw that will appear").
-            // If there are no draws yet, we create one so tickets have something to attach to.
-            var currentDraw = await db.Draws
-                .OrderByDescending(x => x.CreatedAtUtc)
-                .FirstOrDefaultAsync(ct);
-
-            if (currentDraw is null)
-            {
-                currentDraw = new Draw
-                {
-                    Numbers = MiniApp.Features.Draws.DrawsEndpoints.GenerateDrawNumbers(),
-                    CreatedAtUtc = DateTimeOffset.UtcNow
-                };
-                db.Draws.Add(currentDraw);
-                await db.SaveChangesAsync(ct);
-            }
+            // Tickets are assigned to the next draw id. If no draws yet, next draw id is 1.
+            var nextDrawId = (await db.Draws.MaxAsync(x => (long?)x.Id, ct) ?? 0) + 1;
 
             var numbers = GenerateTicketNumbers();
             var ticket = new Ticket
             {
                 UserId = u.Id,
-                DrawId = currentDraw.Id,
+                DrawId = nextDrawId,
                 Numbers = numbers,
                 PurchasedAtUtc = DateTimeOffset.UtcNow
             };

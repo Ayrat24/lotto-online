@@ -4,5 +4,4 @@ public sealed record DrawDto(long Id, string Numbers, DateTimeOffset CreatedAtUt
 
 public sealed record TicketForDrawDto(long Id, long DrawId, string Numbers, DateTimeOffset PurchasedAtUtc);
 
-public sealed record TimelineItemDto(string Type, DrawDto? Draw, TicketForDrawDto? Ticket);
-
+public sealed record DrawGroupDto(long DrawId, DrawDto? Draw, IReadOnlyList<TicketForDrawDto> Tickets);

@@ -11,14 +11,14 @@ namespace MiniApp.Pages.Admin;
 [Authorize(Policy = AdminAuth.PolicyName)]
 public sealed class DrawsModel : PageModel
 {
-    private readonly AppDbContext _db;
+    private readonly AppDbContext db;
 
     public DrawsModel(AppDbContext db)
     {
-        _db = db;
+        this.db = db;
     }
 
-    public DrawDto? LatestDraw { get; private set; }
+    public IReadOnlyList<DrawDto> Draws { get; private set; } = Array.Empty<DrawDto>();
     public string? StatusMessage { get; private set; }
 
     public async Task OnGetAsync(CancellationToken ct)
@@ -28,14 +28,17 @@ public sealed class DrawsModel : PageModel
 
     public async Task<IActionResult> OnPostStartAsync(CancellationToken ct)
     {
+        var nextId = (await db.Draws.MaxAsync(x => (long?)x.Id, ct) ?? 0) + 1;
+
         var draw = new Draw
         {
+            Id = nextId,
             Numbers = DrawsEndpoints.GenerateDrawNumbers(),
             CreatedAtUtc = DateTimeOffset.UtcNow
         };
 
-        _db.Draws.Add(draw);
-        await _db.SaveChangesAsync(ct);
+        db.Draws.Add(draw);
+        await db.SaveChangesAsync(ct);
 
         StatusMessage = $"Started draw #{draw.Id} ({draw.Numbers}).";
         await LoadAsync(ct);
@@ -44,12 +47,11 @@ public sealed class DrawsModel : PageModel
 
     private async Task LoadAsync(CancellationToken ct)
     {
-        var d = await _db.Draws
-            .OrderByDescending(x => x.CreatedAtUtc)
+        Draws = await db.Draws
+            .OrderByDescending(x => x.Id)
+            .Take(200)
             .Select(x => new DrawDto(x.Id, x.Numbers, x.CreatedAtUtc))
-            .FirstOrDefaultAsync(ct);
-
-        LatestDraw = d;
+            .AsNoTracking()
+            .ToListAsync(ct);
     }
 }
-

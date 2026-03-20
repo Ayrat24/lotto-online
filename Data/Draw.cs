@@ -11,4 +11,3 @@ public sealed class Draw
 
     public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
 }
-

@@ -195,18 +195,67 @@ button:disabled {
   margin: 12px 0;
 }
 
-/* Timeline list */
+/* Timeline groups */
 #timelineList {
   list-style: none;
   padding: 0;
   margin: 0;
   display: grid;
-  gap: 12px;
+  gap: 14px;
 }
 
-.timeline-item {
+.timeline-group {
   margin: 0;
   padding: 0;
+}
+
+.draw-group {
+  border-radius: 16px;
+  padding: 12px;
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.draw-group-tickets {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+/* Draw header: intentionally different from ticket visuals */
+.draw-header {
+  border-radius: 14px;
+  padding: 12px 12px;
+  background: linear-gradient(135deg, rgba(16,42,67,0.10), rgba(16,42,67,0.04));
+  border: 1px dashed rgba(16,42,67,0.35);
+}
+
+.draw-header-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.draw-header-title {
+  font-weight: 900;
+  letter-spacing: 0.3px;
+  color: #102a43;
+}
+
+.draw-header-meta {
+  font-size: 0.82rem;
+  opacity: 0.75;
+  color: #102a43;
+}
+
+.draw-header-label {
+  font-size: 0.9rem;
+  font-weight: 700;
+  opacity: 0.85;
+  margin-bottom: 10px;
+  color: #102a43;
 }
 
 /* Make draw cards a touch more visually distinct */

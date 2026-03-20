@@ -15,14 +15,36 @@
     <div class="alert alert-info mt-3">@Model.StatusMessage</div>
 }
 
-@if (Model.LatestDraw is not null)
+@if (Model.Draws.Count == 0)
+{
+    <div class="alert alert-secondary mt-3">No draws yet.</div>
+}
+else
 {
     <div class="card mt-3">
         <div class="card-body">
-            <h5 class="card-title">Latest draw</h5>
-            <div><strong>#@Model.LatestDraw.Id</strong> @Model.LatestDraw.CreatedAtUtc.ToString("u")</div>
-            <div>Numbers: <strong>@Model.LatestDraw.Numbers</strong></div>
+            <h5 class="card-title">Previous draws</h5>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                    <tr>
+                        <th>Id</th>
+                        <th>Created (UTC)</th>
+                        <th>Numbers</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var d in Model.Draws)
+                    {
+                        <tr>
+                            <td><strong>@d.Id</strong></td>
+                            <td>@d.CreatedAtUtc.ToString("u")</td>
+                            <td><code>@d.Numbers</code></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 }
-
