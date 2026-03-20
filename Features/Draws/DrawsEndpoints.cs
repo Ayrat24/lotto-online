@@ -17,6 +17,15 @@ public static class DrawsEndpoints
         {
             var nextId = (await db.Draws.MaxAsync(x => (long?)x.Id, ct) ?? 0) + 1;
 
+            var existing = await db.Draws.SingleOrDefaultAsync(x => x.Id == nextId, ct);
+            if (existing is not null)
+            {
+                existing.Numbers = GenerateDrawNumbers();
+                existing.CreatedAtUtc = DateTimeOffset.UtcNow;
+                await db.SaveChangesAsync(ct);
+                return Results.Ok(new { ok = true, draw = new DrawDto(existing.Id, existing.Numbers, existing.CreatedAtUtc) });
+            }
+
             var draw = new Draw
             {
                 Id = nextId,
