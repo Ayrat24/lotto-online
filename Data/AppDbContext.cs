@@ -24,6 +24,7 @@ public sealed class AppDbContext : DbContext
             b.HasIndex(x => x.TelegramUserId).IsUnique();
 
             b.Property(x => x.TelegramUserId).IsRequired();
+            b.Property(x => x.Number).HasMaxLength(64);
             b.Property(x => x.CreatedAtUtc).IsRequired();
             b.Property(x => x.LastSeenAtUtc).IsRequired();
         });

@@ -56,6 +56,9 @@ if (string.Equals(botMode, "Polling", StringComparison.OrdinalIgnoreCase))
 
 var app = builder.Build();
 
+// Make DI available to the bot update handler.
+BotUpdateHandler.Services = app.Services;
+
 // Auto-apply EF Core migrations on startup.
 // Default: enabled in Development, disabled in other environments.
 // Override via configuration: Database:AutoMigrate=true|false
@@ -189,35 +192,119 @@ sealed class BotSettings
 
 static class BotUpdateHandler
 {
+    public static IServiceProvider Services { get; set; } = default!;
+
+    // Simple in-memory onboarding state: which telegram users are expected to send their number next.
+    // Note: in Webhook mode with multiple instances this should be moved to durable storage.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<long, byte> AwaitingNumber = new();
+
     public static async Task HandleUpdate(Update update, TelegramBotClient bot, BotSettings settings, ILogger logger, CancellationToken ct)
     {
-        if (update.Type != UpdateType.Message || update.Message?.Text is null)
+        if (update.Type != UpdateType.Message || update.Message is null)
         {
             logger.LogInformation("Unhandled update type: {UpdateType}", update.Type);
             return;
         }
 
-        if (update.Message.Text == "/start")
+        var telegramUserId = update.Message.From?.Id;
+        if (telegramUserId is null)
         {
-            if (string.IsNullOrWhiteSpace(settings.WebAppUrl) || !settings.WebAppUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            {
-                await bot.SendMessage(
-                    chatId: update.Message.Chat,
-                    text: "I’m running locally. To open the Mini App inside Telegram, start ngrok and set BotWebAppUrl to the ngrok https:// URL.",
-                    cancellationToken: ct);
-                return;
-            }
+            logger.LogWarning("Message without From.Id");
+            return;
+        }
+
+        var text = update.Message.Text?.Trim();
+
+        // Resolve services from DI.
+        await using var scope = Services.CreateAsyncScope();
+        var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
+
+        static string? TryNormalizeNumber(string? input)
+        {
+            if (string.IsNullOrWhiteSpace(input)) return null;
+
+            // Keep digits and an optional leading '+'.
+            input = input.Trim();
+            var chars = input.Where(c => char.IsDigit(c) || c == '+').ToArray();
+            if (chars.Length == 0) return null;
+
+            var normalized = new string(chars);
+            if (normalized.Count(c => c == '+') > 1) return null;
+            if (normalized.Contains('+') && normalized[0] != '+') return null;
+
+            // Basic sanity bounds.
+            var digits = normalized.Count(char.IsDigit);
+            if (digits < 6 || digits > 20) return null;
+
+            return normalized;
+        }
+
+        async Task SendOpenWebAppButtonAsync()
+        {
+            if (string.IsNullOrWhiteSpace(settings.WebAppUrl)) return;
 
             await bot.SendMessage(
                 chatId: update.Message.Chat,
                 text: "Tap the button below to open the Mini App.",
                 replyMarkup: new InlineKeyboardMarkup(
-                    InlineKeyboardButton.WithWebApp("Open Mini App", settings.WebAppUrl.TrimEnd('/') + "/app")),
+                    InlineKeyboardButton.WithWebApp(
+                        "Open Mini App",
+                        settings.WebAppUrl.TrimEnd('/') + "/app")),
                 cancellationToken: ct);
+        }
+
+        // /start: ensure user exists, and if number isn't stored -> ask for it.
+        if (string.Equals(text, "/start", StringComparison.OrdinalIgnoreCase))
+        {
+            var user = await userService.TouchUserAsync(telegramUserId.Value, ct);
+
+            if (string.IsNullOrWhiteSpace(user.Number))
+            {
+                await bot.SendMessage(
+                    chatId: update.Message.Chat,
+                    text: "Welcome! Please send your number (e.g. +123456789).",
+                    cancellationToken: ct);
+
+                AwaitingNumber[telegramUserId.Value] = 0;
+                return;
+            }
+
+            await bot.SendMessage(
+                chatId: update.Message.Chat,
+                text: "Welcome back!",
+                cancellationToken: ct);
+
+            await SendOpenWebAppButtonAsync();
             return;
         }
 
-        logger.LogInformation("Message received: {Text}", update.Message.Text);
+        // If we're awaiting a number, validate + store it.
+        if (AwaitingNumber.TryRemove(telegramUserId.Value, out _))
+        {
+            var normalized = TryNormalizeNumber(text);
+            if (normalized is null)
+            {
+                await bot.SendMessage(
+                    chatId: update.Message.Chat,
+                    text: "That doesn't look like a valid number. Please send it again (digits, optional leading +).",
+                    cancellationToken: ct);
+
+                AwaitingNumber[telegramUserId.Value] = 0;
+                return;
+            }
+
+            await userService.SetNumberAsync(telegramUserId.Value, normalized, ct);
+
+            await bot.SendMessage(
+                chatId: update.Message.Chat,
+                text: "Thank you! Your number has been saved.",
+                cancellationToken: ct);
+
+            await SendOpenWebAppButtonAsync();
+            return;
+        }
+
+        logger.LogInformation("Message received: {Text}", text);
     }
 }
 

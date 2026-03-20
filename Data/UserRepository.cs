@@ -35,5 +35,13 @@ public sealed class UserRepository : IUserRepository
         await _db.SaveChangesAsync(ct);
         return user;
     }
-}
 
+    public async Task<MiniAppUser> SetNumberAsync(long telegramUserId, string number, CancellationToken ct)
+    {
+        var user = await UpsertByTelegramUserIdAsync(telegramUserId, ct);
+        user.Number = number;
+        user.LastSeenAtUtc = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        return user;
+    }
+}

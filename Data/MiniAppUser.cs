@@ -9,8 +9,12 @@ public sealed class MiniAppUser
     /// </summary>
     public long TelegramUserId { get; set; }
 
+    /// <summary>
+    /// User-submitted number collected via Telegram bot onboarding.
+    /// </summary>
+    public string? Number { get; set; }
+
     public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
 
     public DateTimeOffset LastSeenAtUtc { get; set; } = DateTimeOffset.UtcNow;
 }
-
