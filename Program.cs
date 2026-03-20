@@ -59,12 +59,27 @@ builder.Services.AddSignalR();
 
 var app = builder.Build();
 
-// Optional: auto-apply migrations on startup in Development.
-// (You can disable by setting Database:AutoMigrate=false)
-var autoMigrate = app.Configuration.GetValue("Database:AutoMigrate", app.Environment.IsDevelopment());
+// Auto-apply EF Core migrations on startup.
+// Default: enabled in Development, disabled in other environments.
+// Override via configuration: Database:AutoMigrate=true|false
+// (e.g. env var: Database__AutoMigrate=true)
+var autoMigrate = app.Configuration.GetValue<bool?>("Database:AutoMigrate")
+                 ?? app.Environment.IsDevelopment();
+
 if (autoMigrate)
 {
-    await app.ApplyMigrationsAsync();
+    var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseMigrations");
+    try
+    {
+        logger.LogInformation("Applying database migrations (AutoMigrate enabled)...");
+        await app.ApplyMigrationsAsync();
+        logger.LogInformation("Database migrations applied.");
+    }
+    catch (Exception ex)
+    {
+        logger.LogCritical(ex, "Failed to apply database migrations.");
+        throw;
+    }
 }
 
 // ===== Middleware =====

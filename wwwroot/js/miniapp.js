@@ -232,24 +232,53 @@
 
   // Live draw updates via SignalR
   function startDrawsSignalR() {
-    if (!window.signalR || !window.signalR.HubConnectionBuilder) return;
+    function connect() {
+      if (!window.signalR || !window.signalR.HubConnectionBuilder) {
+        console.warn('SignalR client not available');
+        return false;
+      }
 
+      try {
+        var connection = new signalR.HubConnectionBuilder()
+          .withUrl('/hubs/draws')
+          .withAutomaticReconnect()
+          .build();
+
+        connection.on('draw_created', function () {
+          // When admin creates a draw, refresh groups so winning numbers appear instantly.
+          refreshTimeline();
+        });
+
+        connection.start().catch(function (err) {
+          console.warn('SignalR connection failed', err);
+        });
+
+        return true;
+      } catch (e) {
+        console.warn('SignalR init failed', e);
+        return false;
+      }
+    }
+
+    // If our loader promise exists, wait a bit so we don't miss window.signalR.
+    if (window.__signalRReady && typeof window.__signalRReady.then === 'function') {
+      window.__signalRReady.then(function (ok) {
+        if (!ok) return;
+        connect();
+      });
+      return;
+    }
+
+    connect();
+  }
+
+  // Fallback polling (covers cases where SignalR can't connect in Telegram webview/proxy)
+  function startTimelinePolling() {
     try {
-      var connection = new signalR.HubConnectionBuilder()
-        .withUrl('/hubs/draws')
-        .withAutomaticReconnect()
-        .build();
-
-      connection.on('draw_created', function () {
-        // When admin creates a draw, refresh groups so winning numbers appear instantly.
+      setInterval(function () {
         refreshTimeline();
-      });
-
-      connection.start().catch(function (err) {
-        console.warn('SignalR connection failed', err);
-      });
+      }, 5000);
     } catch (e) {
-      console.warn('SignalR init failed', e);
     }
   }
 
@@ -265,8 +294,13 @@
     devTelegramUserId = getOrCreateDevTelegramUserId();
     refreshTimeline();
     startDrawsSignalR();
+    startTimelinePolling();
     return;
   }
+
+  // Start SignalR as early as possible.
+  startDrawsSignalR();
+  startTimelinePolling();
 
   try {
     Telegram.WebApp.setHeaderColor('#ee964b');
