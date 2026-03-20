@@ -231,36 +231,56 @@
   }
 
   // Live draw updates via SignalR
+  var drawsConnection = null;
+  var drawsConnectionStarting = false;
+
   function startDrawsSignalR() {
+    if (drawsConnection || drawsConnectionStarting) return;
+
     function connect() {
       if (!window.signalR || !window.signalR.HubConnectionBuilder) {
         console.warn('SignalR client not available');
-        return false;
+        return;
       }
 
       try {
-        var connection = new signalR.HubConnectionBuilder()
+        drawsConnectionStarting = true;
+        drawsConnection = new signalR.HubConnectionBuilder()
           .withUrl('/hubs/draws')
           .withAutomaticReconnect()
           .build();
 
-        connection.on('draw_created', function () {
+        // Fired right after connect (server catch-up) and on reconnect (via onreconnected below).
+        drawsConnection.on('draws_connected', function () {
+          refreshTimeline();
+        });
+
+        drawsConnection.on('draw_created', function () {
           // When admin creates a draw, refresh groups so winning numbers appear instantly.
           refreshTimeline();
         });
 
-        connection.start().catch(function (err) {
-          console.warn('SignalR connection failed', err);
+        drawsConnection.onreconnected(function () {
+          // Ensure we re-sync after reconnect.
+          refreshTimeline();
         });
 
-        return true;
+        drawsConnection.start()
+          .catch(function (err) {
+            console.warn('SignalR connection failed', err);
+            drawsConnection = null;
+          })
+          .finally(function () {
+            drawsConnectionStarting = false;
+          });
       } catch (e) {
+        drawsConnectionStarting = false;
+        drawsConnection = null;
         console.warn('SignalR init failed', e);
-        return false;
       }
     }
 
-    // If our loader promise exists, wait a bit so we don't miss window.signalR.
+    // If our loader promise exists, wait so we don't race window.signalR.
     if (window.__signalRReady && typeof window.__signalRReady.then === 'function') {
       window.__signalRReady.then(function (ok) {
         if (!ok) return;
@@ -270,16 +290,6 @@
     }
 
     connect();
-  }
-
-  // Fallback polling (covers cases where SignalR can't connect in Telegram webview/proxy)
-  function startTimelinePolling() {
-    try {
-      setInterval(function () {
-        refreshTimeline();
-      }, 5000);
-    } catch (e) {
-    }
   }
 
   if (purchaseBtn) purchaseBtn.addEventListener('click', purchaseTicket);
@@ -294,13 +304,11 @@
     devTelegramUserId = getOrCreateDevTelegramUserId();
     refreshTimeline();
     startDrawsSignalR();
-    startTimelinePolling();
     return;
   }
 
   // Start SignalR as early as possible.
   startDrawsSignalR();
-  startTimelinePolling();
 
   try {
     Telegram.WebApp.setHeaderColor('#ee964b');
@@ -316,7 +324,6 @@
     if (initData && initData.length > 0) {
       postJson('/api/auth/telegram', { initData: initData })
         .then(function () { return refreshTimeline(); })
-        .then(function () { startDrawsSignalR(); })
         .catch(function (err) {
           console.warn('Failed to auth with Telegram initData', err);
           setPurchaseStatus(err.message);
