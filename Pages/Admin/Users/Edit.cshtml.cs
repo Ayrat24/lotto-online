@@ -23,6 +23,9 @@ public sealed class EditModel : PageModel
     public long TelegramUserId { get; set; }
 
     [BindProperty]
+    public string? Number { get; set; }
+
+    [BindProperty]
     public DateTimeOffset LastSeenAtUtc { get; set; }
 
     public async Task OnGetAsync(long id)
@@ -31,6 +34,7 @@ public sealed class EditModel : PageModel
         if (SelectedUser is null) return;
 
         TelegramUserId = SelectedUser.TelegramUserId;
+        Number = SelectedUser.Number;
         LastSeenAtUtc = SelectedUser.LastSeenAtUtc;
     }
 
@@ -40,6 +44,7 @@ public sealed class EditModel : PageModel
         if (u is null) return NotFound();
 
         u.TelegramUserId = TelegramUserId;
+        u.Number = string.IsNullOrWhiteSpace(Number) ? null : Number.Trim();
         u.LastSeenAtUtc = LastSeenAtUtc;
 
         await _db.SaveChangesAsync();

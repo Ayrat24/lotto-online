@@ -11,6 +11,7 @@
     <tr>
         <th>Id</th>
         <th>TelegramUserId</th>
+        <th>Number</th>
         <th>Created (UTC)</th>
         <th>Last seen (UTC)</th>
         <th></th>
@@ -22,6 +23,7 @@
         <tr>
             <td>@u.Id</td>
             <td>@u.TelegramUserId</td>
+            <td>@(string.IsNullOrWhiteSpace(u.Number) ? "-" : u.Number)</td>
             <td>@u.CreatedAtUtc</td>
             <td>@u.LastSeenAtUtc</td>
             <td>
