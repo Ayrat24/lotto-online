@@ -1,12 +1,17 @@
 (function () {
   var purchaseBtn = document.getElementById('purchaseTicketBtn');
   var purchaseStatusEl = document.getElementById('purchaseStatus');
-  var ticketsListEl = document.getElementById('ticketsList');
-  var ticketsEmptyEl = document.getElementById('ticketsEmpty');
-  var ticketsCountEl = document.getElementById('ticketsCount');
+
+  var timelineListEl = document.getElementById('timelineList');
+  var timelineEmptyEl = document.getElementById('timelineEmpty');
+  var timelineStatusEl = document.getElementById('timelineStatus');
 
   function setPurchaseStatus(text) {
     if (purchaseStatusEl) purchaseStatusEl.textContent = text || '';
+  }
+
+  function setTimelineStatus(text) {
+    if (timelineStatusEl) timelineStatusEl.textContent = text || '';
   }
 
   function formatUtc(iso) {
@@ -25,9 +30,62 @@
       .filter(function (n) { return Number.isFinite(n); });
   }
 
+  function createNumbersRow(numbersStr) {
+    var numbersWrap = document.createElement('div');
+    numbersWrap.className = 'ticket-numbers';
+
+    var nums = parseNumbers(numbersStr);
+    nums.forEach(function (n) {
+      var ball = document.createElement('div');
+      ball.className = 'ball';
+      ball.textContent = String(n);
+      numbersWrap.appendChild(ball);
+    });
+
+    return numbersWrap;
+  }
+
+  function createDrawEl(draw) {
+    var li = document.createElement('li');
+    li.className = 'timeline-item draw-item';
+
+    var card = document.createElement('div');
+    card.className = 'ticket draw';
+
+    var header = document.createElement('div');
+    header.className = 'ticket-header';
+
+    var title = document.createElement('div');
+    title.className = 'ticket-title';
+    title.textContent = 'Draw #' + draw.id;
+
+    var meta = document.createElement('div');
+    meta.className = 'ticket-meta';
+    meta.textContent = formatUtc(draw.createdAtUtc);
+
+    header.appendChild(title);
+    header.appendChild(meta);
+
+    card.appendChild(header);
+
+    var label = document.createElement('div');
+    label.className = 'muted';
+    label.style.marginBottom = '10px';
+    label.textContent = 'Winning numbers';
+
+    card.appendChild(label);
+    card.appendChild(createNumbersRow(draw.numbers));
+
+    li.appendChild(card);
+    return li;
+  }
+
   function createTicketEl(ticket, withEnterAnimation) {
     var li = document.createElement('li');
-    li.className = 'ticket' + (withEnterAnimation ? ' enter' : '');
+    li.className = 'timeline-item ticket-item' + (withEnterAnimation ? ' enter' : '');
+
+    var wrap = document.createElement('div');
+    wrap.className = 'ticket';
 
     var header = document.createElement('div');
     header.className = 'ticket-header';
@@ -43,58 +101,30 @@
     header.appendChild(title);
     header.appendChild(meta);
 
-    var numbersWrap = document.createElement('div');
-    numbersWrap.className = 'ticket-numbers';
+    wrap.appendChild(header);
+    wrap.appendChild(createNumbersRow(ticket.numbers));
 
-    var nums = parseNumbers(ticket.numbers);
-    nums.forEach(function (n) {
-      var ball = document.createElement('div');
-      ball.className = 'ball';
-      ball.textContent = String(n);
-      numbersWrap.appendChild(ball);
-    });
-
-    li.appendChild(header);
-    li.appendChild(numbersWrap);
-
+    li.appendChild(wrap);
     return li;
   }
 
-  function setTicketsCount(count) {
-    if (!ticketsCountEl) return;
-    ticketsCountEl.textContent = (typeof count === 'number') ? (count + ' total') : '';
-  }
+  function setTimeline(items) {
+    if (!timelineListEl || !timelineEmptyEl) return;
 
-  function setTickets(tickets) {
-    if (!ticketsListEl || !ticketsEmptyEl) return;
+    timelineListEl.innerHTML = '';
 
-    ticketsListEl.innerHTML = '';
-
-    var list = tickets || [];
-    setTicketsCount(list.length);
-
+    var list = items || [];
     if (list.length === 0) {
-      ticketsEmptyEl.style.display = '';
+      timelineEmptyEl.style.display = '';
       return;
     }
 
-    ticketsEmptyEl.style.display = 'none';
-    list.forEach(function (t) {
-      ticketsListEl.appendChild(createTicketEl(t, false));
+    timelineEmptyEl.style.display = 'none';
+    list.forEach(function (it) {
+      if (!it) return;
+      if (it.type === 'draw' && it.draw) timelineListEl.appendChild(createDrawEl(it.draw));
+      else if (it.type === 'ticket' && it.ticket) timelineListEl.appendChild(createTicketEl(it.ticket, false));
     });
-  }
-
-  function prependTicket(ticket) {
-    if (!ticketsListEl || !ticketsEmptyEl) return;
-
-    ticketsEmptyEl.style.display = 'none';
-    var el = createTicketEl(ticket, true);
-
-    if (ticketsListEl.firstChild) ticketsListEl.insertBefore(el, ticketsListEl.firstChild);
-    else ticketsListEl.appendChild(el);
-
-    var current = ticketsListEl.children ? ticketsListEl.children.length : null;
-    if (typeof current === 'number') setTicketsCount(current);
   }
 
   function postJson(url, payload, extraHeaders) {
@@ -139,15 +169,19 @@
     return { 'X-Dev-TelegramUserId': devTelegramUserId };
   }
 
-  function refreshTickets() {
+  function refreshTimeline() {
     if (!initData && !devTelegramUserId) return;
-    return postJson('/api/tickets/list', { initData: initData || '' }, getDevHeadersIfNeeded())
+    setTimelineStatus('loading...');
+    return postJson('/api/timeline', { initData: initData || '' }, getDevHeadersIfNeeded())
       .then(function (res) {
-        if (res && res.ok) setTickets(res.tickets);
+        if (res && res.ok) {
+          setTimeline(res.items);
+          setTimelineStatus('');
+        }
       })
       .catch(function (err) {
-        console.warn('Failed to list tickets', err);
-        setPurchaseStatus(err.message);
+        console.warn('Failed to load timeline', err);
+        setTimelineStatus(err.message);
       });
   }
 
@@ -161,10 +195,11 @@
       .then(function (res) {
         if (res && res.ok && res.ticket) {
           setPurchaseStatus('');
-          prependTicket(res.ticket);
-        } else {
-          setPurchaseStatus('Purchase failed.');
+          // Refresh so the ticket appears under the correct draw header.
+          return refreshTimeline();
         }
+
+        setPurchaseStatus('Purchase failed.');
       })
       .catch(function (err) {
         setPurchaseStatus(err.message);
@@ -178,35 +213,30 @@
 
   if (!window.Telegram || !Telegram.WebApp) {
     devTelegramUserId = getOrCreateDevTelegramUserId();
-    refreshTickets();
+    refreshTimeline();
     return;
   }
 
-  // Ensure Telegram top panel/header uses our colors (Telegram may otherwise use its own theme/system defaults)
   try {
-    // Use sandy-brown to match page background and card gradient
     Telegram.WebApp.setHeaderColor('#ee964b');
     Telegram.WebApp.setBackgroundColor('#ee964b');
   } catch (e) {
-    // Some clients/versions may not support these API calls.
   }
 
   Telegram.WebApp.ready();
   Telegram.WebApp.expand();
 
-  // Repeat color set after ready() for clients that require it
   try {
     Telegram.WebApp.setHeaderColor('#ee964b');
     Telegram.WebApp.setBackgroundColor('#ee964b');
   } catch (e) {
-    // ignore
   }
 
   try {
     initData = Telegram.WebApp.initData;
     if (initData && initData.length > 0) {
       postJson('/api/auth/telegram', { initData: initData })
-        .then(function () { return refreshTickets(); })
+        .then(function () { return refreshTimeline(); })
         .catch(function (err) {
           console.warn('Failed to auth with Telegram initData', err);
           setPurchaseStatus(err.message);

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.StaticFiles;
 using MiniApp.Admin;
 using MiniApp.Data;
 using MiniApp.Features.Auth;
+using MiniApp.Features.Draws;
 using MiniApp.Features.Tickets;
 using MiniApp.Features.Users;
 using Telegram.Bot;
@@ -89,6 +90,7 @@ app.MapGet("/api/text", () => Results.Ok(new { text = miniAppText }));
 app.MapUsersEndpoints();
 app.MapTelegramAuthEndpoints();
 app.MapTicketsEndpoints();
+app.MapDrawsEndpoints();
 
 // Small health check / default landing page
 app.MapGet("/", () => Results.Redirect("/Admin"));

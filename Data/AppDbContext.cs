@@ -10,6 +10,7 @@ public sealed class AppDbContext : DbContext
 
     public DbSet<MiniAppUser> Users => Set<MiniAppUser>();
     public DbSet<Ticket> Tickets => Set<Ticket>();
+    public DbSet<Draw> Draws => Set<Draw>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -27,6 +28,17 @@ public sealed class AppDbContext : DbContext
             b.Property(x => x.LastSeenAtUtc).IsRequired();
         });
 
+        modelBuilder.Entity<Draw>(b =>
+        {
+            b.ToTable("draws");
+            b.HasKey(x => x.Id);
+
+            b.HasIndex(x => x.CreatedAtUtc);
+
+            b.Property(x => x.Numbers).HasMaxLength(64).IsRequired();
+            b.Property(x => x.CreatedAtUtc).IsRequired();
+        });
+
         modelBuilder.Entity<Ticket>(b =>
         {
             b.ToTable("tickets");
@@ -37,7 +49,13 @@ public sealed class AppDbContext : DbContext
                 .HasForeignKey(x => x.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            b.HasOne(x => x.Draw)
+                .WithMany()
+                .HasForeignKey(x => x.DrawId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             b.HasIndex(x => new { x.UserId, x.PurchasedAtUtc });
+            b.HasIndex(x => new { x.DrawId, x.PurchasedAtUtc });
 
             b.Property(x => x.Numbers).HasMaxLength(64).IsRequired();
             b.Property(x => x.PurchasedAtUtc).IsRequired();

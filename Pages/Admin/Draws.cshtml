@@ -1,0 +1,28 @@
+@page
+@model MiniApp.Pages.Admin.DrawsModel
+@{
+    ViewData["Title"] = "Draws";
+}
+
+<h1>Draws</h1>
+
+<form method="post" asp-page-handler="Start" class="mt-3">
+    <button type="submit" class="btn btn-danger">Start Drawing</button>
+</form>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <div class="alert alert-info mt-3">@Model.StatusMessage</div>
+}
+
+@if (Model.LatestDraw is not null)
+{
+    <div class="card mt-3">
+        <div class="card-body">
+            <h5 class="card-title">Latest draw</h5>
+            <div><strong>#@Model.LatestDraw.Id</strong> @Model.LatestDraw.CreatedAtUtc.ToString("u")</div>
+            <div>Numbers: <strong>@Model.LatestDraw.Numbers</strong></div>
+        </div>
+    </div>
+}
+

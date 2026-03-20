@@ -7,6 +7,9 @@ public sealed class Ticket
     public long UserId { get; set; }
     public MiniAppUser User { get; set; } = null!;
 
+    public long DrawId { get; set; }
+    public Draw Draw { get; set; } = null!;
+
     /// <summary>
     /// 6 distinct numbers in range 1..49 (sorted), stored as "n1,n2,n3,n4,n5,n6".
     /// </summary>
@@ -14,4 +17,3 @@ public sealed class Ticket
 
     public DateTimeOffset PurchasedAtUtc { get; set; } = DateTimeOffset.UtcNow;
 }
-

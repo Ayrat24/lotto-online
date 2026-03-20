@@ -126,7 +126,7 @@ button:disabled {
   border-radius: 12px;
   border: 1px solid rgba(0, 0, 0, 0.06);
   /* updated: use a subtle gradient from royal-gold to beige */
-  background: linear-gradient(135deg, var(--royal-gold), var(--beige));
+  background: linear-gradient(0deg, var(--royal-gold), var(--beige));
   padding: 12px 12px;
 }
 
@@ -193,4 +193,28 @@ button:disabled {
   height: 1px;
   background: rgba(0, 0, 0, 0.06);
   margin: 12px 0;
+}
+
+/* Timeline list */
+#timelineList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.timeline-item {
+  margin: 0;
+  padding: 0;
+}
+
+/* Make draw cards a touch more visually distinct */
+.ticket.draw {
+  border: 2px solid rgba(0, 0, 0, 0.10);
+}
+
+/* Reuse enter animation for ticket items if we ever prepend */
+.timeline-item.enter {
+  animation: ticketEnter 360ms cubic-bezier(.2,.75,.17,1) both;
 }
