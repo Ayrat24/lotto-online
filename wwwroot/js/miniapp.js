@@ -9,6 +9,9 @@
   // Track a recently purchased ticket id to highlight it briefly.
   var highlightTicketId = null;
 
+  // Cache last rendered timeline snapshot to avoid rebuilding DOM on every poll.
+  var lastTimelineSig = null;
+
   function setPurchaseStatus(text) {
     if (purchaseStatusEl) purchaseStatusEl.textContent = text || '';
   }
@@ -88,10 +91,13 @@
     var el = document.createElement('div');
     el.className = 'ticket';
 
-    // Highlight freshly purchased ticket
+    // Highlight freshly purchased ticket (only once)
     if (highlightTicketId && ticket && ticket.id === highlightTicketId) {
       el.classList.add('enter');
       el.classList.add('highlight');
+      // ensure the animation doesn't re-trigger on subsequent polling renders
+      highlightTicketId = null;
+
       // auto-remove highlight after a short period
       setTimeout(function () {
         try { el.classList.remove('highlight'); } catch (e) { }
@@ -204,13 +210,53 @@
     return { 'X-Dev-TelegramUserId': devTelegramUserId };
   }
 
+  function computeTimelineSig(groups) {
+    try {
+      // Only include stable, relevant fields.
+      // Any changes in draw numbers, draw timestamp, ticket ids/numbers/timestamps will change the signature.
+      return JSON.stringify((groups || []).map(function (g) {
+        return {
+          drawId: g.drawId,
+          draw: g.draw ? { createdAtUtc: g.draw.createdAtUtc || null, numbers: g.draw.numbers || null } : null,
+          tickets: (g.tickets || []).map(function (t) {
+            return { id: t.id, purchasedAtUtc: t.purchasedAtUtc || null, numbers: t.numbers || null };
+          })
+        };
+      }));
+    } catch (e) {
+      // Fail open: if signature can't be computed, force a rerender.
+      return String(Math.random());
+    }
+  }
+
   function refreshTimeline() {
     if (!initData && !devTelegramUserId) return;
     setTimelineStatus('loading...');
     return postJson('/api/timeline', { initData: initData || '' }, getDevHeadersIfNeeded())
       .then(function (res) {
         if (res && res.ok) {
-          setGroups(res.groups);
+          // If we're waiting to animate a ticket, but it didn't come back in the payload,
+          // don't keep trying forever (prevents repeated animations on every poll in edge cases).
+          if (highlightTicketId) {
+            try {
+              var found = false;
+              (res.groups || []).forEach(function (g) {
+                (g.tickets || []).forEach(function (t) {
+                  if (t && t.id === highlightTicketId) found = true;
+                });
+              });
+              if (!found) highlightTicketId = null;
+            } catch (e) {
+              highlightTicketId = null;
+            }
+          }
+
+          var sig = computeTimelineSig(res.groups);
+          if (sig !== lastTimelineSig) {
+            lastTimelineSig = sig;
+            setGroups(res.groups);
+          }
+
           setTimelineStatus('');
         }
       })
