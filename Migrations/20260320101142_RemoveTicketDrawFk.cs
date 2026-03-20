@@ -15,14 +15,23 @@ namespace MiniApp.Migrations
                 name: "FK_tickets_draws_DrawId",
                 table: "tickets");
 
-            migrationBuilder.AlterColumn<long>(
-                name: "Id",
-                table: "draws",
-                type: "bigint",
-                nullable: false,
-                oldClrType: typeof(long),
-                oldType: "bigint")
-                .OldAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);
+            // Some environments already have draws.Id as a plain bigint (not identity).
+            // Only drop identity if it exists.
+            migrationBuilder.Sql(@"
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'draws'
+      AND column_name = 'Id'
+      AND is_identity = 'YES'
+  ) THEN
+    EXECUTE 'ALTER TABLE draws ALTER COLUMN ""Id"" DROP IDENTITY';
+  END IF;
+END $$;
+");
         }
 
         /// <inheritdoc />
