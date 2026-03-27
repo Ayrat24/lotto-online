@@ -46,12 +46,15 @@ public static class TimelineEndpoints
 
             var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.TelegramUserId == telegramUserId, ct);
 
-            var currentDraw = await db.Draws
+            var currentDrawEntity = await db.Draws
                 .Where(x => x.State == DrawState.Active)
                 .OrderByDescending(x => x.Id)
-                .Select(x => new DrawDto(x.Id, x.PrizePool, DrawManagement.ToStateValue(x.State), x.Numbers, x.CreatedAtUtc))
                 .AsNoTracking()
                 .FirstOrDefaultAsync(ct);
+
+            var currentDraw = currentDrawEntity is null
+                ? null
+                : DrawManagement.ToDto(currentDrawEntity);
 
             var tickets = user is null
                 ? new List<TicketForDrawDto>()
@@ -78,11 +81,12 @@ public static class TimelineEndpoints
             var historyDrawIds = historyTicketGroups.Select(x => x.Key).Distinct().ToArray();
             var historyDraws = historyDrawIds.Length == 0
                 ? new Dictionary<long, DrawDto>()
-                : await db.Draws
+                : (await db.Draws
                     .Where(x => historyDrawIds.Contains(x.Id))
-                    .Select(x => new DrawDto(x.Id, x.PrizePool, DrawManagement.ToStateValue(x.State), x.Numbers, x.CreatedAtUtc))
                     .AsNoTracking()
-                    .ToDictionaryAsync(x => x.Id, ct);
+                    .ToListAsync(ct))
+                    .Select(DrawManagement.ToDto)
+                    .ToDictionary(x => x.Id);
 
             var history = historyTicketGroups
                 .Select(g =>

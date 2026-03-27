@@ -76,13 +76,16 @@ public static class DrawsEndpoints
         endpoints.MapGet("/api/draws", async (AppDbContext db, CancellationToken ct) =>
         {
             var draws = await db.Draws
+                .AsNoTracking()
                 .OrderByDescending(d => d.Id)
                 .Take(100)
-                .Select(d => new DrawDto(d.Id, d.PrizePool, DrawManagement.ToStateValue(d.State), d.Numbers, d.CreatedAtUtc))
-                .AsNoTracking()
                 .ToListAsync(ct);
 
-            return Results.Ok(new { ok = true, draws });
+            var drawDtos = draws
+                .Select(DrawManagement.ToDto)
+                .ToArray();
+
+            return Results.Ok(new { ok = true, draws = drawDtos });
         });
 
         return endpoints;

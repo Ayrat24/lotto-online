@@ -117,30 +117,30 @@ public sealed class DrawsModel : PageModel
 
     private async Task LoadAsync(CancellationToken ct)
     {
-        var ticketCounts = _db.Tickets
+        var ticketCounts = await _db.Tickets
             .AsNoTracking()
             .GroupBy(x => x.DrawId)
             .Select(g => new
             {
                 DrawId = g.Key,
                 TicketCount = g.LongCount()
-            });
+            })
+            .ToDictionaryAsync(x => x.DrawId, x => x.TicketCount, ct);
 
-        Draws = await _db.Draws
+        var draws = await _db.Draws
             .AsNoTracking()
-            .GroupJoin(
-                ticketCounts,
-                draw => draw.Id,
-                ticketCount => ticketCount.DrawId,
-                (draw, counts) => new AdminDrawRow(
-                    draw.Id,
-                    draw.PrizePool,
-                    DrawManagement.ToStateValue(draw.State),
-                    draw.Numbers,
-                    draw.CreatedAtUtc,
-                    counts.Select(x => x.TicketCount).FirstOrDefault()))
             .OrderByDescending(x => x.Id)
             .Take(200)
             .ToListAsync(ct);
+
+        Draws = draws
+            .Select(draw => new AdminDrawRow(
+                draw.Id,
+                draw.PrizePool,
+                DrawManagement.ToStateValue(draw.State),
+                draw.Numbers,
+                draw.CreatedAtUtc,
+                ticketCounts.GetValueOrDefault(draw.Id)))
+            .ToArray();
     }
 }
