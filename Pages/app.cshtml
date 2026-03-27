@@ -18,25 +18,98 @@
   <link rel="stylesheet" href="/css/miniapp.css" />
 </head>
 <body>
-  <main class="container stack">
-    <div class="banner card">
-      <div class="banner-inner">
-        <div class="banner-title">Get lucky, win a trillion humster coins!</div>
+  <main class="container app-shell">
+    <section id="lotteryTabPanel" class="tab-panel stack">
+      <div class="banner card">
+        <div class="banner-inner">
+          <div class="eyebrow">Lottery</div>
+          <div class="banner-title">Join the current draw and track your tickets in one place.</div>
+        </div>
       </div>
-    </div>
 
-    <section class="stack">
-      <button id="purchaseTicketBtn" type="button">Purchase Ticket</button>
-      <div id="purchaseStatus" class="muted"></div>
+      <section id="currentDrawCard" class="card stack current-draw-card">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Current draw</div>
+            <div class="section-subtitle">Buying is available only while a draw is active.</div>
+          </div>
+          <div id="currentDrawStateBadge" class="state-badge">waiting</div>
+        </div>
+
+        <div id="currentDrawEmpty" class="empty-card">
+          There is no active draw right now. Ask the admin to create or activate one.
+        </div>
+
+        <div id="currentDrawContent" class="stack" hidden>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-label">Draw ID</div>
+              <div id="currentDrawId" class="stat-value">—</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Prize pool</div>
+              <div id="currentDrawPrizePool" class="stat-value">—</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Created</div>
+              <div id="currentDrawCreatedAt" class="stat-value stat-value-small">—</div>
+            </div>
+          </div>
+
+          <div id="currentDrawNumbersWrap" class="stack" hidden>
+            <div class="section-subtitle">Winning numbers</div>
+            <div id="currentDrawNumbers"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="stack">
+        <button id="purchaseTicketBtn" type="button">Buy ticket</button>
+        <div id="purchaseStatus" class="muted"></div>
+      </section>
+
+      <section class="stack">
+        <div class="section-header">
+          <div>
+            <div class="section-title">My tickets for current draw</div>
+            <div id="timelineStatus" class="section-subtitle"></div>
+          </div>
+        </div>
+
+        <div id="currentTicketsEmpty" class="empty-card">You have not bought any tickets for the current draw yet.</div>
+        <div id="currentTicketsList" class="ticket-list"></div>
+      </section>
     </section>
 
-    <div class="ticket-header">
-      <div class="ticket-title">Draws</div>
-      <div id="timelineStatus" class="ticket-meta"></div>
-    </div>
-    <div id="timelineEmpty" class="muted">No draws yet. Ask admin to start a draw.</div>
-    <ul id="timelineList"></ul>
+    <section id="accountTabPanel" class="tab-panel stack" hidden>
+      <div class="card stack">
+        <div class="section-title">Account</div>
+        <div class="section-subtitle">Open your personal draw and ticket history.</div>
+        <button id="openHistoryBtn" type="button">Open history</button>
+      </div>
+    </section>
   </main>
+
+  <div id="historySheet" class="sheet" hidden>
+    <div id="historyBackdrop" class="sheet-backdrop"></div>
+    <div class="sheet-panel">
+      <div class="sheet-header">
+        <div>
+          <div class="section-title">History</div>
+          <div class="section-subtitle">Your past draws and purchased tickets.</div>
+        </div>
+        <button id="closeHistoryBtn" type="button" class="sheet-close-btn" aria-label="Close history">×</button>
+      </div>
+
+      <div id="historyEmpty" class="empty-card">No ticket history yet.</div>
+      <div id="historyList" class="history-list"></div>
+    </div>
+  </div>
+
+  <nav class="tabbar" aria-label="Bottom tabs">
+    <button id="lotteryTabBtn" type="button" class="tabbar-btn tabbar-btn-active">Lottery</button>
+    <button id="accountTabBtn" type="button" class="tabbar-btn">Account</button>
+  </nav>
 
   <script src="/js/miniapp.js"></script>
 </body>

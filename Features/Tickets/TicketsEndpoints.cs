@@ -17,7 +17,7 @@ public static class TicketsEndpoints
             AppDbContext db,
             CancellationToken ct) =>
         {
-            long? telegramUserId = null;
+            long telegramUserId;
 
             // Dev shortcut used by the JS when not running inside Telegram.
             if (env.IsDevelopment() && http.Request.Headers.TryGetValue("X-Dev-TelegramUserId", out var devTgUserIdStr)
@@ -42,7 +42,7 @@ public static class TicketsEndpoints
                 telegramUserId = tgUser!.Id;
             }
 
-            var u = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.TelegramUserId == telegramUserId!.Value, ct);
+            var u = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.TelegramUserId == telegramUserId, ct);
             if (u is null)
                 return Results.Ok(new { ok = true, tickets = Array.Empty<TicketDto>() });
 
@@ -56,7 +56,7 @@ public static class TicketsEndpoints
             return Results.Ok(new { ok = true, tickets });
         });
 
-        // Purchase a ticket (server-side random numbers).
+        // Purchase a ticket for the current active draw (server-side random numbers).
         endpoints.MapPost("/api/tickets/purchase", async (
             PurchaseTicketRequest req,
             HttpContext http,
@@ -93,15 +93,20 @@ public static class TicketsEndpoints
 
             var u = await users.TouchUserAsync(telegramUserId, ct);
 
-            // Tickets are assigned to the next draw number.
-            // Draws are created only by admin, so we base "next" on existing draws.
-            var nextDrawId = (await db.Draws.MaxAsync(x => (long?)x.Id, ct) ?? 0) + 1;
+            var currentDraw = await db.Draws
+                .Where(x => x.State == DrawState.Active)
+                .OrderByDescending(x => x.Id)
+                .Select(x => new { x.Id })
+                .FirstOrDefaultAsync(ct);
+
+            if (currentDraw is null)
+                return Results.BadRequest(new { ok = false, error = "There is no active draw right now." });
 
             var numbers = GenerateTicketNumbers();
             var ticket = new Ticket
             {
                 UserId = u.Id,
-                DrawId = nextDrawId,
+                DrawId = currentDraw.Id,
                 Numbers = numbers,
                 PurchasedAtUtc = DateTimeOffset.UtcNow
             };

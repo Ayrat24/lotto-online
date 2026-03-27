@@ -6,13 +6,26 @@
 
 <h1>Draws</h1>
 
-<form method="post" asp-page-handler="Start" class="mt-3">
-    <button type="submit" class="btn btn-danger">Start Drawing</button>
-</form>
+<div class="card mt-3">
+    <div class="card-body">
+        <h5 class="card-title">Create draw instance</h5>
+        <p class="text-muted mb-3">A new draw becomes <strong>active</strong> when there is no current active draw. Otherwise it is created as <strong>upcoming</strong>.</p>
+
+        <form method="post" asp-page-handler="Create" class="row g-3 align-items-end">
+            <div class="col-sm-6 col-md-4">
+                <label for="createPrizePool" class="form-label">Prize pool</label>
+                <input id="createPrizePool" name="prizePool" type="number" min="0" step="0.01" value="0" class="form-control" />
+            </div>
+            <div class="col-sm-6 col-md-4">
+                <button type="submit" class="btn btn-danger w-100">Create draw</button>
+            </div>
+        </form>
+    </div>
+</div>
 
 @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
 {
-    <div class="alert alert-info mt-3">@Model.StatusMessage</div>
+    <div class="alert @(Model.StatusIsError ? "alert-danger" : "alert-info") mt-3">@Model.StatusMessage</div>
 }
 
 @if (Model.Draws.Count == 0)
@@ -23,14 +36,18 @@ else
 {
     <div class="card mt-3">
         <div class="card-body">
-            <h5 class="card-title">Previous draws</h5>
+            <h5 class="card-title">Manage draws</h5>
             <div class="table-responsive">
                 <table class="table table-sm align-middle">
                     <thead>
                     <tr>
                         <th>Id</th>
+                        <th>Tickets</th>
+                        <th>State</th>
+                        <th>Prize pool</th>
                         <th>Created (UTC)</th>
                         <th>Numbers</th>
+                        <th>Actions</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -38,8 +55,70 @@ else
                     {
                         <tr>
                             <td><strong>@d.Id</strong></td>
+                            <td>
+                                <span class="badge text-bg-light border">@d.TicketCount</span>
+                            </td>
+                            <td>
+                                <span class="badge @(d.State == "active" ? "text-bg-success" : d.State == "finished" ? "text-bg-dark" : "text-bg-secondary") text-uppercase">
+                                    @d.State
+                                </span>
+                            </td>
+                            <td>
+                                @if (d.State == "finished")
+                                {
+                                    <span>@d.PrizePool.ToString("0.00")</span>
+                                }
+                                else
+                                {
+                                    <form method="post" asp-page-handler="Update" class="row row-cols-lg-auto g-2 align-items-center">
+                                        <input type="hidden" name="id" value="@d.Id" />
+                                        <div class="col-12">
+                                            <input name="prizePool" type="number" min="0" step="0.01" value="@d.PrizePool.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" class="form-control form-control-sm" />
+                                        </div>
+                                        <div class="col-12">
+                                            <select name="state" class="form-select form-select-sm">
+                                                @if (d.State == "active")
+                                                {
+                                                    <option value="active" selected>active</option>
+                                                    <option value="upcoming">upcoming</option>
+                                                }
+                                                else
+                                                {
+                                                    <option value="active">active</option>
+                                                    <option value="upcoming" selected>upcoming</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="col-12 d-flex gap-2">
+                                            <button type="submit" class="btn btn-sm btn-outline-primary">Save</button>
+                                        </div>
+                                    </form>
+                                }
+                            </td>
                             <td>@d.CreatedAtUtc.ToString("u")</td>
-                            <td><code>@d.Numbers</code></td>
+                            <td>
+                                @if (string.IsNullOrWhiteSpace(d.Numbers))
+                                {
+                                    <span class="text-muted">Not executed yet</span>
+                                }
+                                else
+                                {
+                                    <code>@d.Numbers</code>
+                                }
+                            </td>
+                            <td>
+                                @if (d.State == "active")
+                                {
+                                    <form method="post" asp-page-handler="Execute" onsubmit="return confirm('Execute draw #@d.Id?');">
+                                        <input type="hidden" name="id" value="@d.Id" />
+                                        <button type="submit" class="btn btn-sm btn-danger">Execute draw</button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
                         </tr>
                     }
                     </tbody>

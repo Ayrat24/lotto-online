@@ -1,16 +1,37 @@
 (function () {
   var purchaseBtn = document.getElementById('purchaseTicketBtn');
   var purchaseStatusEl = document.getElementById('purchaseStatus');
-
-  var timelineListEl = document.getElementById('timelineList');
-  var timelineEmptyEl = document.getElementById('timelineEmpty');
   var timelineStatusEl = document.getElementById('timelineStatus');
 
-  // Track a recently purchased ticket id to highlight it briefly.
-  var highlightTicketId = null;
+  var lotteryTabBtn = document.getElementById('lotteryTabBtn');
+  var accountTabBtn = document.getElementById('accountTabBtn');
+  var lotteryTabPanel = document.getElementById('lotteryTabPanel');
+  var accountTabPanel = document.getElementById('accountTabPanel');
 
-  // Cache last rendered timeline snapshot to avoid rebuilding DOM on every poll.
-  var lastTimelineSig = null;
+  var currentDrawStateBadgeEl = document.getElementById('currentDrawStateBadge');
+  var currentDrawEmptyEl = document.getElementById('currentDrawEmpty');
+  var currentDrawContentEl = document.getElementById('currentDrawContent');
+  var currentDrawIdEl = document.getElementById('currentDrawId');
+  var currentDrawPrizePoolEl = document.getElementById('currentDrawPrizePool');
+  var currentDrawCreatedAtEl = document.getElementById('currentDrawCreatedAt');
+  var currentDrawNumbersWrapEl = document.getElementById('currentDrawNumbersWrap');
+  var currentDrawNumbersEl = document.getElementById('currentDrawNumbers');
+
+  var currentTicketsEmptyEl = document.getElementById('currentTicketsEmpty');
+  var currentTicketsListEl = document.getElementById('currentTicketsList');
+
+  var openHistoryBtn = document.getElementById('openHistoryBtn');
+  var historySheetEl = document.getElementById('historySheet');
+  var historyBackdropEl = document.getElementById('historyBackdrop');
+  var closeHistoryBtn = document.getElementById('closeHistoryBtn');
+  var historyEmptyEl = document.getElementById('historyEmpty');
+  var historyListEl = document.getElementById('historyList');
+
+  var highlightTicketId = null;
+  var lastStateSig = null;
+  var latestState = { currentDraw: null, currentTickets: [], history: [] };
+  var initData = null;
+  var devTelegramUserId = null;
 
   function setPurchaseStatus(text) {
     if (purchaseStatusEl) purchaseStatusEl.textContent = text || '';
@@ -28,6 +49,12 @@
     }
   }
 
+  function formatPrizePool(value) {
+    var amount = Number(value || 0);
+    if (!Number.isFinite(amount)) amount = 0;
+    return amount.toFixed(2);
+  }
+
   function parseNumbers(numbersStr) {
     if (!numbersStr) return [];
     return String(numbersStr)
@@ -40,8 +67,7 @@
     var numbersWrap = document.createElement('div');
     numbersWrap.className = 'ticket-numbers';
 
-    var nums = parseNumbers(numbersStr);
-    nums.forEach(function (n) {
+    parseNumbers(numbersStr).forEach(function (n) {
       var ball = document.createElement('div');
       ball.className = 'ball';
       ball.textContent = String(n);
@@ -51,54 +77,15 @@
     return numbersWrap;
   }
 
-  function createDrawHeaderEl(drawId, draw) {
-    var header = document.createElement('div');
-    header.className = 'draw-header';
-
-    var top = document.createElement('div');
-    top.className = 'draw-header-top';
-
-    var title = document.createElement('div');
-    title.className = 'draw-header-title';
-    title.textContent = 'Draw #' + drawId;
-
-    var meta = document.createElement('div');
-    meta.className = 'draw-header-meta';
-    meta.textContent = draw ? formatUtc(draw.createdAtUtc) : 'upcoming';
-
-    top.appendChild(title);
-    top.appendChild(meta);
-
-    header.appendChild(top);
-
-    if (draw && draw.numbers) {
-      var label = document.createElement('div');
-      label.className = 'draw-header-label';
-      label.textContent = 'Winning numbers';
-      header.appendChild(label);
-      header.appendChild(createNumbersRow(draw.numbers));
-    } else {
-      var label2 = document.createElement('div');
-      label2.className = 'draw-header-label';
-      label2.textContent = 'Tickets for the next draw';
-      header.appendChild(label2);
-    }
-
-    return header;
-  }
-
   function createTicketEl(ticket) {
     var el = document.createElement('div');
     el.className = 'ticket';
 
-    // Highlight freshly purchased ticket (only once)
     if (highlightTicketId && ticket && ticket.id === highlightTicketId) {
       el.classList.add('enter');
       el.classList.add('highlight');
-      // ensure the animation doesn't re-trigger on subsequent polling renders
       highlightTicketId = null;
 
-      // auto-remove highlight after a short period
       setTimeout(function () {
         try { el.classList.remove('highlight'); } catch (e) { }
       }, 1500);
@@ -124,48 +111,144 @@
     return el;
   }
 
-  function createGroupEl(group) {
-    var li = document.createElement('li');
-    li.className = 'timeline-group';
-
+  function createHistoryGroupEl(group) {
     var container = document.createElement('div');
     container.className = 'draw-group';
 
-    container.appendChild(createDrawHeaderEl(group.drawId, group.draw));
+    var draw = group.draw || null;
+
+    var header = document.createElement('div');
+    header.className = 'draw-header';
+
+    var top = document.createElement('div');
+    top.className = 'draw-header-top';
+
+    var title = document.createElement('div');
+    title.className = 'draw-header-title';
+    title.textContent = 'Draw #' + group.drawId;
+
+    var meta = document.createElement('div');
+    meta.className = 'draw-header-meta';
+    meta.textContent = draw ? formatUtc(draw.createdAtUtc) : 'Created before current format';
+
+    top.appendChild(title);
+    top.appendChild(meta);
+    header.appendChild(top);
+
+    if (draw) {
+      var info = document.createElement('div');
+      info.className = 'draw-header-label';
+      info.textContent = 'State: ' + draw.state + ' • Prize pool: ' + formatPrizePool(draw.prizePool);
+      header.appendChild(info);
+
+      if (draw.numbers) {
+        header.appendChild(createNumbersRow(draw.numbers));
+      }
+    }
+
+    container.appendChild(header);
 
     var tickets = group.tickets || [];
     if (tickets.length === 0) {
       var empty = document.createElement('div');
-      empty.className = 'muted';
-      empty.style.padding = '10px 2px 2px';
-      empty.textContent = 'No tickets.';
+      empty.className = 'muted history-empty-row';
+      empty.textContent = 'No tickets for this draw.';
       container.appendChild(empty);
     } else {
       var ticketsWrap = document.createElement('div');
       ticketsWrap.className = 'draw-group-tickets';
-      tickets.forEach(function (t) { ticketsWrap.appendChild(createTicketEl(t)); });
+      tickets.forEach(function (ticket) {
+        ticketsWrap.appendChild(createTicketEl(ticket));
+      });
       container.appendChild(ticketsWrap);
     }
 
-    li.appendChild(container);
-    return li;
+    return container;
   }
 
-  function setGroups(groups) {
-    if (!timelineListEl || !timelineEmptyEl) return;
+  function renderCurrentDraw(draw) {
+    if (!currentDrawEmptyEl || !currentDrawContentEl || !currentDrawStateBadgeEl) return;
 
-    timelineListEl.innerHTML = '';
-
-    var list = groups || [];
-    if (list.length === 0) {
-      timelineEmptyEl.style.display = '';
+    if (!draw) {
+      currentDrawStateBadgeEl.textContent = 'waiting';
+      currentDrawStateBadgeEl.className = 'state-badge state-badge-muted';
+      currentDrawEmptyEl.hidden = false;
+      currentDrawContentEl.hidden = true;
+      if (purchaseBtn) {
+        purchaseBtn.disabled = true;
+        purchaseBtn.title = 'No active draw available.';
+      }
       return;
     }
 
-    timelineEmptyEl.style.display = 'none';
-    list.forEach(function (g) {
-      timelineListEl.appendChild(createGroupEl(g));
+    currentDrawStateBadgeEl.textContent = draw.state;
+    currentDrawStateBadgeEl.className = 'state-badge ' + (draw.state === 'active' ? 'state-badge-active' : draw.state === 'finished' ? 'state-badge-finished' : 'state-badge-upcoming');
+    currentDrawEmptyEl.hidden = true;
+    currentDrawContentEl.hidden = false;
+
+    if (currentDrawIdEl) currentDrawIdEl.textContent = '#' + draw.id;
+    if (currentDrawPrizePoolEl) currentDrawPrizePoolEl.textContent = formatPrizePool(draw.prizePool);
+    if (currentDrawCreatedAtEl) currentDrawCreatedAtEl.textContent = formatUtc(draw.createdAtUtc);
+
+    var hasNumbers = !!(draw.numbers && String(draw.numbers).length > 0);
+    if (currentDrawNumbersWrapEl) currentDrawNumbersWrapEl.hidden = !hasNumbers;
+    if (currentDrawNumbersEl) {
+      currentDrawNumbersEl.innerHTML = '';
+      if (hasNumbers) currentDrawNumbersEl.appendChild(createNumbersRow(draw.numbers));
+    }
+
+    if (purchaseBtn) {
+      purchaseBtn.disabled = draw.state !== 'active';
+      purchaseBtn.title = draw.state === 'active' ? '' : 'Only the active draw accepts purchases.';
+    }
+  }
+
+  function renderCurrentTickets(tickets) {
+    if (!currentTicketsListEl || !currentTicketsEmptyEl) return;
+
+    currentTicketsListEl.innerHTML = '';
+
+    var list = tickets || [];
+    currentTicketsEmptyEl.hidden = list.length > 0;
+
+    list.forEach(function (ticket) {
+      currentTicketsListEl.appendChild(createTicketEl(ticket));
     });
+  }
+
+  function renderHistory(groups) {
+    if (!historyListEl || !historyEmptyEl) return;
+
+    historyListEl.innerHTML = '';
+
+    var list = groups || [];
+    historyEmptyEl.hidden = list.length > 0;
+
+    list.forEach(function (group) {
+      historyListEl.appendChild(createHistoryGroupEl(group));
+    });
+  }
+
+  function setActiveTab(name) {
+    var isLottery = name !== 'account';
+
+    if (lotteryTabPanel) lotteryTabPanel.hidden = !isLottery;
+    if (accountTabPanel) accountTabPanel.hidden = isLottery;
+
+    if (lotteryTabBtn) lotteryTabBtn.classList.toggle('tabbar-btn-active', isLottery);
+    if (accountTabBtn) accountTabBtn.classList.toggle('tabbar-btn-active', !isLottery);
+  }
+
+  function openHistory() {
+    if (!historySheetEl) return;
+    historySheetEl.hidden = false;
+    document.body.classList.add('sheet-open');
+  }
+
+  function closeHistory() {
+    if (!historySheetEl) return;
+    historySheetEl.hidden = true;
+    document.body.classList.remove('sheet-open');
   }
 
   function postJson(url, payload, extraHeaders) {
@@ -179,16 +262,16 @@
       headers: headers,
       body: JSON.stringify(payload)
     }).then(function (r) {
-      if (!r.ok) return r.json().catch(function () { return null; }).then(function (b) {
-        var msg = (b && b.error) ? b.error : ('HTTP ' + r.status);
-        throw new Error(msg);
-      });
+      if (!r.ok) {
+        return r.json().catch(function () { return null; }).then(function (body) {
+          var msg = (body && body.error) ? body.error : ('HTTP ' + r.status);
+          throw new Error(msg);
+        });
+      }
+
       return r.json();
     });
   }
-
-  var initData = null;
-  var devTelegramUserId = null;
 
   function getOrCreateDevTelegramUserId() {
     try {
@@ -210,67 +293,83 @@
     return { 'X-Dev-TelegramUserId': devTelegramUserId };
   }
 
-  function computeTimelineSig(groups) {
+  function computeStateSig(state) {
     try {
-      // Only include stable, relevant fields.
-      // Any changes in draw numbers, draw timestamp, ticket ids/numbers/timestamps will change the signature.
-      return JSON.stringify((groups || []).map(function (g) {
-        return {
-          drawId: g.drawId,
-          draw: g.draw ? { createdAtUtc: g.draw.createdAtUtc || null, numbers: g.draw.numbers || null } : null,
-          tickets: (g.tickets || []).map(function (t) {
-            return { id: t.id, purchasedAtUtc: t.purchasedAtUtc || null, numbers: t.numbers || null };
-          })
-        };
-      }));
+      return JSON.stringify({
+        currentDraw: state && state.currentDraw ? {
+          id: state.currentDraw.id,
+          prizePool: state.currentDraw.prizePool,
+          state: state.currentDraw.state,
+          numbers: state.currentDraw.numbers || null,
+          createdAtUtc: state.currentDraw.createdAtUtc || null
+        } : null,
+        currentTickets: (state && state.currentTickets || []).map(function (ticket) {
+          return { id: ticket.id, drawId: ticket.drawId, numbers: ticket.numbers || null, purchasedAtUtc: ticket.purchasedAtUtc || null };
+        }),
+        history: (state && state.history || []).map(function (group) {
+          return {
+            drawId: group.drawId,
+            draw: group.draw ? {
+              id: group.draw.id,
+              prizePool: group.draw.prizePool,
+              state: group.draw.state,
+              numbers: group.draw.numbers || null,
+              createdAtUtc: group.draw.createdAtUtc || null
+            } : null,
+            tickets: (group.tickets || []).map(function (ticket) {
+              return { id: ticket.id, numbers: ticket.numbers || null, purchasedAtUtc: ticket.purchasedAtUtc || null };
+            })
+          };
+        })
+      });
     } catch (e) {
-      // Fail open: if signature can't be computed, force a rerender.
       return String(Math.random());
     }
   }
 
-  function refreshTimeline() {
+  function applyState(state) {
+    latestState = state || { currentDraw: null, currentTickets: [], history: [] };
+
+    renderCurrentDraw(latestState.currentDraw || null);
+    renderCurrentTickets(latestState.currentTickets || []);
+    renderHistory(latestState.history || []);
+  }
+
+  function refreshState() {
     if (!initData && !devTelegramUserId) return;
+
     setTimelineStatus('loading...');
+
     return postJson('/api/timeline', { initData: initData || '' }, getDevHeadersIfNeeded())
       .then(function (res) {
-        if (res && res.ok) {
-          // If we're waiting to animate a ticket, but it didn't come back in the payload,
-          // don't keep trying forever (prevents repeated animations on every poll in edge cases).
-          if (highlightTicketId) {
-            try {
-              var found = false;
-              (res.groups || []).forEach(function (g) {
-                (g.tickets || []).forEach(function (t) {
-                  if (t && t.id === highlightTicketId) found = true;
-                });
-              });
-              if (!found) highlightTicketId = null;
-            } catch (e) {
-              highlightTicketId = null;
-            }
-          }
+        if (!(res && res.ok && res.state)) return;
 
-          var sig = computeTimelineSig(res.groups);
-          if (sig !== lastTimelineSig) {
-            lastTimelineSig = sig;
-            setGroups(res.groups);
-          }
-
-          setTimelineStatus('');
+        if (highlightTicketId) {
+          var found = false;
+          (res.state.currentTickets || []).forEach(function (ticket) {
+            if (ticket && ticket.id === highlightTicketId) found = true;
+          });
+          if (!found) highlightTicketId = null;
         }
+
+        var sig = computeStateSig(res.state);
+        if (sig !== lastStateSig) {
+          lastStateSig = sig;
+          applyState(res.state);
+        }
+
+        setTimelineStatus('');
       })
       .catch(function (err) {
-        console.warn('Failed to load timeline', err);
+        console.warn('Failed to load app state', err);
         setTimelineStatus(err.message);
       });
   }
 
-  function startTimelinePolling() {
-    // Polling is used for draw updates (SignalR removed).
+  function startPolling() {
     try {
       setInterval(function () {
-        refreshTimeline();
+        refreshState();
       }, 4000);
     } catch (e) {
     }
@@ -278,17 +377,20 @@
 
   function purchaseTicket() {
     if (!initData && !devTelegramUserId) return;
+    if (!latestState.currentDraw || latestState.currentDraw.state !== 'active') {
+      setPurchaseStatus('There is no active draw right now.');
+      return;
+    }
 
     if (purchaseBtn) purchaseBtn.disabled = true;
-    setPurchaseStatus('...');
+    setPurchaseStatus('Buying ticket...');
 
     postJson('/api/tickets/purchase', { initData: initData || '' }, getDevHeadersIfNeeded())
       .then(function (res) {
         if (res && res.ok && res.ticket) {
-          // mark ticket for highlight on next render
           highlightTicketId = res.ticket.id;
-          setPurchaseStatus('');
-          return refreshTimeline();
+          setPurchaseStatus('Ticket purchased.');
+          return refreshState();
         }
 
         setPurchaseStatus('Purchase failed.');
@@ -297,27 +399,32 @@
         setPurchaseStatus(err.message);
       })
       .finally(function () {
-        if (purchaseBtn) purchaseBtn.disabled = false;
+        if (purchaseBtn) {
+          purchaseBtn.disabled = !(latestState.currentDraw && latestState.currentDraw.state === 'active');
+        }
       });
   }
 
   if (purchaseBtn) purchaseBtn.addEventListener('click', purchaseTicket);
+  if (lotteryTabBtn) lotteryTabBtn.addEventListener('click', function () { setActiveTab('lottery'); });
+  if (accountTabBtn) accountTabBtn.addEventListener('click', function () { setActiveTab('account'); });
+  if (openHistoryBtn) openHistoryBtn.addEventListener('click', openHistory);
+  if (closeHistoryBtn) closeHistoryBtn.addEventListener('click', closeHistory);
+  if (historyBackdropEl) historyBackdropEl.addEventListener('click', closeHistory);
 
-  // Disable purchase button since purchases are not implemented now
-  if (purchaseBtn) {
-    purchaseBtn.disabled = false;
-    purchaseBtn.title = '';
-  }
+  setActiveTab('lottery');
+  renderCurrentDraw(null);
+  renderCurrentTickets([]);
+  renderHistory([]);
 
   if (!window.Telegram || !Telegram.WebApp) {
     devTelegramUserId = getOrCreateDevTelegramUserId();
-    refreshTimeline();
-    startTimelinePolling();
+    refreshState();
+    startPolling();
     return;
   }
 
-  // Start polling early.
-  startTimelinePolling();
+  startPolling();
 
   try {
     Telegram.WebApp.setHeaderColor('#ee964b');
@@ -332,7 +439,7 @@
     initData = Telegram.WebApp.initData;
     if (initData && initData.length > 0) {
       postJson('/api/auth/telegram', { initData: initData })
-        .then(function () { return refreshTimeline(); })
+        .then(function () { return refreshState(); })
         .catch(function (err) {
           console.warn('Failed to auth with Telegram initData', err);
           setPurchaseStatus(err.message);

@@ -1,5 +1,3 @@
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using MiniApp.Admin;
@@ -11,34 +9,76 @@ public static class DrawsEndpoints
 {
     public static IEndpointRouteBuilder MapDrawsEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        // Admin: start the next draw (generate 6 numbers) with the next sequential id.
+        // Admin: create the next draw instance. If there is no active draw, the new instance becomes active.
         endpoints.MapPost("/api/admin/draws/start", [Authorize(Policy = AdminAuth.PolicyName)] async (
+            CreateDrawRequest? req,
             AppDbContext db,
             CancellationToken ct) =>
         {
-            var nextId = (await db.Draws.MaxAsync(x => (long?)x.Id, ct) ?? 0) + 1;
-
-            var draw = new Draw
+            try
             {
-                Id = nextId,
-                Numbers = GenerateDrawNumbers(),
-                CreatedAtUtc = DateTimeOffset.UtcNow
-            };
+                var draw = await DrawManagement.CreateDrawAsync(db, req?.PrizePool ?? 0m, ct);
+                var dto = DrawManagement.ToDto(draw);
+                return Results.Ok(new { ok = true, draw = dto });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { ok = false, error = ex.Message });
+            }
 
-            db.Draws.Add(draw);
-            await db.SaveChangesAsync(ct);
-
-            var dto = new DrawDto(draw.Id, draw.Numbers, draw.CreatedAtUtc);
-            return Results.Ok(new { ok = true, draw = dto });
         });
 
-        // Public: list recent draws
+        endpoints.MapPost("/api/admin/draws/{id:long}/update", [Authorize(Policy = AdminAuth.PolicyName)] async (
+            long id,
+            UpdateDrawRequest req,
+            AppDbContext db,
+            CancellationToken ct) =>
+        {
+            var draw = await db.Draws.SingleOrDefaultAsync(x => x.Id == id, ct);
+            if (draw is null)
+                return Results.NotFound(new { ok = false, error = $"Draw #{id} was not found." });
+
+            if (!DrawManagement.TryParseEditableState(req.State, out var state))
+                return Results.BadRequest(new { ok = false, error = "State must be active or upcoming." });
+
+            try
+            {
+                await DrawManagement.UpdateDrawAsync(db, draw, req.PrizePool, state, ct);
+                return Results.Ok(new { ok = true, draw = DrawManagement.ToDto(draw) });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { ok = false, error = ex.Message });
+            }
+        });
+
+        endpoints.MapPost("/api/admin/draws/{id:long}/execute", [Authorize(Policy = AdminAuth.PolicyName)] async (
+            long id,
+            AppDbContext db,
+            CancellationToken ct) =>
+        {
+            var draw = await db.Draws.SingleOrDefaultAsync(x => x.Id == id, ct);
+            if (draw is null)
+                return Results.NotFound(new { ok = false, error = $"Draw #{id} was not found." });
+
+            try
+            {
+                await DrawManagement.ExecuteDrawAsync(db, draw, ct);
+                return Results.Ok(new { ok = true, draw = DrawManagement.ToDto(draw) });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { ok = false, error = ex.Message });
+            }
+        });
+
+        // Public: list recent draws.
         endpoints.MapGet("/api/draws", async (AppDbContext db, CancellationToken ct) =>
         {
             var draws = await db.Draws
                 .OrderByDescending(d => d.Id)
                 .Take(100)
-                .Select(d => new DrawDto(d.Id, d.Numbers, d.CreatedAtUtc))
+                .Select(d => new DrawDto(d.Id, d.PrizePool, DrawManagement.ToStateValue(d.State), d.Numbers, d.CreatedAtUtc))
                 .AsNoTracking()
                 .ToListAsync(ct);
 
@@ -46,16 +86,5 @@ public static class DrawsEndpoints
         });
 
         return endpoints;
-    }
-
-    internal static string GenerateDrawNumbers()
-    {
-        var set = new HashSet<int>();
-        while (set.Count < 6)
-            set.Add(Random.Shared.Next(1, 50));
-
-        var arr = set.ToArray();
-        Array.Sort(arr);
-        return string.Join(',', arr);
     }
 }

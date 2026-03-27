@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using MiniApp.Data;
 using MiniApp.Features.Draws;
+using MiniApp.Features.Tickets;
 using MiniApp.TelegramLogin;
 
 namespace MiniApp.Features.Timeline;
@@ -9,9 +10,9 @@ public static class TimelineEndpoints
 {
     public static IEndpointRouteBuilder MapTimelineEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        // Returns UI model: groups grouped by drawId, containing optional draw (when already created) and user's tickets for that draw.
+        // Returns the current draw, the user's tickets for it, and grouped personal history for previous draws.
         endpoints.MapPost("/api/timeline", async (
-            MiniApp.Features.Tickets.PurchaseTicketRequest req,
+            PurchaseTicketRequest req,
             HttpContext http,
             IConfiguration config,
             IWebHostEnvironment env,
@@ -45,7 +46,13 @@ public static class TimelineEndpoints
 
             var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.TelegramUserId == telegramUserId, ct);
 
-            // Load user's tickets (if any)
+            var currentDraw = await db.Draws
+                .Where(x => x.State == DrawState.Active)
+                .OrderByDescending(x => x.Id)
+                .Select(x => new DrawDto(x.Id, x.PrizePool, DrawManagement.ToStateValue(x.State), x.Numbers, x.CreatedAtUtc))
+                .AsNoTracking()
+                .FirstOrDefaultAsync(ct);
+
             var tickets = user is null
                 ? new List<TicketForDrawDto>()
                 : await db.Tickets
@@ -55,47 +62,38 @@ public static class TimelineEndpoints
                     .AsNoTracking()
                     .ToListAsync(ct);
 
-            var ticketsByDraw = tickets
-                .GroupBy(t => t.DrawId)
-                .ToDictionary(g => g.Key, g => (IReadOnlyList<TicketForDrawDto>)g.OrderByDescending(x => x.PurchasedAtUtc).ToList());
+            var currentTickets = currentDraw is null
+                ? Array.Empty<TicketForDrawDto>()
+                : tickets
+                    .Where(x => x.DrawId == currentDraw.Id)
+                    .OrderByDescending(x => x.PurchasedAtUtc)
+                    .ToArray();
 
-            // Global draws (recent)
-            var draws = await db.Draws
-                .OrderByDescending(d => d.Id)
-                .Take(100)
-                .Select(d => new DrawDto(d.Id, d.Numbers, d.CreatedAtUtc))
-                .AsNoTracking()
-                .ToListAsync(ct);
+            var historyTicketGroups = tickets
+                .Where(x => currentDraw is null || x.DrawId != currentDraw.Id)
+                .GroupBy(x => x.DrawId)
+                .OrderByDescending(g => g.Key)
+                .ToList();
 
-            var drawsById = draws.ToDictionary(d => d.Id, d => d);
+            var historyDrawIds = historyTicketGroups.Select(x => x.Key).Distinct().ToArray();
+            var historyDraws = historyDrawIds.Length == 0
+                ? new Dictionary<long, DrawDto>()
+                : await db.Draws
+                    .Where(x => historyDrawIds.Contains(x.Id))
+                    .Select(x => new DrawDto(x.Id, x.PrizePool, DrawManagement.ToStateValue(x.State), x.Numbers, x.CreatedAtUtc))
+                    .AsNoTracking()
+                    .ToDictionaryAsync(x => x.Id, ct);
 
-            // Next draw id is always last draw + 1.
-            var lastDrawId = draws.Count == 0 ? 0 : draws.Max(x => x.Id);
-            var nextDrawId = lastDrawId + 1;
+            var history = historyTicketGroups
+                .Select(g =>
+                {
+                    historyDraws.TryGetValue(g.Key, out var draw);
+                    return new DrawGroupDto(g.Key, draw, g.OrderByDescending(x => x.PurchasedAtUtc).ToArray());
+                })
+                .ToArray();
 
-            // Group ids shown in UI:
-            // - all draws that exist
-            // - all drawIds that user has tickets for (including upcoming ones)
-            // - always include "next" draw so user sees the upcoming container even with no tickets
-            var groupIds = new HashSet<long>();
-            foreach (var d in draws)
-                groupIds.Add(d.Id);
-            foreach (var drawId in ticketsByDraw.Keys)
-                groupIds.Add(drawId);
-            groupIds.Add(nextDrawId);
-
-            var ordered = groupIds.OrderByDescending(x => x).ToArray();
-            var groups = new List<DrawGroupDto>(ordered.Length);
-            foreach (var drawId in ordered)
-            {
-                drawsById.TryGetValue(drawId, out var draw);
-                ticketsByDraw.TryGetValue(drawId, out var groupTickets);
-                groupTickets ??= Array.Empty<TicketForDrawDto>();
-
-                groups.Add(new DrawGroupDto(drawId, draw, groupTickets));
-            }
-
-            return Results.Ok(new { ok = true, groups, nextDrawId });
+            var state = new MiniAppStateDto(currentDraw, currentTickets, history);
+            return Results.Ok(new { ok = true, state });
         });
 
         return endpoints;

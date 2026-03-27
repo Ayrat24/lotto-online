@@ -37,8 +37,14 @@ public sealed class AppDbContext : DbContext
             b.Property(x => x.Id).ValueGeneratedNever();
 
             b.HasIndex(x => x.CreatedAtUtc);
+            b.HasIndex(x => x.State);
 
-            b.Property(x => x.Numbers).HasMaxLength(64).IsRequired();
+            b.Property(x => x.PrizePool).HasPrecision(18, 2).IsRequired();
+            b.Property(x => x.State)
+                .HasConversion<string>()
+                .HasMaxLength(32)
+                .IsRequired();
+            b.Property(x => x.Numbers).HasMaxLength(64);
             b.Property(x => x.CreatedAtUtc).IsRequired();
         });
 
@@ -51,6 +57,11 @@ public sealed class AppDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasOne(x => x.Draw)
+                .WithMany()
+                .HasForeignKey(x => x.DrawId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             b.HasIndex(x => new { x.UserId, x.PurchasedAtUtc });
             b.HasIndex(x => new { x.DrawId, x.PurchasedAtUtc });
