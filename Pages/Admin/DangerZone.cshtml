@@ -8,14 +8,21 @@
 
 <div class="alert alert-warning">
     <strong>Warning:</strong> Actions on this page are destructive and irreversible.
+    Resetting the database deletes all data, recreates the <code>public</code> schema, and reapplies EF Core migrations.
 </div>
 
-<form method="post" asp-page-handler="DropAllTables" onsubmit="return confirm('DROP ALL TABLES? This will delete ALL data. Are you absolutely sure?');">
+<form method="post" asp-page-handler="DropAllTables" onsubmit="return confirm('RESET DATABASE? This will delete ALL data, recreate the schema, and reapply migrations. Are you absolutely sure?');">
     @Html.AntiForgeryToken()
-    <button type="submit" class="btn btn-danger">Drop all tables</button>
+    <button type="submit" class="btn btn-danger">Reset database</button>
 </form>
 
 @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
 {
     <div class="alert alert-info mt-3">@Model.StatusMessage</div>
 }
+
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="alert alert-danger mt-3">@Model.ErrorMessage</div>
+}
+
