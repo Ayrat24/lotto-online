@@ -4,15 +4,15 @@ services:
     container_name: miniapp-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: miniapp
-      POSTGRES_USER: miniapp
-      POSTGRES_PASSWORD: miniapp
+      POSTGRES_DB: ${POSTGRES_DB:-miniapp}
+      POSTGRES_USER: ${POSTGRES_USER:-miniapp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-miniapp}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - miniapp_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U miniapp -d miniapp"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-miniapp} -d ${POSTGRES_DB:-miniapp}"]
       interval: 5s
       timeout: 3s
       retries: 20
