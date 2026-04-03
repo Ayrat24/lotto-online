@@ -45,6 +45,14 @@
 - Changes to auth/initData handling must be mirrored across auth, tickets, and timeline endpoints.
 - If changing draw/ticket semantics, verify both purchase endpoint and timeline grouping logic together.
 
+## Local debug mode maintenance (important)
+- Local debug mode is Development-only and must never affect production behavior; keep guards aligned in `Program.cs`, `appsettings.json`, and `docker-compose.app.yml`.
+- Debug data is intentionally synthetic and seeded in `Features/Auth/LocalDebugSeed.cs`; if you change draw/ticket/user semantics, update seed logic so `/app` still has: 1 active draw, 1 upcoming draw, at least 2 finished draws with tickets for the debug user.
+- Debug identity resolution lives in `Features/Auth/LocalDebugMode.cs`; if auth flow changes, keep auth/tickets/timeline endpoints consistent with the same debug user contract.
+- Client bootstrap in `wwwroot/js/miniapp.js` must continue to fall back to local debug when Telegram `initData` is missing (normal browser), then call auth before timeline/purchase APIs.
+- Admin debug pages (`Pages/Admin/Draws.cshtml.cs`, `Pages/Admin/Users/Index.cshtml.cs`) should continue to load against seeded debug data so admin actions visibly affect `/app` in local runs.
+- For any feature touching auth, timeline, tickets, or draws, verify both modes before merging: (1) local-debug browser at `/app`; (2) normal Telegram/production path.
+
 ## Deployment
 - app is running on DigitalOcean
 - project uses GitHub Actions for CD via `.github/workflows/deploy-droplet.yml`; on push to `main`/`master` it SSHes to the droplet, pulls the repo, and runs `docker compose -f docker-compose.app.yml up -d --build` on the server.

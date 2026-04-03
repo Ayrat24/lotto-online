@@ -9,13 +9,28 @@ public static class TelegramAuthEndpoints
     {
         endpoints.MapPost("/api/auth/telegram", async (
             TelegramAuthRequest req,
+            HttpContext http,
             IConfiguration config,
             IWebHostEnvironment env,
             ILoggerFactory loggerFactory,
+            AppDbContext db,
             IUserService users,
             CancellationToken ct) =>
         {
             var logger = loggerFactory.CreateLogger("TelegramAuth");
+
+            if (LocalDebugMode.TryGetDebugTelegramUserId(http, config, env, out var debugTelegramUserId))
+            {
+                await LocalDebugSeed.EnsureSeededAsync(db, debugTelegramUserId, ct);
+                var debugUser = await users.TouchUserAsync(debugTelegramUserId, ct);
+                return Results.Ok(new TelegramAuthResult(
+                    Ok: true,
+                    TelegramUserId: debugUser.TelegramUserId,
+                    Username: "debug-user",
+                    FirstName: "Debug",
+                    LastName: "User",
+                    Error: null));
+            }
 
             var botToken = config["BotToken"];
             if (string.IsNullOrWhiteSpace(botToken))

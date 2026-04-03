@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using MiniApp.Admin;
 using MiniApp.Data;
+using MiniApp.Features.Auth;
 using MiniApp.Features.Draws;
 
 namespace MiniApp.Pages.Admin;
@@ -20,10 +21,14 @@ public sealed class DrawsModel : PageModel
         long TicketCount);
 
     private readonly AppDbContext _db;
+    private readonly IConfiguration _config;
+    private readonly IWebHostEnvironment _env;
 
-    public DrawsModel(AppDbContext db)
+    public DrawsModel(AppDbContext db, IConfiguration config, IWebHostEnvironment env)
     {
         _db = db;
+        _config = config;
+        _env = env;
     }
 
     public IReadOnlyList<AdminDrawRow> Draws { get; private set; } = Array.Empty<AdminDrawRow>();
@@ -32,11 +37,13 @@ public sealed class DrawsModel : PageModel
 
     public async Task OnGetAsync(CancellationToken ct)
     {
+        await EnsureDebugSeedAsync(ct);
         await LoadAsync(ct);
     }
 
     public async Task<IActionResult> OnPostCreateAsync(decimal prizePool, CancellationToken ct)
     {
+        await EnsureDebugSeedAsync(ct);
         try
         {
             var draw = await DrawManagement.CreateDrawAsync(_db, prizePool, ct);
@@ -55,6 +62,7 @@ public sealed class DrawsModel : PageModel
 
     public async Task<IActionResult> OnPostUpdateAsync(long id, decimal prizePool, string state, CancellationToken ct)
     {
+        await EnsureDebugSeedAsync(ct);
         var draw = await _db.Draws.SingleOrDefaultAsync(x => x.Id == id, ct);
         if (draw is null)
         {
@@ -90,6 +98,7 @@ public sealed class DrawsModel : PageModel
 
     public async Task<IActionResult> OnPostExecuteAsync(long id, CancellationToken ct)
     {
+        await EnsureDebugSeedAsync(ct);
         var draw = await _db.Draws.SingleOrDefaultAsync(x => x.Id == id, ct);
         if (draw is null)
         {
@@ -142,5 +151,13 @@ public sealed class DrawsModel : PageModel
                 draw.CreatedAtUtc,
                 ticketCounts.GetValueOrDefault(draw.Id)))
             .ToArray();
+    }
+
+    private async Task EnsureDebugSeedAsync(CancellationToken ct)
+    {
+        if (!LocalDebugMode.TryGetDebugTelegramUserId(HttpContext, _config, _env, out var debugTelegramUserId))
+            return;
+
+        await LocalDebugSeed.EnsureSeededAsync(_db, debugTelegramUserId, ct);
     }
 }

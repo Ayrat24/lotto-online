@@ -17,8 +17,15 @@ using Telegram.Bot.Types.ReplyMarkups;
 var builder = WebApplication.CreateBuilder(args);
 
 // ===== Config =====
+var localDebugRequested = builder.Configuration.GetValue<bool>("LocalDebug:Enabled");
+if (localDebugRequested && !builder.Environment.IsDevelopment())
+    throw new InvalidOperationException("LocalDebug is only allowed in Development.");
+
+var localDebugEnabled = LocalDebugMode.IsEnabled(builder.Configuration, builder.Environment);
+var telegramEnabled = !localDebugEnabled;
+
 var token = builder.Configuration["BotToken"];
-if (string.IsNullOrWhiteSpace(token) || token == "YOUR_BOT_TOKEN")
+if (telegramEnabled && (string.IsNullOrWhiteSpace(token) || token == "YOUR_BOT_TOKEN"))
     throw new InvalidOperationException("Set BotToken in appsettings.json (or User Secrets) to your real Telegram token.");
 
 var botMode = builder.Configuration["BotMode"]; // Polling | Webhook
@@ -36,28 +43,34 @@ builder.Services.AddAdminArea(builder.Configuration);
 // PostgreSQL + EF Core (modular)
 builder.Services.AddPostgresDatabase(builder.Configuration);
 
-builder.Services
-    .AddHttpClient("tg")
-    .RemoveAllLoggers()
-    .AddTypedClient(httpClient => new TelegramBotClient(token, httpClient));
-
-builder.Services.AddSingleton(new BotSettings
+if (telegramEnabled)
 {
-    Mode = botMode,
-    WebAppUrl = webAppUrl
-});
+    builder.Services
+        .AddHttpClient("tg")
+        .RemoveAllLoggers()
+        .AddTypedClient(httpClient => new TelegramBotClient(token!, httpClient));
 
-// Polling runs in-process and doesn't need any inbound traffic.
-// In Webhook mode we don't start polling, otherwise Telegram will respond with 409 conflicts.
-if (string.Equals(botMode, "Polling", StringComparison.OrdinalIgnoreCase))
-{
-    builder.Services.AddHostedService<TelegramPollingService>();
+    builder.Services.AddSingleton(new BotSettings
+    {
+        Mode = botMode,
+        WebAppUrl = webAppUrl
+    });
+
+    // Polling runs in-process and doesn't need any inbound traffic.
+    // In Webhook mode we don't start polling, otherwise Telegram will respond with 409 conflicts.
+    if (string.Equals(botMode, "Polling", StringComparison.OrdinalIgnoreCase))
+    {
+        builder.Services.AddHostedService<TelegramPollingService>();
+    }
 }
 
 var app = builder.Build();
 
 // Make DI available to the bot update handler.
-BotUpdateHandler.Services = app.Services;
+if (telegramEnabled)
+{
+    BotUpdateHandler.Services = app.Services;
+}
 
 // Auto-apply EF Core migrations on startup.
 // Default: enabled in Development, disabled in other environments.
@@ -72,8 +85,11 @@ if (autoMigrate)
     try
     {
         logger.LogInformation("Applying database migrations (AutoMigrate enabled)...");
-        await app.ApplyMigrationsAsync();
-        logger.LogInformation("Database migrations applied.");
+        var migrationsApplied = await app.ApplyMigrationsAsync();
+        if (migrationsApplied)
+            logger.LogInformation("Database migrations applied.");
+        else
+            logger.LogInformation("Skipping database migrations for non-relational local debug provider.");
     }
     catch (Exception ex)
     {
@@ -100,6 +116,25 @@ app.UseStaticFiles(new StaticFileOptions { ContentTypeProvider = provider });
 app.UseRouting();
 
 app.UseAuthentication();
+
+if (localDebugEnabled)
+{
+    app.Use(async (http, next) =>
+    {
+        if (LocalDebugMode.IsLocalRequest(http)
+            && !(http.User.Identity?.IsAuthenticated ?? false)
+            && (http.Request.Path.StartsWithSegments("/Admin", StringComparison.OrdinalIgnoreCase)
+                || http.Request.Path.StartsWithSegments("/api/admin", StringComparison.OrdinalIgnoreCase)))
+        {
+            var debugAdminUsername = LocalDebugMode.GetAdminUsername(app.Configuration);
+            await AdminAuth.SignInAdminAsync(http, debugAdminUsername);
+            http.User = AdminAuth.CreateAdminPrincipal(debugAdminUsername);
+        }
+
+        await next();
+    });
+}
+
 app.UseAuthorization();
 
 app.MapRazorPages();
@@ -113,7 +148,54 @@ app.MapDrawsEndpoints();
 app.MapTimelineEndpoints();
 
 // Small health check / default landing page
-app.MapGet("/", () => Results.Redirect("/Admin"));
+app.MapGet("/", () => Results.Redirect(localDebugEnabled ? "/local-debug" : "/Admin"));
+
+if (localDebugEnabled)
+{
+    app.MapGet("/local-debug", (HttpContext http) =>
+    {
+        if (!LocalDebugMode.IsLocalRequest(http))
+            return Results.NotFound();
+
+        const string html = """
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MiniApp Local Debug</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 24px; max-width: 720px; margin: 0 auto; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+    a, button { padding: 10px 14px; border: 1px solid #ccc; border-radius: 8px; text-decoration: none; background: #fff; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Local Debug Mode</h1>
+  <p>Opening mini app and admin pages for local development.</p>
+  <div class="row">
+    <a href="/app" target="_self">Open Mini App</a>
+    <a href="/Admin" target="_blank" rel="noopener">Open Admin</a>
+    <button id="openBoth" type="button">Open Both</button>
+  </div>
+  <script>
+    (function () {
+      var btn = document.getElementById('openBoth');
+      if (!btn) return;
+      btn.addEventListener('click', function () {
+        try { window.open('/Admin', '_blank', 'noopener'); } catch (e) {}
+        window.location.href = '/app';
+      });
+      btn.click();
+    })();
+  </script>
+</body>
+</html>
+""";
+
+        return Results.Content(html, "text/html");
+    });
+}
 
 // ===== Telegram bot endpoints =====
 static bool IsValidPublicHttpsBaseUrl(string? url)
@@ -123,62 +205,65 @@ static bool IsValidPublicHttpsBaseUrl(string? url)
        && !url.Contains("127.0.0.1", StringComparison.OrdinalIgnoreCase)
        && !url.Contains("[::1]", StringComparison.OrdinalIgnoreCase);
 
-// Set the webhook (call this after setting BotWebAppUrl to your ngrok/cloudflared https URL)
-app.MapGet("/bot/setWebhook", async (TelegramBotClient bot, BotSettings settings, CancellationToken ct) =>
+if (telegramEnabled)
 {
-    if (!string.Equals(settings.Mode, "Webhook", StringComparison.OrdinalIgnoreCase))
-        return Results.BadRequest("Set BotMode=Webhook first.");
-
-    var baseUrl = settings.WebAppUrl;
-    if (!IsValidPublicHttpsBaseUrl(baseUrl))
-        return Results.BadRequest("Set BotWebAppUrl to your public https:// URL first (ngrok/cloudflared). Do not use localhost.");
-
-    var webhookUrl = baseUrl!.TrimEnd('/') + "/bot";
-    await bot.SetWebhook(webhookUrl, cancellationToken: ct);
-    return Results.Text($"Webhook set to {webhookUrl}");
-});
-
-// Show current webhook info (useful for debugging)
-app.MapGet("/bot/webhookInfo", async (TelegramBotClient bot, CancellationToken ct) =>
-{
-    var info = await bot.GetWebhookInfo(ct);
-    return Results.Ok(info);
-});
-
-// Delete webhook (switching back to polling etc.)
-app.MapGet("/bot/deleteWebhook", async (TelegramBotClient bot, CancellationToken ct) =>
-{
-    await bot.DeleteWebhook(dropPendingUpdates: false, cancellationToken: ct);
-    return Results.Text("Webhook deleted");
-});
-
-// Webhook receiver endpoint (Telegram will POST updates here in Webhook mode)
-app.MapPost("/bot", async (
-    [FromBody] Update update,
-    TelegramBotClient bot,
-    BotSettings settings,
-    ILoggerFactory loggerFactory,
-    CancellationToken ct) =>
-{
-    var logger = loggerFactory.CreateLogger("TelegramWebhook");
-
-    if (!string.Equals(settings.Mode, "Webhook", StringComparison.OrdinalIgnoreCase))
+    // Set the webhook (call this after setting BotWebAppUrl to your ngrok/cloudflared https URL)
+    app.MapGet("/bot/setWebhook", async (TelegramBotClient bot, BotSettings settings, CancellationToken ct) =>
     {
-        logger.LogWarning("Received /bot POST but BotMode is {Mode}. Ignoring.", settings.Mode);
-        return Results.Ok();
-    }
+        if (!string.Equals(settings.Mode, "Webhook", StringComparison.OrdinalIgnoreCase))
+            return Results.BadRequest("Set BotMode=Webhook first.");
 
-    try
+        var baseUrl = settings.WebAppUrl;
+        if (!IsValidPublicHttpsBaseUrl(baseUrl))
+            return Results.BadRequest("Set BotWebAppUrl to your public https:// URL first (ngrok/cloudflared). Do not use localhost.");
+
+        var webhookUrl = baseUrl!.TrimEnd('/') + "/bot";
+        await bot.SetWebhook(webhookUrl, cancellationToken: ct);
+        return Results.Text($"Webhook set to {webhookUrl}");
+    });
+
+    // Show current webhook info (useful for debugging)
+    app.MapGet("/bot/webhookInfo", async (TelegramBotClient bot, CancellationToken ct) =>
     {
-        await BotUpdateHandler.HandleUpdate(update, bot, settings, logger, ct);
-        return Results.Ok();
-    }
-    catch (Exception ex)
+        var info = await bot.GetWebhookInfo(ct);
+        return Results.Ok(info);
+    });
+
+    // Delete webhook (switching back to polling etc.)
+    app.MapGet("/bot/deleteWebhook", async (TelegramBotClient bot, CancellationToken ct) =>
     {
-        logger.LogError(ex, "Failed to handle update");
-        return Results.Ok();
-    }
-});
+        await bot.DeleteWebhook(dropPendingUpdates: false, cancellationToken: ct);
+        return Results.Text("Webhook deleted");
+    });
+
+    // Webhook receiver endpoint (Telegram will POST updates here in Webhook mode)
+    app.MapPost("/bot", async (
+        [FromBody] Update update,
+        TelegramBotClient bot,
+        BotSettings settings,
+        ILoggerFactory loggerFactory,
+        CancellationToken ct) =>
+    {
+        var logger = loggerFactory.CreateLogger("TelegramWebhook");
+
+        if (!string.Equals(settings.Mode, "Webhook", StringComparison.OrdinalIgnoreCase))
+        {
+            logger.LogWarning("Received /bot POST but BotMode is {Mode}. Ignoring.", settings.Mode);
+            return Results.Ok();
+        }
+
+        try
+        {
+            await BotUpdateHandler.HandleUpdate(update, bot, settings, logger, ct);
+            return Results.Ok();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to handle update");
+            return Results.Ok();
+        }
+    });
+}
 
 app.Run();
 

@@ -33,6 +33,16 @@ public sealed class DatabaseResetService
         await _gate.WaitAsync(ct);
         try
         {
+            if (string.IsNullOrWhiteSpace(_connectionString))
+                throw new InvalidOperationException("Database reset requires a PostgreSQL connection string.");
+
+            await using (var providerScope = _scopeFactory.CreateAsyncScope())
+            {
+                var providerDb = providerScope.ServiceProvider.GetRequiredService<AppDbContext>();
+                if (!providerDb.Database.IsRelational())
+                    throw new InvalidOperationException("Database reset is only available for relational database providers.");
+            }
+
             _logger.LogWarning("Admin database reset started: dropping and recreating public schema.");
 
             await using (var connection = new NpgsqlConnection(_connectionString))

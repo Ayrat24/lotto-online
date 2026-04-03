@@ -31,7 +31,6 @@
   var lastStateSig = null;
   var latestState = { currentDraw: null, currentTickets: [], history: [] };
   var initData = null;
-  var devTelegramUserId = null;
 
   function setPurchaseStatus(text) {
     if (purchaseStatusEl) purchaseStatusEl.textContent = text || '';
@@ -273,26 +272,6 @@
     });
   }
 
-  function getOrCreateDevTelegramUserId() {
-    try {
-      var key = 'miniapp.devTelegramUserId';
-      var existing = localStorage.getItem(key);
-      if (existing && /^\d+$/.test(existing)) return existing;
-
-      var n = Math.floor(100000000 + Math.random() * 900000000);
-      localStorage.setItem(key, String(n));
-      return String(n);
-    } catch (e) {
-      return String(Math.floor(100000000 + Math.random() * 900000000));
-    }
-  }
-
-  function getDevHeadersIfNeeded() {
-    if (initData) return null;
-    if (!devTelegramUserId) return null;
-    return { 'X-Dev-TelegramUserId': devTelegramUserId };
-  }
-
   function computeStateSig(state) {
     try {
       return JSON.stringify({
@@ -336,11 +315,11 @@
   }
 
   function refreshState() {
-    if (!initData && !devTelegramUserId) return;
+    if (!initData) return;
 
     setTimelineStatus('loading...');
 
-    return postJson('/api/timeline', { initData: initData || '' }, getDevHeadersIfNeeded())
+    return postJson('/api/timeline', { initData: initData || '' }, null)
       .then(function (res) {
         if (!(res && res.ok && res.state)) return;
 
@@ -376,7 +355,7 @@
   }
 
   function purchaseTicket() {
-    if (!initData && !devTelegramUserId) return;
+    if (!initData) return;
     if (!latestState.currentDraw || latestState.currentDraw.state !== 'active') {
       setPurchaseStatus('There is no active draw right now.');
       return;
@@ -385,7 +364,7 @@
     if (purchaseBtn) purchaseBtn.disabled = true;
     setPurchaseStatus('Buying ticket...');
 
-    postJson('/api/tickets/purchase', { initData: initData || '' }, getDevHeadersIfNeeded())
+    postJson('/api/tickets/purchase', { initData: initData || '' }, null)
       .then(function (res) {
         if (res && res.ok && res.ticket) {
           highlightTicketId = res.ticket.id;
@@ -417,10 +396,26 @@
   renderCurrentTickets([]);
   renderHistory([]);
 
-  if (!window.Telegram || !Telegram.WebApp) {
-    devTelegramUserId = getOrCreateDevTelegramUserId();
-    refreshState();
-    startPolling();
+  var hasTelegramInitData = false;
+  try {
+    hasTelegramInitData = !!(window.Telegram && Telegram.WebApp && Telegram.WebApp.initData && Telegram.WebApp.initData.length > 0);
+  } catch (e) {
+    hasTelegramInitData = false;
+  }
+
+  if (!hasTelegramInitData) {
+    initData = 'local-debug';
+
+    postJson('/api/auth/telegram', { initData: initData })
+      .then(function () { return refreshState(); })
+      .catch(function (err) {
+        console.warn('Failed local debug auth', err);
+        setPurchaseStatus(err.message);
+      })
+      .finally(function () {
+        startPolling();
+      });
+
     return;
   }
 
@@ -437,14 +432,12 @@
 
   try {
     initData = Telegram.WebApp.initData;
-    if (initData && initData.length > 0) {
-      postJson('/api/auth/telegram', { initData: initData })
-        .then(function () { return refreshState(); })
-        .catch(function (err) {
-          console.warn('Failed to auth with Telegram initData', err);
-          setPurchaseStatus(err.message);
-        });
-    }
+    postJson('/api/auth/telegram', { initData: initData })
+      .then(function () { return refreshState(); })
+      .catch(function (err) {
+        console.warn('Failed to auth with Telegram initData', err);
+        setPurchaseStatus(err.message);
+      });
   } catch (e) {
     console.warn('Telegram auth initData error', e);
   }

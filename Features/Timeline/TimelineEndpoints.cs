@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using MiniApp.Data;
+using MiniApp.Features.Auth;
 using MiniApp.Features.Draws;
 using MiniApp.Features.Tickets;
 using MiniApp.TelegramLogin;
@@ -21,12 +22,10 @@ public static class TimelineEndpoints
         {
             long telegramUserId;
 
-            // Dev shortcut used by the JS when not running inside Telegram.
-            if (env.IsDevelopment() && http.Request.Headers.TryGetValue("X-Dev-TelegramUserId", out var devTgUserIdStr)
-                && long.TryParse(devTgUserIdStr.ToString(), out var devTgUserId)
-                && devTgUserId > 0)
+            if (LocalDebugMode.TryGetDebugTelegramUserId(http, config, env, out var localDebugUserId))
             {
-                telegramUserId = devTgUserId;
+                await LocalDebugSeed.EnsureSeededAsync(db, localDebugUserId, ct);
+                telegramUserId = localDebugUserId;
             }
             else
             {

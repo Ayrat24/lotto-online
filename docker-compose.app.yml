@@ -10,6 +10,7 @@ services:
         condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Production
+      LocalDebug__Enabled: "false"
       # Use double-underscore for nested config (maps to Database:ConnectionString)
       Database__ConnectionString: Host=db;Port=5432;Database=${POSTGRES_DB:-miniapp};Username=${POSTGRES_USER:-miniapp};Password=${POSTGRES_PASSWORD}
       Database__AutoMigrate: "true"

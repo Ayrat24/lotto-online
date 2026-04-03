@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using MiniApp.Admin;
 using MiniApp.Data;
+using MiniApp.Features.Auth;
 
 namespace MiniApp.Pages.Admin.Users;
 
@@ -11,16 +12,23 @@ namespace MiniApp.Pages.Admin.Users;
 public sealed class IndexModel : PageModel
 {
     private readonly AppDbContext _db;
+    private readonly IConfiguration _config;
+    private readonly IWebHostEnvironment _env;
 
-    public IndexModel(AppDbContext db)
+    public IndexModel(AppDbContext db, IConfiguration config, IWebHostEnvironment env)
     {
         _db = db;
+        _config = config;
+        _env = env;
     }
 
     public List<MiniAppUser> Users { get; private set; } = new();
 
     public async Task OnGetAsync()
     {
+        if (LocalDebugMode.TryGetDebugTelegramUserId(HttpContext, _config, _env, out var debugTelegramUserId))
+            await LocalDebugSeed.EnsureSeededAsync(_db, debugTelegramUserId, HttpContext.RequestAborted);
+
         Users = await _db.Users
             .OrderByDescending(x => x.LastSeenAtUtc)
             .Take(200)
