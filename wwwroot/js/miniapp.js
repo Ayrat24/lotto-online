@@ -14,6 +14,8 @@
   var currentDrawIdEl = document.getElementById('currentDrawId');
   var currentDrawPrizePoolEl = document.getElementById('currentDrawPrizePool');
   var currentDrawCreatedAtEl = document.getElementById('currentDrawCreatedAt');
+  var jackpotAmountEl = document.getElementById('jackpotAmount');
+  var jackpotSubtitleEl = document.getElementById('jackpotSubtitle');
   var currentDrawNumbersWrapEl = document.getElementById('currentDrawNumbersWrap');
   var currentDrawNumbersEl = document.getElementById('currentDrawNumbers');
 
@@ -42,7 +44,7 @@
 
   function formatUtc(iso) {
     try {
-      return new Date(iso).toISOString().replace('T', ' ').replace('Z', ' UTC');
+      return new Date(iso).toLocaleString();
     } catch (e) {
       return String(iso || '');
     }
@@ -51,7 +53,13 @@
   function formatPrizePool(value) {
     var amount = Number(value || 0);
     if (!Number.isFinite(amount)) amount = 0;
-    return amount.toFixed(2);
+    return amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function formatJackpot(value) {
+    var amount = Number(value || 0);
+    if (!Number.isFinite(amount)) amount = 0;
+    return '$' + Math.round(amount).toLocaleString();
   }
 
   function parseNumbers(numbersStr) {
@@ -173,6 +181,11 @@
       currentDrawStateBadgeEl.className = 'state-badge state-badge-muted';
       currentDrawEmptyEl.hidden = false;
       currentDrawContentEl.hidden = true;
+      if (currentDrawIdEl) currentDrawIdEl.textContent = 'PowerBall Global';
+      if (currentDrawPrizePoolEl) currentDrawPrizePoolEl.textContent = '$0.00';
+      if (currentDrawCreatedAtEl) currentDrawCreatedAtEl.textContent = 'Ends in --:--:--';
+      if (jackpotAmountEl) jackpotAmountEl.textContent = '$0';
+      if (jackpotSubtitleEl) jackpotSubtitleEl.textContent = 'The next draw is coming soon. Get your tickets now.';
       if (purchaseBtn) {
         purchaseBtn.disabled = true;
         purchaseBtn.title = 'No active draw available.';
@@ -185,9 +198,13 @@
     currentDrawEmptyEl.hidden = true;
     currentDrawContentEl.hidden = false;
 
-    if (currentDrawIdEl) currentDrawIdEl.textContent = '#' + draw.id;
-    if (currentDrawPrizePoolEl) currentDrawPrizePoolEl.textContent = formatPrizePool(draw.prizePool);
-    if (currentDrawCreatedAtEl) currentDrawCreatedAtEl.textContent = formatUtc(draw.createdAtUtc);
+    if (currentDrawIdEl) currentDrawIdEl.textContent = 'PowerBall Global • #' + draw.id;
+    if (currentDrawPrizePoolEl) currentDrawPrizePoolEl.textContent = '$' + formatPrizePool(draw.prizePool);
+    if (currentDrawCreatedAtEl) currentDrawCreatedAtEl.textContent = 'Opened ' + formatUtc(draw.createdAtUtc);
+    if (jackpotAmountEl) jackpotAmountEl.textContent = formatJackpot(draw.prizePool);
+    if (jackpotSubtitleEl) jackpotSubtitleEl.textContent = draw.state === 'active'
+      ? 'The draw is live. Don\'t miss your chance to become a multi-millionaire!'
+      : 'The next draw is coming soon. Get your tickets now.';
 
     var hasNumbers = !!(draw.numbers && String(draw.numbers).length > 0);
     if (currentDrawNumbersWrapEl) currentDrawNumbersWrapEl.hidden = !hasNumbers;
@@ -317,7 +334,7 @@
   function refreshState() {
     if (!initData) return;
 
-    setTimelineStatus('loading...');
+    setTimelineStatus('Loading timeline...');
 
     return postJson('/api/timeline', { initData: initData || '' }, null)
       .then(function (res) {
@@ -422,8 +439,8 @@
   startPolling();
 
   try {
-    Telegram.WebApp.setHeaderColor('#ee964b');
-    Telegram.WebApp.setBackgroundColor('#ee964b');
+    Telegram.WebApp.setHeaderColor('#0b1019');
+    Telegram.WebApp.setBackgroundColor('#0b1019');
   } catch (e) {
   }
 

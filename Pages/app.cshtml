@@ -8,9 +8,8 @@
   <meta name="robots" content="noindex, nofollow" />
   <title>Lotto</title>
 
-  <!-- Use sandy-brown as system/browser theme color -->
-  <meta name="theme-color" content="#ee964b" />
-  <meta name="msapplication-navbutton-color" content="#ee964b" />
+  <meta name="theme-color" content="#0b1019" />
+  <meta name="msapplication-navbutton-color" content="#0b1019" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
@@ -20,40 +19,41 @@
 <body>
   <main class="container app-shell">
     <section id="lotteryTabPanel" class="tab-panel stack">
-      <div class="banner card">
-        <div class="banner-inner">
-          <div class="eyebrow">Lottery</div>
-          <div class="banner-title">Join the current draw and track your tickets in one place.</div>
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-icon">⚡</div>
+          <div class="brand-title">LottoVibe</div>
         </div>
-      </div>
+        <div class="balance-block">
+          <div class="balance-label">Balance</div>
+          <div class="balance-value" id="currentDrawPrizePool">$0.00</div>
+        </div>
+      </header>
+
+      <section class="card jackpot-card">
+        <div class="jackpot-top">
+          <span class="jackpot-chip">Jackpot alert</span>
+          <span class="jackpot-time" id="currentDrawCreatedAt">Ends in --:--:--</span>
+        </div>
+        <div class="jackpot-amount" id="jackpotAmount">$0.00</div>
+        <p class="jackpot-copy" id="jackpotSubtitle">The next draw is coming soon. Get your tickets now.</p>
+      </section>
 
       <section id="currentDrawCard" class="card stack current-draw-card">
+        <div class="draw-accent"></div>
         <div class="section-header">
           <div>
-            <div class="section-title">Current draw</div>
-            <div class="section-subtitle">Buying is available only while a draw is active.</div>
+            <div class="section-title" id="currentDrawId">PowerBall Global</div>
+            <div class="section-subtitle">Next draw and ticket purchase</div>
           </div>
-          <div id="currentDrawStateBadge" class="state-badge">waiting</div>
+          <div id="currentDrawStateBadge" class="state-badge state-badge-muted">waiting</div>
         </div>
 
-        <div id="currentDrawEmpty" class="empty-card">
-          There is no active draw right now. Ask the admin to create or activate one.
-        </div>
+        <div id="currentDrawEmpty" class="empty-card">There is no active draw right now.</div>
 
         <div id="currentDrawContent" class="stack" hidden>
-          <div class="stats-grid">
-            <div class="stat-card">
-              <div class="stat-label">Draw ID</div>
-              <div id="currentDrawId" class="stat-value">—</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">Prize pool</div>
-              <div id="currentDrawPrizePool" class="stat-value">—</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">Created</div>
-              <div id="currentDrawCreatedAt" class="stat-value stat-value-small">—</div>
-            </div>
+          <div class="draw-meta-row">
+            <span>Tickets start at <strong>$2.00</strong> per entry.</span>
           </div>
 
           <div id="currentDrawNumbersWrap" class="stack" hidden>
@@ -61,21 +61,17 @@
             <div id="currentDrawNumbers"></div>
           </div>
         </div>
-      </section>
 
-      <section class="stack">
-        <button id="purchaseTicketBtn" type="button">Buy ticket</button>
+        <button id="purchaseTicketBtn" type="button">Purchase ticket</button>
         <div id="purchaseStatus" class="muted"></div>
       </section>
 
       <section class="stack">
-        <div class="section-header">
-          <div>
-            <div class="section-title">My tickets for current draw</div>
-            <div id="timelineStatus" class="section-subtitle"></div>
-          </div>
+        <div class="section-header tickets-header">
+          <div class="section-title">Active tickets</div>
+          <button id="openHistoryBtn" type="button" class="link-btn">View all</button>
         </div>
-
+        <div id="timelineStatus" class="section-subtitle"></div>
         <div id="currentTicketsEmpty" class="empty-card">You have not bought any tickets for the current draw yet.</div>
         <div id="currentTicketsList" class="ticket-list"></div>
       </section>
@@ -83,9 +79,8 @@
 
     <section id="accountTabPanel" class="tab-panel stack" hidden>
       <div class="card stack">
-        <div class="section-title">Account</div>
-        <div class="section-subtitle">Open your personal draw and ticket history.</div>
-        <button id="openHistoryBtn" type="button">Open history</button>
+        <div class="section-title">My tickets</div>
+        <div class="section-subtitle">Tap View all in Active tickets for the complete history.</div>
       </div>
     </section>
   </main>
@@ -107,8 +102,11 @@
   </div>
 
   <nav class="tabbar" aria-label="Bottom tabs">
-    <button id="lotteryTabBtn" type="button" class="tabbar-btn tabbar-btn-active">Lottery</button>
-    <button id="accountTabBtn" type="button" class="tabbar-btn">Account</button>
+    <button id="lotteryTabBtn" type="button" class="tabbar-btn tabbar-btn-active">Home</button>
+    <button id="accountTabBtn" type="button" class="tabbar-btn">My Tickets</button>
+    <button type="button" class="tabbar-btn" disabled>Results</button>
+    <button type="button" class="tabbar-btn" disabled>History</button>
+    <button type="button" class="tabbar-btn" disabled>Profile</button>
   </nav>
 
   <script src="/js/miniapp.js"></script>
