@@ -53,6 +53,16 @@ body.sheet-open {
   font-size: 0.84rem;
 }
 
+.debug-mode-badge {
+  border-radius: 10px;
+  border: 1px solid rgba(241, 190, 55, 0.4);
+  background: rgba(241, 190, 55, 0.12);
+  color: #ffe598;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 8px 10px;
+}
+
 .card {
   background: linear-gradient(180deg, #121a29, #0f1624);
   border: 1px solid var(--line-soft);
@@ -325,12 +335,15 @@ button:disabled {
 
 .ticket-picker-panel {
   display: grid;
+  grid-template-rows: auto 1fr auto auto;
   gap: 14px;
-  width: 100vw;
-  max-width: none;
+  width: 100%;
+  max-width: 100%;
   margin: 0;
-  min-height: 50vh;
-  max-height: 50vh;
+  min-height: clamp(300px, 50dvh, 560px);
+  height: clamp(300px, 50dvh, 560px);
+  max-height: calc(100dvh - env(safe-area-inset-bottom, 0px) - 8px);
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   border-radius: 18px 18px 0 0;
 }
 
@@ -338,6 +351,7 @@ button:disabled {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
+  min-height: 0;
 }
 
 .picker-slot {
@@ -346,13 +360,16 @@ button:disabled {
   border-radius: 14px;
   padding: 8px;
   display: grid;
+  grid-template-rows: auto 1fr auto;
   gap: 8px;
   justify-items: center;
+  min-height: 0;
 }
 
 .picker-arrow {
   width: 100%;
-  min-height: 34px;
+  min-height: clamp(28px, 4.8dvh, 38px);
+  padding: 8px;
   border-radius: 10px;
   font-size: 1.2rem;
   font-weight: 700;
@@ -363,13 +380,14 @@ button:disabled {
 
 .picker-value {
   width: 100%;
-  min-height: 56px;
+  min-height: 0;
+  height: 100%;
   border-radius: 12px;
   display: grid;
   place-items: center;
   border: 1px solid rgba(33, 144, 255, 0.28);
   background: rgba(33, 144, 255, 0.1);
-  font-size: 1.5rem;
+  font-size: clamp(1.1rem, 2.2dvh, 1.5rem);
   font-weight: 900;
   user-select: none;
   touch-action: pan-y;
@@ -384,6 +402,22 @@ button:disabled {
 
 .picker-value-number {
   font-variant-numeric: tabular-nums;
+}
+
+@media (max-height: 720px) {
+  .ticket-picker-panel {
+    min-height: 56dvh;
+    height: 56dvh;
+  }
+
+  .ticket-picker-grid {
+    gap: 6px;
+  }
+
+  .picker-slot {
+    padding: 5px;
+    gap: 6px;
+  }
 }
 
 .tickets-header .section-title {

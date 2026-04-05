@@ -153,9 +153,8 @@ public static class TicketsEndpoints
             }
         }
 
-        var arr = set.ToArray();
-        Array.Sort(arr);
-        normalizedNumbers = string.Join(',', arr);
+        // Keep the original user-selected order for player-facing views.
+        normalizedNumbers = string.Join(',', selectedNumbers);
         return true;
     }
 }

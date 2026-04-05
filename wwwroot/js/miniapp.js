@@ -28,6 +28,7 @@
   var closeHistoryBtn = document.getElementById('closeHistoryBtn');
   var historyEmptyEl = document.getElementById('historyEmpty');
   var historyListEl = document.getElementById('historyList');
+  var debugModeBadgeEl = document.getElementById('debugModeBadge');
 
   var ticketPickerSheetEl = document.getElementById('ticketPickerSheet');
   var ticketPickerBackdropEl = document.getElementById('ticketPickerBackdrop');
@@ -52,6 +53,14 @@
 
   function setTimelineStatus(text) {
     if (timelineStatusEl) timelineStatusEl.textContent = text || '';
+  }
+
+  function setDebugModeBadge(text) {
+    if (!debugModeBadgeEl) return;
+
+    var value = String(text || '').trim();
+    debugModeBadgeEl.hidden = value.length === 0;
+    debugModeBadgeEl.textContent = value;
   }
 
   function formatUtc(iso) {
@@ -632,6 +641,16 @@
   renderHistory([]);
   buildTicketPickerSlots();
 
+  var search = '';
+  try {
+    search = window.location && window.location.search ? window.location.search : '';
+  } catch (e) {
+    search = '';
+  }
+
+  var query = new URLSearchParams(search || '');
+  var forceLocalDebug = query.get('debug') === '1' || query.get('mode') === 'local-debug';
+
   var hasTelegramInitData = false;
   try {
     hasTelegramInitData = !!(window.Telegram && Telegram.WebApp && Telegram.WebApp.initData && Telegram.WebApp.initData.length > 0);
@@ -639,7 +658,11 @@
     hasTelegramInitData = false;
   }
 
-  if (!hasTelegramInitData) {
+  if (forceLocalDebug || !hasTelegramInitData) {
+    setDebugModeBadge(forceLocalDebug
+      ? 'Client debug mode: forced local debug via query parameter.'
+      : 'Client debug mode: Telegram initData is missing, using local debug.');
+
     initData = 'local-debug';
 
     postJson('/api/auth/telegram', { initData: initData })
@@ -654,6 +677,8 @@
 
     return;
   }
+
+  setDebugModeBadge('');
 
   startPolling();
 
