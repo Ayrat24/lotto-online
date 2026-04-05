@@ -57,7 +57,7 @@ public sealed class EditModel : PageModel
     [TempData]
     public bool? FlashIsError { get; set; }
 
-    public async Task OnGetAsync(long id, int page = 1, CancellationToken ct = default)
+    public async Task OnGetAsync(long id, int ticketPage = 1, CancellationToken ct = default)
     {
         await EnsureDebugSeedAsync(ct);
 
@@ -79,10 +79,10 @@ public sealed class EditModel : PageModel
             StatusIsError = true;
         }
 
-        await LoadTicketsAsync(id, page, ct);
+        await LoadTicketsAsync(id, ticketPage, ct);
     }
 
-    public async Task<IActionResult> OnPostAsync(long id, int page = 1, CancellationToken ct = default)
+    public async Task<IActionResult> OnPostAsync(long id, int ticketPage = 1, CancellationToken ct = default)
     {
         await EnsureDebugSeedAsync(ct);
 
@@ -95,7 +95,7 @@ public sealed class EditModel : PageModel
             StatusMessage = "State must be active or upcoming.";
             StatusIsError = true;
             SelectedDraw = draw;
-            await LoadTicketsAsync(id, page, ct);
+            await LoadTicketsAsync(id, ticketPage, ct);
             return Page();
         }
 
@@ -111,7 +111,7 @@ public sealed class EditModel : PageModel
             StatusMessage = ex.Message;
             StatusIsError = true;
             SelectedDraw = draw;
-            await LoadTicketsAsync(id, page, ct);
+            await LoadTicketsAsync(id, ticketPage, ct);
             return Page();
         }
     }
