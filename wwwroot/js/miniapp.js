@@ -54,6 +54,8 @@
   var pickerWheelResizeBound = false;
   var pickerArrowHoldState = [];
   var wheelOrderDescending = true;
+  var ticketPickerBuilt = false;
+  var ticketPickerCloseTimer = null;
 
   function setPurchaseStatus(text) {
     if (purchaseStatusEl) purchaseStatusEl.textContent = text || '';
@@ -286,11 +288,19 @@
       var nearestInfo = getWheelNearestItemInfo(wheelState);
       if (!nearestInfo || !nearestInfo.item) return;
 
+      wheelState.isAutoScrolling = true;
       centerWheelOnItem(wheelState, nearestInfo.item, 'smooth');
 
-      // After momentum settles, rebase to the middle cycle to keep infinite-like scrolling.
       setTimeout(function () {
-        normalizeWheelToMiddleCycle(index, 'auto');
+        wheelState.isAutoScrolling = false;
+
+        var viewport = wheelState.viewport;
+        var maxScrollTop = Math.max(0, (viewport.scrollHeight || 0) - (viewport.clientHeight || 0));
+        var edgePadding = (wheelState.itemHeight || 40) * 4;
+        if (viewport.scrollTop < edgePadding || viewport.scrollTop > maxScrollTop - edgePadding) {
+          normalizeWheelToMiddleCycle(index, 'auto');
+        }
+
         renderWheelVisual(index);
         updatePickerUi();
       }, 180);
@@ -369,6 +379,10 @@
 
   function buildTicketPickerSlots() {
     if (!ticketPickerGridEl) return;
+
+    if (ticketPickerBuilt && ticketPickerGridEl.children.length > 0) {
+      return;
+    }
 
     normalizePickerNumbers();
     ticketPickerGridEl.innerHTML = '';
@@ -462,7 +476,9 @@
 
           vp.addEventListener('scroll', function () {
             renderWheelVisual(idx);
-            scheduleWheelSnap(idx);
+            if (!wheelState.isAutoScrolling) {
+              scheduleWheelSnap(idx);
+            }
           }, { passive: true });
 
           // Ensure desktop mouse wheel changes the picker even when nested in sheets.
@@ -485,6 +501,8 @@
         syncAllWheelLayouts();
       });
     }
+
+    ticketPickerBuilt = true;
 
     updatePickerUi();
   }
@@ -689,8 +707,22 @@
   function openTicketPicker() {
     if (!ticketPickerSheetEl) return;
 
-    buildTicketPickerSlots();
+    if (!ticketPickerBuilt) {
+      buildTicketPickerSlots();
+    } else {
+      normalizePickerNumbers();
+      updatePickerUi();
+    }
+
+    if (ticketPickerCloseTimer) {
+      clearTimeout(ticketPickerCloseTimer);
+      ticketPickerCloseTimer = null;
+    }
+
     ticketPickerSheetEl.hidden = false;
+    ticketPickerSheetEl.classList.remove('ticket-picker-closing');
+    ticketPickerSheetEl.offsetHeight;
+    ticketPickerSheetEl.classList.add('ticket-picker-open');
     setSheetOpenClass();
 
     requestAnimationFrame(function () {
@@ -700,8 +732,18 @@
 
   function closeTicketPicker() {
     if (!ticketPickerSheetEl) return;
-    ticketPickerSheetEl.hidden = true;
+
+    ticketPickerSheetEl.classList.remove('ticket-picker-open');
+    ticketPickerSheetEl.classList.add('ticket-picker-closing');
     setSheetOpenClass();
+
+    if (ticketPickerCloseTimer) clearTimeout(ticketPickerCloseTimer);
+    ticketPickerCloseTimer = setTimeout(function () {
+      ticketPickerSheetEl.hidden = true;
+      ticketPickerSheetEl.classList.remove('ticket-picker-closing');
+      ticketPickerCloseTimer = null;
+      setSheetOpenClass();
+    }, 260);
   }
 
   function confirmSelectedTicketNumbers() {
