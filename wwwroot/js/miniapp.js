@@ -51,6 +51,7 @@
 
   var pickerWheels = [];
   var pickerWheelSnapTimers = [];
+  var pickerWheelResizeBound = false;
 
   function setPurchaseStatus(text) {
     if (purchaseStatusEl) purchaseStatusEl.textContent = text || '';
@@ -206,6 +207,41 @@
     centerWheelOnItem(wheelState, wheelState.items[preferredItemIndex], behavior || 'auto');
   }
 
+  function computeWheelItemHeight(wheelState) {
+    if (!wheelState || !wheelState.slot) return 40;
+
+    var slotHeight = wheelState.slot.clientHeight || 0;
+    var arrows = wheelState.slot.querySelectorAll('.picker-arrow');
+    var arrowsHeight = 0;
+    for (var i = 0; i < arrows.length; i++) {
+      arrowsHeight += arrows[i].offsetHeight || 0;
+    }
+
+    // Account for slot paddings/gaps so center wheel always fits exactly 5 rows.
+    var wheelBudget = slotHeight - arrowsHeight - 22;
+    var target = wheelBudget > 0 ? Math.floor(wheelBudget / 5) : 40;
+    return Math.max(28, Math.min(58, target));
+  }
+
+  function applyWheelLayout(wheelState) {
+    if (!wheelState || !wheelState.viewport || !wheelState.root) return;
+
+    var itemHeight = computeWheelItemHeight(wheelState);
+    wheelState.itemHeight = itemHeight;
+    wheelState.root.style.setProperty('--wheel-item-height', itemHeight.toFixed(2) + 'px');
+    wheelState.root.style.setProperty('--wheel-visible-height', (itemHeight * 5).toFixed(2) + 'px');
+  }
+
+  function syncAllWheelLayouts() {
+    for (var i = 0; i < pickerWheels.length; i++) {
+      var wheelState = pickerWheels[i];
+      if (!wheelState) continue;
+      applyWheelLayout(wheelState);
+      normalizeWheelToMiddleCycle(i, 'auto');
+      renderWheelVisual(i);
+    }
+  }
+
   function renderWheelVisual(index) {
     var wheelState = pickerWheels[index];
     if (!wheelState || !wheelState.items || wheelState.items.length === 0) return;
@@ -221,10 +257,11 @@
       var normalized = Math.min(3.3, distance / wheelState.itemHeight);
       var direction = itemCenter < center ? -1 : 1;
 
-      var scale = Math.max(0.74, 1.24 - normalized * 0.16);
-      var opacity = Math.max(0.12, 1 - normalized * 0.26);
-      var blur = Math.max(0, (normalized - 0.55) * 0.9);
-      var rotate = direction * Math.min(58, normalized * 24);
+      // Selected row is ~40% larger than baseline; nearby rows taper smoothly.
+      var scale = Math.max(0.72, 1.4 - normalized * 0.22);
+      var opacity = Math.max(0.1, 1 - normalized * 0.24);
+      var blur = Math.max(0, (normalized - 0.62) * 0.82);
+      var rotate = direction * Math.min(52, normalized * 20);
 
       item.style.transform = 'translateZ(0) rotateX(' + rotate.toFixed(2) + 'deg) scale(' + scale.toFixed(3) + ')';
       item.style.opacity = opacity.toFixed(3);
@@ -348,31 +385,49 @@
       ticketPickerGridEl.appendChild(slot);
 
       // Delay wheel metrics until after layout is committed.
-      (function (idx, vp, tr) {
+      (function (idx, slotEl, rootEl, vp, tr) {
         requestAnimationFrame(function () {
           var items = tr.querySelectorAll('.picker-wheel-item');
           if (!items || items.length === 0) return;
 
-          var itemHeight = items[0].offsetHeight || 40;
           var wheelState = {
+            root: rootEl,
+            slot: slotEl,
             viewport: vp,
             track: tr,
             items: items,
-            itemHeight: itemHeight,
+            itemHeight: 40,
             middleCycleStart: Math.floor(WHEEL_REPEAT_CYCLES / 2) * PICKER_VALUE_RANGE
           };
 
           pickerWheels[idx] = wheelState;
+
+          applyWheelLayout(wheelState);
 
           vp.addEventListener('scroll', function () {
             renderWheelVisual(idx);
             scheduleWheelSnap(idx);
           }, { passive: true });
 
+          // Ensure desktop mouse wheel changes the picker even when nested in sheets.
+          rootEl.addEventListener('wheel', function (e) {
+            e.preventDefault();
+            vp.scrollTop += e.deltaY;
+            renderWheelVisual(idx);
+            scheduleWheelSnap(idx);
+          }, { passive: false });
+
           normalizeWheelToMiddleCycle(idx, 'auto');
           renderWheelVisual(idx);
         });
-      })(i, viewport, track);
+      })(i, slot, value, viewport, track);
+    }
+
+    if (!pickerWheelResizeBound) {
+      pickerWheelResizeBound = true;
+      window.addEventListener('resize', function () {
+        syncAllWheelLayouts();
+      });
     }
 
     updatePickerUi();
@@ -581,6 +636,10 @@
     buildTicketPickerSlots();
     ticketPickerSheetEl.hidden = false;
     setSheetOpenClass();
+
+    requestAnimationFrame(function () {
+      syncAllWheelLayouts();
+    });
   }
 
   function closeTicketPicker() {

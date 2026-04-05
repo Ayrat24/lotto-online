@@ -336,7 +336,7 @@ button:disabled {
 .ticket-picker-panel {
   display: grid;
   grid-template-rows: auto 1fr auto auto;
-  gap: 14px;
+  gap: 12px;
   width: 100%;
   max-width: 100%;
   margin: 0;
@@ -346,6 +346,7 @@ button:disabled {
   padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   border-radius: 18px 18px 0 0;
   box-sizing: border-box;
+  overflow: hidden;
   overflow-x: hidden;
 }
 
@@ -354,6 +355,7 @@ button:disabled {
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
   min-height: 0;
+  align-items: stretch;
 }
 
 .picker-slot {
@@ -381,9 +383,12 @@ button:disabled {
 }
 
 .picker-value {
+  --wheel-item-height: clamp(30px, 7dvh, 52px);
+  --wheel-visible-height: calc(var(--wheel-item-height) * 5);
   width: 100%;
-  min-height: 0;
-  height: 100%;
+  min-height: var(--wheel-visible-height);
+  height: var(--wheel-visible-height);
+  max-height: var(--wheel-visible-height);
   border-radius: 12px;
   display: block;
   position: relative;
@@ -397,7 +402,7 @@ button:disabled {
 }
 
 .picker-wheel-viewport {
-  height: 100%;
+  height: var(--wheel-visible-height);
   perspective: 640px;
   overflow-y: auto;
   overflow-x: hidden;
@@ -407,7 +412,7 @@ button:disabled {
   scrollbar-width: none;
   touch-action: pan-y;
   box-sizing: border-box;
-  padding-block: calc(50% - 20px);
+  padding-block: 0;
 }
 
 .picker-wheel-viewport::-webkit-scrollbar {
@@ -422,11 +427,12 @@ button:disabled {
 }
 
 .picker-wheel-item {
-  min-height: 40px;
-  height: 40px;
-  line-height: 40px;
+  min-height: var(--wheel-item-height);
+  height: var(--wheel-item-height);
+  line-height: var(--wheel-item-height);
   text-align: center;
   font-variant-numeric: tabular-nums;
+  font-size: calc(var(--wheel-item-height) * 0.56);
   color: rgba(220, 234, 255, 0.66);
   transition: transform 90ms linear, opacity 90ms linear, filter 90ms linear, color 120ms linear;
   scroll-snap-align: center;
@@ -443,7 +449,7 @@ button:disabled {
   left: 6px;
   right: 6px;
   top: 50%;
-  height: 40px;
+  height: var(--wheel-item-height);
   transform: translateY(-50%);
   border-radius: 10px;
   border: 1px solid rgba(33, 144, 255, 0.4);
@@ -480,20 +486,15 @@ button:disabled {
 }
 
 @media (max-height: 720px) {
-  .picker-wheel-item,
-  .picker-wheel-focus {
-    min-height: 34px;
-    height: 34px;
-    line-height: 34px;
-  }
-
-  .picker-wheel-viewport {
-    padding-block: calc(50% - 17px);
+  .picker-value {
+    --wheel-item-height: clamp(28px, 6.4dvh, 40px);
   }
 }
 
 #ticketPickerStatus {
   min-height: 1.2em;
+  line-height: 1.2;
+  margin-top: 2px;
   color: #ff6b6b;
 }
 
