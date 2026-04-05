@@ -345,6 +345,8 @@ button:disabled {
   max-height: calc(100dvh - env(safe-area-inset-bottom, 0px) - 8px);
   padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   border-radius: 18px 18px 0 0;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .ticket-picker-grid {
@@ -383,25 +385,116 @@ button:disabled {
   min-height: 0;
   height: 100%;
   border-radius: 12px;
-  display: grid;
-  place-items: center;
+  display: block;
+  position: relative;
+  overflow: hidden;
   border: 1px solid rgba(33, 144, 255, 0.28);
-  background: rgba(33, 144, 255, 0.1);
-  font-size: clamp(1.1rem, 2.2dvh, 1.5rem);
+  background: linear-gradient(180deg, rgba(27, 38, 57, 0.92), rgba(15, 24, 38, 0.94));
+  font-size: clamp(1.2rem, 2.4dvh, 1.65rem);
   font-weight: 900;
   user-select: none;
+  touch-action: none;
+}
+
+.picker-wheel-viewport {
+  height: 100%;
+  perspective: 640px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-snap-type: y mandatory;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
   touch-action: pan-y;
+  box-sizing: border-box;
+  padding-block: calc(50% - 20px);
 }
 
-.picker-value-label {
-  display: block;
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 600;
+.picker-wheel-viewport::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
-.picker-value-number {
+.picker-wheel-track {
+  display: flex;
+  flex-direction: column;
+  transform-style: preserve-3d;
+}
+
+.picker-wheel-item {
+  min-height: 40px;
+  height: 40px;
+  line-height: 40px;
+  text-align: center;
   font-variant-numeric: tabular-nums;
+  color: rgba(220, 234, 255, 0.66);
+  transition: transform 90ms linear, opacity 90ms linear, filter 90ms linear, color 120ms linear;
+  scroll-snap-align: center;
+  transform-origin: center center;
+}
+
+.picker-wheel-selected {
+  color: #ffffff;
+  text-shadow: 0 0 18px rgba(33, 144, 255, 0.34);
+}
+
+.picker-wheel-focus {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 50%;
+  height: 40px;
+  transform: translateY(-50%);
+  border-radius: 10px;
+  border: 1px solid rgba(33, 144, 255, 0.4);
+  box-shadow: 0 0 0 1px rgba(33, 144, 255, 0.16) inset;
+  background: linear-gradient(180deg, rgba(33, 144, 255, 0.16), rgba(33, 144, 255, 0.08));
+  pointer-events: none;
+  z-index: 3;
+}
+
+.picker-value::before,
+.picker-value::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 34%;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.picker-value::before {
+  top: 0;
+  background: linear-gradient(180deg, rgba(15, 24, 38, 0.95), rgba(15, 24, 38, 0));
+}
+
+.picker-value::after {
+  bottom: 0;
+  background: linear-gradient(0deg, rgba(15, 24, 38, 0.95), rgba(15, 24, 38, 0));
+}
+
+.picker-wheel::selection,
+.picker-wheel-item::selection {
+  background: transparent;
+}
+
+@media (max-height: 720px) {
+  .picker-wheel-item,
+  .picker-wheel-focus {
+    min-height: 34px;
+    height: 34px;
+    line-height: 34px;
+  }
+
+  .picker-wheel-viewport {
+    padding-block: calc(50% - 17px);
+  }
+}
+
+#ticketPickerStatus {
+  min-height: 1.2em;
+  color: #ff6b6b;
 }
 
 @media (max-height: 720px) {

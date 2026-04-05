@@ -46,6 +46,11 @@
   var LOTTO_NUMBERS_COUNT = 5;
   var LOTTO_MIN = 1;
   var LOTTO_MAX = 36;
+  var PICKER_VALUE_RANGE = LOTTO_MAX - LOTTO_MIN + 1;
+  var WHEEL_REPEAT_CYCLES = 7;
+
+  var pickerWheels = [];
+  var pickerWheelSnapTimers = [];
 
   function setPurchaseStatus(text) {
     if (purchaseStatusEl) purchaseStatusEl.textContent = text || '';
@@ -150,13 +155,8 @@
   }
 
   function updatePickerUi() {
-    if (!ticketPickerGridEl) return;
-
-    var values = ticketPickerGridEl.querySelectorAll('[data-picker-value]');
-    for (var i = 0; i < values.length; i++) {
-      var idx = parseInt(values[i].getAttribute('data-picker-value'), 10);
-      if (!Number.isFinite(idx) || idx < 0 || idx >= pickerNumbers.length) continue;
-      values[i].textContent = formatPickerNumber(pickerNumbers[idx]);
+    for (var i = 0; i < pickerWheels.length; i++) {
+      renderWheelVisual(i);
     }
 
     var validation = validatePickerSelection();
@@ -164,49 +164,126 @@
     if (confirmTicketNumbersBtn) confirmTicketNumbersBtn.disabled = !validation.ok;
   }
 
-  function stepPickerIndex(index, delta) {
-    if (!Number.isFinite(index) || index < 0 || index >= pickerNumbers.length) return;
-    pickerNumbers[index] = wrapPickerNumber(pickerNumbers[index] + delta);
-    updatePickerUi();
+  function getWheelNearestItemInfo(wheelState) {
+    if (!wheelState || !wheelState.items || wheelState.items.length === 0) return null;
+
+    var viewport = wheelState.viewport;
+    var center = viewport.scrollTop + viewport.clientHeight / 2;
+    var nearestIndex = 0;
+    var nearestDistance = Number.POSITIVE_INFINITY;
+
+    for (var i = 0; i < wheelState.items.length; i++) {
+      var item = wheelState.items[i];
+      var itemCenter = item.offsetTop + item.offsetHeight / 2;
+      var distance = Math.abs(itemCenter - center);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestIndex = i;
+      }
+    }
+
+    return {
+      index: nearestIndex,
+      item: wheelState.items[nearestIndex]
+    };
   }
 
-  function attachPickerSwipeHandlers(target, index) {
-    if (!target) return;
+  function centerWheelOnItem(wheelState, item, behavior) {
+    if (!wheelState || !item) return;
+    var viewport = wheelState.viewport;
+    var targetTop = item.offsetTop - (viewport.clientHeight - item.offsetHeight) / 2;
+    viewport.scrollTo({ top: Math.max(0, targetTop), behavior: behavior || 'auto' });
+  }
 
-    var startY = null;
+  function normalizeWheelToMiddleCycle(index, behavior) {
+    var wheelState = pickerWheels[index];
+    if (!wheelState || !wheelState.items || wheelState.items.length === 0) return;
 
-    function begin(y) {
-      startY = y;
+    var selected = pickerNumbers[index];
+    var inRange = Math.min(LOTTO_MAX, Math.max(LOTTO_MIN, parseInt(selected, 10) || LOTTO_MIN));
+    var preferredItemIndex = wheelState.middleCycleStart + (inRange - LOTTO_MIN);
+    preferredItemIndex = Math.max(0, Math.min(wheelState.items.length - 1, preferredItemIndex));
+    centerWheelOnItem(wheelState, wheelState.items[preferredItemIndex], behavior || 'auto');
+  }
+
+  function renderWheelVisual(index) {
+    var wheelState = pickerWheels[index];
+    if (!wheelState || !wheelState.items || wheelState.items.length === 0) return;
+
+    var viewport = wheelState.viewport;
+    var center = viewport.scrollTop + viewport.clientHeight / 2;
+    var nearestInfo = getWheelNearestItemInfo(wheelState);
+
+    for (var i = 0; i < wheelState.items.length; i++) {
+      var item = wheelState.items[i];
+      var itemCenter = item.offsetTop + item.offsetHeight / 2;
+      var distance = Math.abs(itemCenter - center);
+      var normalized = Math.min(3.3, distance / wheelState.itemHeight);
+      var direction = itemCenter < center ? -1 : 1;
+
+      var scale = Math.max(0.74, 1.24 - normalized * 0.16);
+      var opacity = Math.max(0.12, 1 - normalized * 0.26);
+      var blur = Math.max(0, (normalized - 0.55) * 0.9);
+      var rotate = direction * Math.min(58, normalized * 24);
+
+      item.style.transform = 'translateZ(0) rotateX(' + rotate.toFixed(2) + 'deg) scale(' + scale.toFixed(3) + ')';
+      item.style.opacity = opacity.toFixed(3);
+      item.style.filter = 'blur(' + blur.toFixed(2) + 'px)';
+      item.classList.toggle('picker-wheel-selected', !!nearestInfo && i === nearestInfo.index);
     }
 
-    function end(y) {
-      if (startY === null) return;
-      var delta = y - startY;
-      startY = null;
+    if (nearestInfo && nearestInfo.item) {
+      var nextValue = parseInt(nearestInfo.item.getAttribute('data-value'), 10);
+      if (Number.isFinite(nextValue)) pickerNumbers[index] = nextValue;
+    }
+  }
 
-      if (Math.abs(delta) < 14) return;
-      if (delta < 0) stepPickerIndex(index, 1);
-      else stepPickerIndex(index, -1);
+  function scheduleWheelSnap(index) {
+    if (pickerWheelSnapTimers[index]) {
+      clearTimeout(pickerWheelSnapTimers[index]);
     }
 
-    target.addEventListener('wheel', function (e) {
-      e.preventDefault();
-      stepPickerIndex(index, e.deltaY > 0 ? -1 : 1);
-    }, { passive: false });
+    pickerWheelSnapTimers[index] = setTimeout(function () {
+      var wheelState = pickerWheels[index];
+      if (!wheelState) return;
 
-    target.addEventListener('mousedown', function (e) { begin(e.clientY); });
-    target.addEventListener('mouseup', function (e) { end(e.clientY); });
-    target.addEventListener('mouseleave', function () { startY = null; });
+      var nearestInfo = getWheelNearestItemInfo(wheelState);
+      if (!nearestInfo || !nearestInfo.item) return;
 
-    target.addEventListener('touchstart', function (e) {
-      if (!e.touches || e.touches.length === 0) return;
-      begin(e.touches[0].clientY);
-    }, { passive: true });
+      centerWheelOnItem(wheelState, nearestInfo.item, 'smooth');
 
-    target.addEventListener('touchend', function (e) {
-      if (!e.changedTouches || e.changedTouches.length === 0) return;
-      end(e.changedTouches[0].clientY);
-    }, { passive: true });
+      // After momentum settles, rebase to the middle cycle to keep infinite-like scrolling.
+      setTimeout(function () {
+        normalizeWheelToMiddleCycle(index, 'auto');
+        renderWheelVisual(index);
+        updatePickerUi();
+      }, 180);
+    }, 90);
+  }
+
+  function stepPickerIndex(index, delta) {
+    var wheelState = pickerWheels[index];
+    if (!wheelState) {
+      if (!Number.isFinite(index) || index < 0 || index >= pickerNumbers.length) return;
+      pickerNumbers[index] = wrapPickerNumber(pickerNumbers[index] + delta);
+      updatePickerUi();
+      return;
+    }
+
+    var nearestInfo = getWheelNearestItemInfo(wheelState);
+    if (!nearestInfo) return;
+
+    var targetIndex = nearestInfo.index + delta;
+    if (targetIndex < 0 || targetIndex >= wheelState.items.length) {
+      normalizeWheelToMiddleCycle(index, 'auto');
+      nearestInfo = getWheelNearestItemInfo(wheelState);
+      if (!nearestInfo) return;
+      targetIndex = nearestInfo.index + delta;
+      targetIndex = Math.max(0, Math.min(wheelState.items.length - 1, targetIndex));
+    }
+
+    centerWheelOnItem(wheelState, wheelState.items[targetIndex], 'smooth');
+    scheduleWheelSnap(index);
   }
 
   function buildTicketPickerSlots() {
@@ -214,6 +291,8 @@
 
     normalizePickerNumbers();
     ticketPickerGridEl.innerHTML = '';
+    pickerWheels = [];
+    pickerWheelSnapTimers = [];
 
     for (var i = 0; i < LOTTO_NUMBERS_COUNT; i++) {
       var slot = document.createElement('div');
@@ -228,19 +307,32 @@
       })(i));
 
       var value = document.createElement('div');
-      value.className = 'picker-value';
+      value.className = 'picker-value picker-wheel';
 
-      var label = document.createElement('span');
-      label.className = 'picker-value-label';
-      label.textContent = 'No. ' + (i + 1);
+      var focusBand = document.createElement('div');
+      focusBand.className = 'picker-wheel-focus';
 
-      var number = document.createElement('span');
-      number.className = 'picker-value-number';
-      number.setAttribute('data-picker-value', String(i));
-      number.textContent = formatPickerNumber(pickerNumbers[i]);
+      var viewport = document.createElement('div');
+      viewport.className = 'picker-wheel-viewport';
+      viewport.setAttribute('data-picker-viewport', String(i));
 
-      value.appendChild(label);
-      value.appendChild(number);
+      var track = document.createElement('div');
+      track.className = 'picker-wheel-track';
+      track.setAttribute('data-picker-track', String(i));
+
+      for (var c = 0; c < WHEEL_REPEAT_CYCLES; c++) {
+        for (var v = LOTTO_MIN; v <= LOTTO_MAX; v++) {
+          var wheelItem = document.createElement('div');
+          wheelItem.className = 'picker-wheel-item';
+          wheelItem.setAttribute('data-value', String(v));
+          wheelItem.textContent = formatPickerNumber(v);
+          track.appendChild(wheelItem);
+        }
+      }
+
+      viewport.appendChild(track);
+      value.appendChild(viewport);
+      value.appendChild(focusBand);
 
       var downBtn = document.createElement('button');
       downBtn.type = 'button';
@@ -250,12 +342,37 @@
         return function () { stepPickerIndex(idx, -1); };
       })(i));
 
-      attachPickerSwipeHandlers(value, i);
-
       slot.appendChild(upBtn);
       slot.appendChild(value);
       slot.appendChild(downBtn);
       ticketPickerGridEl.appendChild(slot);
+
+      // Delay wheel metrics until after layout is committed.
+      (function (idx, vp, tr) {
+        requestAnimationFrame(function () {
+          var items = tr.querySelectorAll('.picker-wheel-item');
+          if (!items || items.length === 0) return;
+
+          var itemHeight = items[0].offsetHeight || 40;
+          var wheelState = {
+            viewport: vp,
+            track: tr,
+            items: items,
+            itemHeight: itemHeight,
+            middleCycleStart: Math.floor(WHEEL_REPEAT_CYCLES / 2) * PICKER_VALUE_RANGE
+          };
+
+          pickerWheels[idx] = wheelState;
+
+          vp.addEventListener('scroll', function () {
+            renderWheelVisual(idx);
+            scheduleWheelSnap(idx);
+          }, { passive: true });
+
+          normalizeWheelToMiddleCycle(idx, 'auto');
+          renderWheelVisual(idx);
+        });
+      })(i, viewport, track);
     }
 
     updatePickerUi();
