@@ -146,7 +146,11 @@ public sealed class EditModel : PageModel
 
         var groupedTickets = ticketsForDraw
             .GroupBy(x => x.Numbers)
-            .Select(g => new DrawTicketRow(g.Key, g.LongCount()));
+            .Select(g => new
+            {
+                Numbers = g.Key,
+                SelectionCount = g.LongCount()
+            });
 
         TicketsTotalCount = await groupedTickets.LongCountAsync(ct);
 
@@ -168,6 +172,7 @@ public sealed class EditModel : PageModel
             .ThenBy(x => x.Numbers)
             .Skip((TicketsPage - 1) * TicketsPageSize)
             .Take(TicketsPageSize)
+            .Select(x => new DrawTicketRow(x.Numbers, x.SelectionCount))
             .ToArrayAsync(ct);
 
         SelectedTicketNumbers = string.IsNullOrWhiteSpace(ticketNumbers) ? null : ticketNumbers.Trim();
