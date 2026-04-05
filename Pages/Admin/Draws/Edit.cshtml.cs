@@ -12,7 +12,8 @@ namespace MiniApp.Pages.Admin.Draws;
 [Authorize(Policy = AdminAuth.PolicyName)]
 public sealed class EditModel : PageModel
 {
-    public sealed record DrawTicketRow(long Id, string Numbers, DateTimeOffset PurchasedAtUtc, long SelectionCount);
+    public sealed record DrawTicketRow(string Numbers, long SelectionCount);
+    public sealed record DrawTicketUserRow(long UserId, long TelegramUserId, string? Number, long TicketCount, DateTimeOffset LastPurchasedAtUtc);
 
     private readonly AppDbContext _db;
     private readonly IConfiguration _config;
@@ -30,6 +31,8 @@ public sealed class EditModel : PageModel
     public bool CanEdit => SelectedDraw is not null && SelectedDraw.State != DrawState.Finished;
 
     public IReadOnlyList<DrawTicketRow> Tickets { get; private set; } = Array.Empty<DrawTicketRow>();
+    public IReadOnlyList<DrawTicketUserRow> TicketUsers { get; private set; } = Array.Empty<DrawTicketUserRow>();
+    public string? SelectedTicketNumbers { get; private set; }
     public int TicketsPage { get; private set; } = 1;
     public int TicketsTotalPages { get; private set; }
     public long TicketsTotalCount { get; private set; }
@@ -57,7 +60,7 @@ public sealed class EditModel : PageModel
     [TempData]
     public bool? FlashIsError { get; set; }
 
-    public async Task OnGetAsync(long id, int ticketPage = 1, CancellationToken ct = default)
+    public async Task OnGetAsync(long id, int ticketPage = 1, string? ticketNumbers = null, CancellationToken ct = default)
     {
         await EnsureDebugSeedAsync(ct);
 
@@ -79,10 +82,10 @@ public sealed class EditModel : PageModel
             StatusIsError = true;
         }
 
-        await SafeLoadTicketsAsync(id, ticketPage, ct);
+        await SafeLoadTicketsAsync(id, ticketPage, ticketNumbers, ct);
     }
 
-    public async Task<IActionResult> OnPostAsync(long id, int ticketPage = 1, CancellationToken ct = default)
+    public async Task<IActionResult> OnPostAsync(long id, int ticketPage = 1, string? ticketNumbers = null, CancellationToken ct = default)
     {
         await EnsureDebugSeedAsync(ct);
 
@@ -95,7 +98,7 @@ public sealed class EditModel : PageModel
             StatusMessage = "State must be active or upcoming.";
             StatusIsError = true;
             SelectedDraw = draw;
-            await SafeLoadTicketsAsync(id, ticketPage, ct);
+            await SafeLoadTicketsAsync(id, ticketPage, ticketNumbers, ct);
             return Page();
         }
 
@@ -111,20 +114,22 @@ public sealed class EditModel : PageModel
             StatusMessage = ex.Message;
             StatusIsError = true;
             SelectedDraw = draw;
-            await SafeLoadTicketsAsync(id, ticketPage, ct);
+            await SafeLoadTicketsAsync(id, ticketPage, ticketNumbers, ct);
             return Page();
         }
     }
 
-    private async Task SafeLoadTicketsAsync(long drawId, int requestedPage, CancellationToken ct)
+    private async Task SafeLoadTicketsAsync(long drawId, int requestedPage, string? ticketNumbers, CancellationToken ct)
     {
         try
         {
-            await LoadTicketsAsync(drawId, requestedPage, ct);
+            await LoadTicketsAsync(drawId, requestedPage, ticketNumbers, ct);
         }
         catch (Exception ex)
         {
             Tickets = Array.Empty<DrawTicketRow>();
+            TicketUsers = Array.Empty<DrawTicketUserRow>();
+            SelectedTicketNumbers = null;
             TicketsTotalCount = 0;
             TicketsTotalPages = 0;
             TicketsPage = 1;
@@ -133,17 +138,23 @@ public sealed class EditModel : PageModel
         }
     }
 
-    private async Task LoadTicketsAsync(long drawId, int requestedPage, CancellationToken ct)
+    private async Task LoadTicketsAsync(long drawId, int requestedPage, string? ticketNumbers, CancellationToken ct)
     {
         var ticketsForDraw = _db.Tickets
             .AsNoTracking()
             .Where(x => x.DrawId == drawId);
 
-        TicketsTotalCount = await ticketsForDraw.LongCountAsync(ct);
+        var groupedTickets = ticketsForDraw
+            .GroupBy(x => x.Numbers)
+            .Select(g => new DrawTicketRow(g.Key, g.LongCount()));
+
+        TicketsTotalCount = await groupedTickets.LongCountAsync(ct);
 
         if (TicketsTotalCount == 0)
         {
             Tickets = Array.Empty<DrawTicketRow>();
+            TicketUsers = Array.Empty<DrawTicketUserRow>();
+            SelectedTicketNumbers = null;
             TicketsTotalPages = 0;
             TicketsPage = 1;
             return;
@@ -152,27 +163,34 @@ public sealed class EditModel : PageModel
         TicketsTotalPages = (int)Math.Ceiling(TicketsTotalCount / (double)TicketsPageSize);
         TicketsPage = Math.Clamp(requestedPage, 1, TicketsTotalPages);
 
-        var countsByNumbers = await ticketsForDraw
-            .GroupBy(x => x.Numbers)
-            .Select(g => new { Numbers = g.Key, SelectionCount = g.LongCount() })
-            .ToDictionaryAsync(x => x.Numbers, x => x.SelectionCount, ct);
-
-        var allTicketRows = await ticketsForDraw
-            .Select(x => new { x.Id, x.Numbers, x.PurchasedAtUtc })
-            .ToListAsync(ct);
-
-        Tickets = allTicketRows
-            .OrderByDescending(x => countsByNumbers.GetValueOrDefault(x.Numbers))
-            .ThenByDescending(x => x.PurchasedAtUtc)
-            .ThenByDescending(x => x.Id)
+        Tickets = await groupedTickets
+            .OrderByDescending(x => x.SelectionCount)
+            .ThenBy(x => x.Numbers)
             .Skip((TicketsPage - 1) * TicketsPageSize)
             .Take(TicketsPageSize)
-            .Select(x => new DrawTicketRow(
-                x.Id,
-                x.Numbers,
-                x.PurchasedAtUtc,
-                countsByNumbers.GetValueOrDefault(x.Numbers)))
-            .ToArray();
+            .ToArrayAsync(ct);
+
+        SelectedTicketNumbers = string.IsNullOrWhiteSpace(ticketNumbers) ? null : ticketNumbers.Trim();
+        if (SelectedTicketNumbers is null)
+        {
+            TicketUsers = Array.Empty<DrawTicketUserRow>();
+            return;
+        }
+
+        TicketUsers = await _db.Tickets
+            .AsNoTracking()
+            .Where(x => x.DrawId == drawId && x.Numbers == SelectedTicketNumbers)
+            .GroupBy(x => new { x.UserId, x.User.TelegramUserId, x.User.Number })
+            .Select(g => new DrawTicketUserRow(
+                g.Key.UserId,
+                g.Key.TelegramUserId,
+                g.Key.Number,
+                g.LongCount(),
+                g.Max(x => x.PurchasedAtUtc)))
+            .OrderByDescending(x => x.TicketCount)
+            .ThenByDescending(x => x.LastPurchasedAtUtc)
+            .ThenBy(x => x.UserId)
+            .ToArrayAsync(ct);
     }
 
     private async Task EnsureDebugSeedAsync(CancellationToken ct)
