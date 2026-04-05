@@ -101,6 +101,24 @@
     </div>
   </div>
 
+  <div id="ticketPickerSheet" class="sheet" hidden>
+    <div id="ticketPickerBackdrop" class="sheet-backdrop"></div>
+    <div class="sheet-panel ticket-picker-panel">
+      <div class="sheet-header">
+        <div>
+          <div class="section-title">Pick your numbers</div>
+          <div class="section-subtitle">Choose 5 unique numbers from 1 to 36.</div>
+        </div>
+        <button id="closeTicketPickerBtn" type="button" class="sheet-close-btn" aria-label="Close picker">x</button>
+      </div>
+
+      <div id="ticketPickerGrid" class="ticket-picker-grid" aria-label="Number picker"></div>
+
+      <div id="ticketPickerStatus" class="muted"></div>
+      <button id="confirmTicketNumbersBtn" type="button">Confirm numbers</button>
+    </div>
+  </div>
+
   <nav class="tabbar" aria-label="Bottom tabs">
     <button id="lotteryTabBtn" type="button" class="tabbar-btn tabbar-btn-active">Home</button>
     <button id="accountTabBtn" type="button" class="tabbar-btn">My Tickets</button>

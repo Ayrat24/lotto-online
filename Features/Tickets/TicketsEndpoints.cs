@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using MiniApp.Data;
 using MiniApp.Features.Auth;
+using MiniApp.Features.Draws;
 using MiniApp.TelegramLogin;
 
 namespace MiniApp.Features.Tickets;
@@ -55,7 +56,7 @@ public static class TicketsEndpoints
             return Results.Ok(new { ok = true, tickets });
         });
 
-        // Purchase a ticket for the current active draw (server-side random numbers).
+        // Purchase a ticket for the current active draw using user-selected numbers.
         endpoints.MapPost("/api/tickets/purchase", async (
             PurchaseTicketRequest req,
             HttpContext http,
@@ -99,7 +100,9 @@ public static class TicketsEndpoints
             if (currentDraw is null)
                 return Results.BadRequest(new { ok = false, error = "There is no active draw right now." });
 
-            var numbers = GenerateTicketNumbers();
+            if (!TryNormalizeSelectedNumbers(req.Numbers, out var numbers, out var validationError))
+                return Results.BadRequest(new { ok = false, error = validationError });
+
             var ticket = new Ticket
             {
                 UserId = u.Id,
@@ -117,15 +120,42 @@ public static class TicketsEndpoints
         return endpoints;
     }
 
-    private static string GenerateTicketNumbers()
+    private static bool TryNormalizeSelectedNumbers(IReadOnlyList<int>? selectedNumbers, out string normalizedNumbers, out string error)
     {
-        // 6 distinct ints in [1..49], sorted.
+        normalizedNumbers = string.Empty;
+        error = string.Empty;
+
+        if (selectedNumbers is null)
+        {
+            error = "Please select numbers first.";
+            return false;
+        }
+
+        if (selectedNumbers.Count != DrawManagement.NumbersPerDraw)
+        {
+            error = $"Exactly {DrawManagement.NumbersPerDraw} numbers are required.";
+            return false;
+        }
+
         var set = new HashSet<int>();
-        while (set.Count < 6)
-            set.Add(Random.Shared.Next(1, 50));
+        foreach (var n in selectedNumbers)
+        {
+            if (n < DrawManagement.MinNumber || n > DrawManagement.MaxNumber)
+            {
+                error = $"Each number must be between {DrawManagement.MinNumber} and {DrawManagement.MaxNumber}.";
+                return false;
+            }
+
+            if (!set.Add(n))
+            {
+                error = "Numbers must be unique.";
+                return false;
+            }
+        }
 
         var arr = set.ToArray();
         Array.Sort(arr);
-        return string.Join(',', arr);
+        normalizedNumbers = string.Join(',', arr);
+        return true;
     }
 }

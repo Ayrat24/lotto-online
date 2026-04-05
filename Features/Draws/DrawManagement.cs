@@ -5,6 +5,10 @@ namespace MiniApp.Features.Draws;
 
 internal static class DrawManagement
 {
+    public const int NumbersPerDraw = 5;
+    public const int MinNumber = 1;
+    public const int MaxNumber = 36;
+
     public static async Task<Draw> CreateDrawAsync(AppDbContext db, decimal prizePool, CancellationToken ct)
     {
         EnsurePrizePool(prizePool);
@@ -98,8 +102,8 @@ internal static class DrawManagement
     public static string GenerateDrawNumbers()
     {
         var set = new HashSet<int>();
-        while (set.Count < 6)
-            set.Add(Random.Shared.Next(1, 50));
+        while (set.Count < NumbersPerDraw)
+            set.Add(Random.Shared.Next(MinNumber, MaxNumber + 1));
 
         var arr = set.ToArray();
         Array.Sort(arr);

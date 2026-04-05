@@ -11,7 +11,7 @@ public sealed class Ticket
     public Draw Draw { get; set; } = null!;
 
     /// <summary>
-    /// 6 distinct numbers in range 1..49 (sorted), stored as "n1,n2,n3,n4,n5,n6".
+    /// 5 distinct numbers in range 1..36 (sorted), stored as "n1,n2,n3,n4,n5".
     /// </summary>
     public string Numbers { get; set; } = null!;
 
