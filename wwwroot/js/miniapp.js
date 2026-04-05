@@ -52,6 +52,8 @@
   var pickerWheels = [];
   var pickerWheelSnapTimers = [];
   var pickerWheelResizeBound = false;
+  var pickerArrowHoldState = [];
+  var wheelOrderDescending = true;
 
   function setPurchaseStatus(text) {
     if (purchaseStatusEl) purchaseStatusEl.textContent = text || '';
@@ -202,7 +204,7 @@
 
     var selected = pickerNumbers[index];
     var inRange = Math.min(LOTTO_MAX, Math.max(LOTTO_MIN, parseInt(selected, 10) || LOTTO_MIN));
-    var preferredItemIndex = wheelState.middleCycleStart + (inRange - LOTTO_MIN);
+    var preferredItemIndex = wheelState.middleCycleStart + (wheelOrderDescending ? (LOTTO_MAX - inRange) : (inRange - LOTTO_MIN));
     preferredItemIndex = Math.max(0, Math.min(wheelState.items.length - 1, preferredItemIndex));
     centerWheelOnItem(wheelState, wheelState.items[preferredItemIndex], behavior || 'auto');
   }
@@ -212,7 +214,8 @@
 
     // Keep wheel inside the slot's middle row so status/confirm rows never get overlapped.
     var visibleHeight = wheelState.root.clientHeight || 0;
-    var target = visibleHeight > 0 ? Math.floor(visibleHeight / 5) : 40;
+    var rowGap = wheelState.rowGap || 0;
+    var target = visibleHeight > 0 ? Math.floor((visibleHeight - rowGap * 4) / 5) : 40;
     return Math.max(26, Math.min(56, target));
   }
 
@@ -220,8 +223,10 @@
     if (!wheelState || !wheelState.viewport || !wheelState.root) return;
 
     var visibleHeight = wheelState.root.clientHeight || 0;
+    var rowGap = wheelState.rowGap || 0;
     var itemHeight = computeWheelItemHeight(wheelState);
     wheelState.itemHeight = itemHeight;
+    wheelState.root.style.setProperty('--wheel-row-gap', rowGap.toFixed(2) + 'px');
     wheelState.root.style.setProperty('--wheel-item-height', itemHeight.toFixed(2) + 'px');
     wheelState.root.style.setProperty('--wheel-visible-height', (visibleHeight > 0 ? visibleHeight : itemHeight * 5).toFixed(2) + 'px');
   }
@@ -251,11 +256,11 @@
       var normalized = Math.min(3.3, distance / wheelState.itemHeight);
       var direction = itemCenter < center ? -1 : 1;
 
-      // Selected row is ~40% larger than baseline; nearby rows taper smoothly.
-      var scale = Math.max(0.72, 1.4 - normalized * 0.22);
-      var opacity = Math.max(0.1, 1 - normalized * 0.24);
-      var blur = Math.max(0, (normalized - 0.62) * 0.82);
-      var rotate = direction * Math.min(52, normalized * 20);
+      // Selected row is much larger/brighter than neighbors.
+      var scale = Math.max(0.66, 1.62 - normalized * 0.28);
+      var opacity = Math.max(0.08, 1 - normalized * 0.28);
+      var blur = Math.max(0, (normalized - 0.55) * 0.9);
+      var rotate = direction * Math.min(54, normalized * 20);
 
       item.style.transform = 'translateZ(0) rotateX(' + rotate.toFixed(2) + 'deg) scale(' + scale.toFixed(3) + ')';
       item.style.opacity = opacity.toFixed(3);
@@ -304,17 +309,62 @@
     var nearestInfo = getWheelNearestItemInfo(wheelState);
     if (!nearestInfo) return;
 
-    var targetIndex = nearestInfo.index + delta;
+      var targetIndex = nearestInfo.index + (wheelOrderDescending ? -delta : delta);
     if (targetIndex < 0 || targetIndex >= wheelState.items.length) {
       normalizeWheelToMiddleCycle(index, 'auto');
       nearestInfo = getWheelNearestItemInfo(wheelState);
       if (!nearestInfo) return;
-      targetIndex = nearestInfo.index + delta;
+        targetIndex = nearestInfo.index + (wheelOrderDescending ? -delta : delta);
       targetIndex = Math.max(0, Math.min(wheelState.items.length - 1, targetIndex));
     }
 
     centerWheelOnItem(wheelState, wheelState.items[targetIndex], 'smooth');
     scheduleWheelSnap(index);
+  }
+
+  function stopArrowHold(button) {
+    var state = button && button._pickerHoldState;
+    if (!state) return;
+
+    if (state.repeatTimer) clearInterval(state.repeatTimer);
+    if (state.startTimer) clearTimeout(state.startTimer);
+    state.repeatTimer = null;
+    state.startTimer = null;
+    state.active = false;
+  }
+
+  function bindArrowHold(button, stepFn) {
+    if (!button) return;
+
+    var state = { active: false, startTimer: null, repeatTimer: null };
+    button._pickerHoldState = state;
+
+    function beginHold(ev) {
+      ev.preventDefault();
+      if (state.active) return;
+
+      state.active = true;
+      stepFn();
+
+      state.startTimer = setTimeout(function () {
+        if (!state.active) return;
+        state.repeatTimer = setInterval(function () {
+          if (!state.active) return;
+          stepFn();
+        }, 100);
+      }, 500);
+    }
+
+    function endHold() {
+      stopArrowHold(button);
+    }
+
+    button.addEventListener('pointerdown', beginHold);
+    button.addEventListener('pointerup', endHold);
+    button.addEventListener('pointercancel', endHold);
+    button.addEventListener('pointerleave', endHold);
+    button.addEventListener('lostpointercapture', endHold);
+    button.addEventListener('contextmenu', function (ev) { ev.preventDefault(); });
   }
 
   function buildTicketPickerSlots() {
@@ -333,9 +383,6 @@
       upBtn.type = 'button';
       upBtn.className = 'picker-arrow';
       upBtn.textContent = '^';
-      upBtn.addEventListener('click', (function (idx) {
-        return function () { stepPickerIndex(idx, 1); };
-      })(i));
 
       var value = document.createElement('div');
       value.className = 'picker-value picker-wheel';
@@ -352,12 +399,22 @@
       track.setAttribute('data-picker-track', String(i));
 
       for (var c = 0; c < WHEEL_REPEAT_CYCLES; c++) {
-        for (var v = LOTTO_MIN; v <= LOTTO_MAX; v++) {
-          var wheelItem = document.createElement('div');
-          wheelItem.className = 'picker-wheel-item';
-          wheelItem.setAttribute('data-value', String(v));
-          wheelItem.textContent = formatPickerNumber(v);
-          track.appendChild(wheelItem);
+        if (wheelOrderDescending) {
+          for (var vd = LOTTO_MAX; vd >= LOTTO_MIN; vd--) {
+            var wheelItemD = document.createElement('div');
+            wheelItemD.className = 'picker-wheel-item';
+            wheelItemD.setAttribute('data-value', String(vd));
+            wheelItemD.textContent = formatPickerNumber(vd);
+            track.appendChild(wheelItemD);
+          }
+        } else {
+          for (var va = LOTTO_MIN; va <= LOTTO_MAX; va++) {
+            var wheelItemA = document.createElement('div');
+            wheelItemA.className = 'picker-wheel-item';
+            wheelItemA.setAttribute('data-value', String(va));
+            wheelItemA.textContent = formatPickerNumber(va);
+            track.appendChild(wheelItemA);
+          }
         }
       }
 
@@ -369,7 +426,12 @@
       downBtn.type = 'button';
       downBtn.className = 'picker-arrow';
       downBtn.textContent = 'v';
-      downBtn.addEventListener('click', (function (idx) {
+
+      bindArrowHold(upBtn, (function (idx) {
+        return function () { stepPickerIndex(idx, 1); };
+      })(i));
+
+      bindArrowHold(downBtn, (function (idx) {
         return function () { stepPickerIndex(idx, -1); };
       })(i));
 
@@ -389,6 +451,7 @@
             viewport: vp,
             track: tr,
             items: items,
+            rowGap: 6,
             itemHeight: 40,
             middleCycleStart: Math.floor(WHEEL_REPEAT_CYCLES / 2) * PICKER_VALUE_RANGE
           };
