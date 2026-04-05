@@ -39,7 +39,9 @@ public sealed class AppDbContext : DbContext
             b.HasIndex(x => x.CreatedAtUtc);
             b.HasIndex(x => x.State);
 
-            b.Property(x => x.PrizePool).HasPrecision(18, 2).IsRequired();
+            b.Property(x => x.PrizePoolMatch3).HasPrecision(18, 2).IsRequired();
+            b.Property(x => x.PrizePoolMatch4).HasPrecision(18, 2).IsRequired();
+            b.Property(x => x.PrizePoolMatch5).HasPrecision(18, 2).IsRequired();
             b.Property(x => x.State)
                 .HasConversion<string>()
                 .HasMaxLength(32)

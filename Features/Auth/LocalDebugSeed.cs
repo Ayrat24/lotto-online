@@ -31,7 +31,9 @@ public static class LocalDebugSeed
             var finished = new Draw
             {
                 Id = nextId++,
-                PrizePool = 100m + finishedDraws.Count * 50m,
+                PrizePoolMatch3 = 40m + finishedDraws.Count * 10m,
+                PrizePoolMatch4 = 25m + finishedDraws.Count * 10m,
+                PrizePoolMatch5 = 35m + finishedDraws.Count * 30m,
                 State = DrawState.Finished,
                 Numbers = DrawManagement.GenerateDrawNumbers(),
                 CreatedAtUtc = now.AddHours(-3 + finishedDraws.Count)
@@ -52,7 +54,9 @@ public static class LocalDebugSeed
             activeDraw = new Draw
             {
                 Id = nextId++,
-                PrizePool = 200m,
+                PrizePoolMatch3 = 80m,
+                PrizePoolMatch4 = 50m,
+                PrizePoolMatch5 = 70m,
                 State = DrawState.Active,
                 CreatedAtUtc = now.AddHours(-1)
             };
@@ -74,7 +78,9 @@ public static class LocalDebugSeed
             upcomingDraw = new Draw
             {
                 Id = nextId++,
-                PrizePool = 300m,
+                PrizePoolMatch3 = 120m,
+                PrizePoolMatch4 = 70m,
+                PrizePoolMatch5 = 110m,
                 State = DrawState.Upcoming,
                 CreatedAtUtc = now
             };

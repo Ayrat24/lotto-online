@@ -1,0 +1,120 @@
+@page "{id:long}"
+@model MiniApp.Pages.Admin.Draws.EditModel
+@{
+    ViewData["Title"] = "Edit draw";
+}
+
+<h1>Edit draw</h1>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <div class="alert @(Model.StatusIsError ? "alert-danger" : "alert-info") mt-3">@Model.StatusMessage</div>
+}
+
+@if (Model.SelectedDraw is null)
+{
+    <div class="alert alert-warning mt-3">Draw not found.</div>
+    <a class="btn btn-secondary" asp-page="/Admin/Draws">Back</a>
+}
+else if (Model.CanEdit)
+{
+    <form method="post" class="mt-3">
+        <input type="hidden" name="page" value="@Model.TicketsPage" />
+        <div class="mb-3">
+            <label class="form-label">Id</label>
+            <input class="form-control" value="@Model.SelectedDraw.Id" disabled />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">State</label>
+            <select asp-for="State" class="form-select">
+                <option value="active">active</option>
+                <option value="upcoming">upcoming</option>
+            </select>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Prize pool 3/5</label>
+                <input asp-for="PrizePoolMatch3" type="number" min="0" step="0.01" class="form-control" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Prize pool 4/5</label>
+                <input asp-for="PrizePoolMatch4" type="number" min="0" step="0.01" class="form-control" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Prize pool 5/5</label>
+                <input asp-for="PrizePoolMatch5" type="number" min="0" step="0.01" class="form-control" />
+            </div>
+        </div>
+
+        <div class="form-text mt-2">Total pool: @((Model.PrizePoolMatch3 + Model.PrizePoolMatch4 + Model.PrizePoolMatch5).ToString("0.00"))</div>
+
+        <div class="mt-4 d-flex gap-2">
+            <button class="btn btn-primary" type="submit">Save</button>
+            <a class="btn btn-secondary" asp-page="/Admin/Draws">Back</a>
+        </div>
+    </form>
+}
+else
+{
+    <a class="btn btn-secondary mt-3" asp-page="/Admin/Draws">Back</a>
+}
+
+@if (Model.SelectedDraw is not null)
+{
+    <div class="card mt-4">
+        <div class="card-body">
+            <h5 class="card-title">Bought tickets</h5>
+            <p class="text-muted mb-3">Showing tickets for draw #@Model.SelectedDraw.Id. Ordered by how often each number set was selected.</p>
+
+            @if (Model.TicketsTotalCount == 0)
+            {
+                <div class="alert alert-secondary mb-0">No tickets bought for this draw yet.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead>
+                        <tr>
+                            <th>Ticket Id</th>
+                            <th>Numbers</th>
+                            <th>Selected count</th>
+                            <th>Bought (UTC)</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var t in Model.Tickets)
+                        {
+                            <tr>
+                                <td>@t.Id</td>
+                                <td><code>@t.Numbers</code></td>
+                                <td><span class="badge text-bg-primary">@t.SelectionCount</span></td>
+                                <td>@t.PurchasedAtUtc.ToString("u")</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <small class="text-muted">Page @Model.TicketsPage of @Model.TicketsTotalPages (@Model.TicketsTotalCount tickets)</small>
+                    <div class="btn-group" role="group" aria-label="Ticket pagination">
+                        <a class="btn btn-sm btn-outline-secondary @(Model.TicketsPage <= 1 ? "disabled" : null)"
+                           asp-page="/Admin/Draws/Edit"
+                           asp-route-id="@Model.SelectedDraw.Id"
+                           asp-route-page="@(Model.TicketsPage - 1)">Previous</a>
+                        <a class="btn btn-sm btn-outline-secondary @(Model.TicketsPage >= Model.TicketsTotalPages ? "disabled" : null)"
+                           asp-page="/Admin/Draws/Edit"
+                           asp-route-id="@Model.SelectedDraw.Id"
+                           asp-route-page="@(Model.TicketsPage + 1)">Next</a>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+
+

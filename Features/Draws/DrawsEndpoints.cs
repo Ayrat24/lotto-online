@@ -17,7 +17,13 @@ public static class DrawsEndpoints
         {
             try
             {
-                var draw = await DrawManagement.CreateDrawAsync(db, req?.PrizePool ?? 0m, ct);
+                var request = req ?? new CreateDrawRequest(0m, 0m, 0m);
+                var draw = await DrawManagement.CreateDrawAsync(
+                    db,
+                    request.PrizePoolMatch3,
+                    request.PrizePoolMatch4,
+                    request.PrizePoolMatch5,
+                    ct);
                 var dto = DrawManagement.ToDto(draw);
                 return Results.Ok(new { ok = true, draw = dto });
             }
@@ -43,7 +49,14 @@ public static class DrawsEndpoints
 
             try
             {
-                await DrawManagement.UpdateDrawAsync(db, draw, req.PrizePool, state, ct);
+                await DrawManagement.UpdateDrawAsync(
+                    db,
+                    draw,
+                    req.PrizePoolMatch3,
+                    req.PrizePoolMatch4,
+                    req.PrizePoolMatch5,
+                    state,
+                    ct);
                 return Results.Ok(new { ok = true, draw = DrawManagement.ToDto(draw) });
             }
             catch (InvalidOperationException ex)

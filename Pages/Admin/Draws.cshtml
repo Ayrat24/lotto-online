@@ -13,8 +13,16 @@
 
         <form method="post" asp-page-handler="Create" class="row g-3 align-items-end">
             <div class="col-sm-6 col-md-4">
-                <label for="createPrizePool" class="form-label">Prize pool</label>
-                <input id="createPrizePool" name="prizePool" type="number" min="0" step="0.01" value="0" class="form-control" />
+                <label for="createPrizePoolMatch3" class="form-label">Prize pool 3/5</label>
+                <input id="createPrizePoolMatch3" name="prizePoolMatch3" type="number" min="0" step="0.01" value="0" class="form-control" />
+            </div>
+            <div class="col-sm-6 col-md-4">
+                <label for="createPrizePoolMatch4" class="form-label">Prize pool 4/5</label>
+                <input id="createPrizePoolMatch4" name="prizePoolMatch4" type="number" min="0" step="0.01" value="0" class="form-control" />
+            </div>
+            <div class="col-sm-6 col-md-4">
+                <label for="createPrizePoolMatch5" class="form-label">Prize pool 5/5</label>
+                <input id="createPrizePoolMatch5" name="prizePoolMatch5" type="number" min="0" step="0.01" value="0" class="form-control" />
             </div>
             <div class="col-sm-6 col-md-4">
                 <button type="submit" class="btn btn-danger w-100">Create draw</button>
@@ -44,7 +52,8 @@ else
                         <th>Id</th>
                         <th>Tickets</th>
                         <th>State</th>
-                        <th>Prize pool</th>
+                        <th>Total pool</th>
+                        <th>Pools (3/5, 4/5, 5/5)</th>
                         <th>Created (UTC)</th>
                         <th>Numbers</th>
                         <th>Actions</th>
@@ -64,37 +73,9 @@ else
                                 </span>
                             </td>
                             <td>
-                                @if (d.State == "finished")
-                                {
-                                    <span>@d.PrizePool.ToString("0.00")</span>
-                                }
-                                else
-                                {
-                                    <form method="post" asp-page-handler="Update" class="row row-cols-lg-auto g-2 align-items-center">
-                                        <input type="hidden" name="id" value="@d.Id" />
-                                        <div class="col-12">
-                                            <input name="prizePool" type="number" min="0" step="0.01" value="@d.PrizePool.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" class="form-control form-control-sm" />
-                                        </div>
-                                        <div class="col-12">
-                                            <select name="state" class="form-select form-select-sm">
-                                                @if (d.State == "active")
-                                                {
-                                                    <option value="active" selected>active</option>
-                                                    <option value="upcoming">upcoming</option>
-                                                }
-                                                else
-                                                {
-                                                    <option value="active">active</option>
-                                                    <option value="upcoming" selected>upcoming</option>
-                                                }
-                                            </select>
-                                        </div>
-                                        <div class="col-12 d-flex gap-2">
-                                            <button type="submit" class="btn btn-sm btn-outline-primary">Save</button>
-                                        </div>
-                                    </form>
-                                }
+                                @d.TotalPrizePool.ToString("0.00")
                             </td>
+                            <td><code>@d.PrizePoolMatch3.ToString("0.00")</code>, <code>@d.PrizePoolMatch4.ToString("0.00")</code>, <code>@d.PrizePoolMatch5.ToString("0.00")</code></td>
                             <td>@d.CreatedAtUtc.ToString("u")</td>
                             <td>
                                 @if (string.IsNullOrWhiteSpace(d.Numbers))
@@ -109,10 +90,17 @@ else
                             <td>
                                 @if (d.State == "active")
                                 {
-                                    <form method="post" asp-page-handler="Execute" onsubmit="return confirm('Execute draw #@d.Id?');">
-                                        <input type="hidden" name="id" value="@d.Id" />
-                                        <button type="submit" class="btn btn-sm btn-danger">Execute draw</button>
-                                    </form>
+                                    <div class="d-flex gap-2">
+                                        <a class="btn btn-sm btn-outline-primary" asp-page="/Admin/Draws/Edit" asp-route-id="@d.Id">Edit</a>
+                                        <form method="post" asp-page-handler="Execute" onsubmit="return confirm('Execute draw #@d.Id?');">
+                                            <input type="hidden" name="id" value="@d.Id" />
+                                            <button type="submit" class="btn btn-sm btn-danger">Execute draw</button>
+                                        </form>
+                                    </div>
+                                }
+                                else if (d.State == "upcoming")
+                                {
+                                    <a class="btn btn-sm btn-outline-primary" asp-page="/Admin/Draws/Edit" asp-route-id="@d.Id">Edit</a>
                                 }
                                 else
                                 {

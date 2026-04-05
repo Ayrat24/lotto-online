@@ -11,7 +11,11 @@ public sealed class Draw
 {
     public long Id { get; set; }
 
-    public decimal PrizePool { get; set; }
+    public decimal PrizePoolMatch3 { get; set; }
+
+    public decimal PrizePoolMatch4 { get; set; }
+
+    public decimal PrizePoolMatch5 { get; set; }
 
     public DrawState State { get; set; } = DrawState.Upcoming;
 

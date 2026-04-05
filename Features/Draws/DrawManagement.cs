@@ -9,9 +9,11 @@ internal static class DrawManagement
     public const int MinNumber = 1;
     public const int MaxNumber = 36;
 
-    public static async Task<Draw> CreateDrawAsync(AppDbContext db, decimal prizePool, CancellationToken ct)
+    public static async Task<Draw> CreateDrawAsync(AppDbContext db, decimal prizePoolMatch3, decimal prizePoolMatch4, decimal prizePoolMatch5, CancellationToken ct)
     {
-        EnsurePrizePool(prizePool);
+        EnsurePrizePool(prizePoolMatch3, "3/5");
+        EnsurePrizePool(prizePoolMatch4, "4/5");
+        EnsurePrizePool(prizePoolMatch5, "5/5");
 
         var nextId = (await db.Draws.MaxAsync(x => (long?)x.Id, ct) ?? 0) + 1;
         var hasActiveDraw = await db.Draws.AnyAsync(x => x.State == DrawState.Active, ct);
@@ -19,7 +21,9 @@ internal static class DrawManagement
         var draw = new Draw
         {
             Id = nextId,
-            PrizePool = decimal.Round(prizePool, 2, MidpointRounding.AwayFromZero),
+            PrizePoolMatch3 = RoundPrizePool(prizePoolMatch3),
+            PrizePoolMatch4 = RoundPrizePool(prizePoolMatch4),
+            PrizePoolMatch5 = RoundPrizePool(prizePoolMatch5),
             State = hasActiveDraw ? DrawState.Upcoming : DrawState.Active,
             CreatedAtUtc = DateTimeOffset.UtcNow
         };
@@ -29,9 +33,11 @@ internal static class DrawManagement
         return draw;
     }
 
-    public static async Task UpdateDrawAsync(AppDbContext db, Draw draw, decimal prizePool, DrawState state, CancellationToken ct)
+    public static async Task UpdateDrawAsync(AppDbContext db, Draw draw, decimal prizePoolMatch3, decimal prizePoolMatch4, decimal prizePoolMatch5, DrawState state, CancellationToken ct)
     {
-        EnsurePrizePool(prizePool);
+        EnsurePrizePool(prizePoolMatch3, "3/5");
+        EnsurePrizePool(prizePoolMatch4, "4/5");
+        EnsurePrizePool(prizePoolMatch5, "5/5");
 
         if (draw.State == DrawState.Finished)
             throw new InvalidOperationException("Finished draws cannot be edited.");
@@ -49,7 +55,9 @@ internal static class DrawManagement
                 activeDraw.State = DrawState.Upcoming;
         }
 
-        draw.PrizePool = decimal.Round(prizePool, 2, MidpointRounding.AwayFromZero);
+        draw.PrizePoolMatch3 = RoundPrizePool(prizePoolMatch3);
+        draw.PrizePoolMatch4 = RoundPrizePool(prizePoolMatch4);
+        draw.PrizePoolMatch5 = RoundPrizePool(prizePoolMatch5);
         draw.State = state;
         await db.SaveChangesAsync(ct);
     }
@@ -68,7 +76,18 @@ internal static class DrawManagement
     }
 
     public static DrawDto ToDto(Draw draw)
-        => new(draw.Id, draw.PrizePool, ToStateValue(draw.State), draw.Numbers, draw.CreatedAtUtc);
+    {
+        var totalPrizePool = draw.PrizePoolMatch3 + draw.PrizePoolMatch4 + draw.PrizePoolMatch5;
+        return new(
+            draw.Id,
+            totalPrizePool,
+            draw.PrizePoolMatch3,
+            draw.PrizePoolMatch4,
+            draw.PrizePoolMatch5,
+            ToStateValue(draw.State),
+            draw.Numbers,
+            draw.CreatedAtUtc);
+    }
 
     public static bool TryParseEditableState(string? value, out DrawState state)
     {
@@ -110,10 +129,13 @@ internal static class DrawManagement
         return string.Join(',', arr);
     }
 
-    private static void EnsurePrizePool(decimal prizePool)
+    private static decimal RoundPrizePool(decimal prizePool)
+        => decimal.Round(prizePool, 2, MidpointRounding.AwayFromZero);
+
+    private static void EnsurePrizePool(decimal prizePool, string tier)
     {
         if (prizePool < 0)
-            throw new InvalidOperationException("Prize pool cannot be negative.");
+            throw new InvalidOperationException($"Prize pool for {tier} cannot be negative.");
     }
 }
 

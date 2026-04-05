@@ -14,11 +14,16 @@ public sealed class DrawsModel : PageModel
 {
     public sealed record AdminDrawRow(
         long Id,
-        decimal PrizePool,
+        decimal PrizePoolMatch3,
+        decimal PrizePoolMatch4,
+        decimal PrizePoolMatch5,
         string State,
         string? Numbers,
         DateTimeOffset CreatedAtUtc,
-        long TicketCount);
+        long TicketCount)
+    {
+        public decimal TotalPrizePool => PrizePoolMatch3 + PrizePoolMatch4 + PrizePoolMatch5;
+    }
 
     private readonly AppDbContext _db;
     private readonly IConfiguration _config;
@@ -35,55 +40,30 @@ public sealed class DrawsModel : PageModel
     public string? StatusMessage { get; private set; }
     public bool StatusIsError { get; private set; }
 
+    [TempData]
+    public string? FlashMessage { get; set; }
+
+    [TempData]
+    public bool? FlashIsError { get; set; }
+
     public async Task OnGetAsync(CancellationToken ct)
     {
         await EnsureDebugSeedAsync(ct);
+        if (!string.IsNullOrWhiteSpace(FlashMessage))
+        {
+            StatusMessage = FlashMessage;
+            StatusIsError = FlashIsError ?? false;
+        }
         await LoadAsync(ct);
     }
 
-    public async Task<IActionResult> OnPostCreateAsync(decimal prizePool, CancellationToken ct)
+    public async Task<IActionResult> OnPostCreateAsync(decimal prizePoolMatch3, decimal prizePoolMatch4, decimal prizePoolMatch5, CancellationToken ct)
     {
         await EnsureDebugSeedAsync(ct);
         try
         {
-            var draw = await DrawManagement.CreateDrawAsync(_db, prizePool, ct);
+            var draw = await DrawManagement.CreateDrawAsync(_db, prizePoolMatch3, prizePoolMatch4, prizePoolMatch5, ct);
             StatusMessage = $"Created draw #{draw.Id} in {DrawManagement.ToStateValue(draw.State)} state.";
-            StatusIsError = false;
-        }
-        catch (InvalidOperationException ex)
-        {
-            StatusMessage = ex.Message;
-            StatusIsError = true;
-        }
-
-        await LoadAsync(ct);
-        return Page();
-    }
-
-    public async Task<IActionResult> OnPostUpdateAsync(long id, decimal prizePool, string state, CancellationToken ct)
-    {
-        await EnsureDebugSeedAsync(ct);
-        var draw = await _db.Draws.SingleOrDefaultAsync(x => x.Id == id, ct);
-        if (draw is null)
-        {
-            StatusMessage = $"Draw #{id} was not found.";
-            StatusIsError = true;
-            await LoadAsync(ct);
-            return Page();
-        }
-
-        if (!DrawManagement.TryParseEditableState(state, out var parsedState))
-        {
-            StatusMessage = "State must be active or upcoming.";
-            StatusIsError = true;
-            await LoadAsync(ct);
-            return Page();
-        }
-
-        try
-        {
-            await DrawManagement.UpdateDrawAsync(_db, draw, prizePool, parsedState, ct);
-            StatusMessage = $"Updated draw #{draw.Id}.";
             StatusIsError = false;
         }
         catch (InvalidOperationException ex)
@@ -145,7 +125,9 @@ public sealed class DrawsModel : PageModel
         Draws = draws
             .Select(draw => new AdminDrawRow(
                 draw.Id,
-                draw.PrizePool,
+                draw.PrizePoolMatch3,
+                draw.PrizePoolMatch4,
+                draw.PrizePoolMatch5,
                 DrawManagement.ToStateValue(draw.State),
                 draw.Numbers,
                 draw.CreatedAtUtc,
