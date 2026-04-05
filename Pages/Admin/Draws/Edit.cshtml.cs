@@ -182,20 +182,31 @@ public sealed class EditModel : PageModel
             return;
         }
 
-        TicketUsers = await _db.Tickets
+        var ticketUsersQuery = _db.Tickets
             .AsNoTracking()
             .Where(x => x.DrawId == drawId && x.Numbers == SelectedTicketNumbers)
             .GroupBy(x => new { x.UserId, x.User.TelegramUserId, x.User.Number })
-            .Select(g => new DrawTicketUserRow(
+            .Select(g => new
+            {
                 g.Key.UserId,
                 g.Key.TelegramUserId,
                 g.Key.Number,
-                g.LongCount(),
-                g.Max(x => x.PurchasedAtUtc)))
+                TicketCount = g.LongCount(),
+                LastPurchasedAtUtc = g.Max(x => x.PurchasedAtUtc)
+            })
             .OrderByDescending(x => x.TicketCount)
             .ThenByDescending(x => x.LastPurchasedAtUtc)
-            .ThenBy(x => x.UserId)
-            .ToArrayAsync(ct);
+            .ThenBy(x => x.UserId);
+
+        var ticketUsers = await ticketUsersQuery.ToArrayAsync(ct);
+        TicketUsers = ticketUsers
+            .Select(x => new DrawTicketUserRow(
+                x.UserId,
+                x.TelegramUserId,
+                x.Number,
+                x.TicketCount,
+                x.LastPurchasedAtUtc))
+            .ToArray();
     }
 
     private async Task EnsureDebugSeedAsync(CancellationToken ct)
