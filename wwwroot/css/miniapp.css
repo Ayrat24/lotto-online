@@ -340,8 +340,8 @@ button:disabled {
   width: 100%;
   max-width: 100%;
   margin: 0;
-  min-height: clamp(360px, 75dvh, 780px);
-  height: clamp(360px, 75dvh, 780px);
+  min-height: clamp(270px, 56dvh, 585px);
+  height: clamp(270px, 56dvh, 585px);
   max-height: calc(100dvh - env(safe-area-inset-bottom, 0px) - 8px);
   padding: 8px 6px calc(10px + env(safe-area-inset-bottom, 0px));
   border-radius: 18px 18px 0 0;
@@ -402,7 +402,7 @@ button:disabled {
   overflow: hidden;
   border: 1px solid rgba(33, 144, 255, 0.28);
   background: linear-gradient(180deg, rgba(27, 38, 57, 0.92), rgba(15, 24, 38, 0.94));
-  font-size: clamp(1.3rem, 2.8dvh, 1.8rem);
+  font-size: clamp(1.04rem, 2.24dvh, 1.44rem);
   font-weight: 900;
   user-select: none;
   touch-action: none;
@@ -440,7 +440,7 @@ button:disabled {
   line-height: var(--wheel-item-height);
   text-align: center;
   font-variant-numeric: tabular-nums;
-  font-size: calc(var(--wheel-item-height) * 0.84);
+  font-size: calc(var(--wheel-item-height) * 0.67);
   color: rgba(220, 234, 255, 0.48);
   transition: transform 90ms linear, opacity 90ms linear, filter 90ms linear, color 120ms linear;
   scroll-snap-align: center;
@@ -546,8 +546,8 @@ button:disabled {
 
 @media (max-height: 720px) {
   .ticket-picker-panel {
-    min-height: 75dvh;
-    height: 75dvh;
+    min-height: 56dvh;
+    height: 56dvh;
   }
 
   .ticket-picker-grid {
