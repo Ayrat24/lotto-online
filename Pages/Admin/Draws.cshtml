@@ -88,17 +88,7 @@ else
                                 }
                             </td>
                             <td>
-                                @if (d.State == "active")
-                                {
-                                    <div class="d-flex gap-2">
-                                        <a class="btn btn-sm btn-outline-primary" asp-page="/Admin/Draws/Edit" asp-route-id="@d.Id">Edit</a>
-                                        <form method="post" asp-page-handler="Execute" onsubmit="return confirm('Execute draw #@d.Id?');">
-                                            <input type="hidden" name="id" value="@d.Id" />
-                                            <button type="submit" class="btn btn-sm btn-danger">Execute draw</button>
-                                        </form>
-                                    </div>
-                                }
-                                else if (d.State == "upcoming")
+                                @if (d.State == "active" || d.State == "upcoming")
                                 {
                                     <a class="btn btn-sm btn-outline-primary" asp-page="/Admin/Draws/Edit" asp-route-id="@d.Id">Edit</a>
                                 }

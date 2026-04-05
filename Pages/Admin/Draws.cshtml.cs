@@ -76,33 +76,6 @@ public sealed class DrawsModel : PageModel
         return Page();
     }
 
-    public async Task<IActionResult> OnPostExecuteAsync(long id, CancellationToken ct)
-    {
-        await EnsureDebugSeedAsync(ct);
-        var draw = await _db.Draws.SingleOrDefaultAsync(x => x.Id == id, ct);
-        if (draw is null)
-        {
-            StatusMessage = $"Draw #{id} was not found.";
-            StatusIsError = true;
-            await LoadAsync(ct);
-            return Page();
-        }
-
-        try
-        {
-            await DrawManagement.ExecuteDrawAsync(_db, draw, ct);
-            StatusMessage = $"Executed draw #{draw.Id}: {draw.Numbers}.";
-            StatusIsError = false;
-        }
-        catch (InvalidOperationException ex)
-        {
-            StatusMessage = ex.Message;
-            StatusIsError = true;
-        }
-
-        await LoadAsync(ct);
-        return Page();
-    }
 
     private async Task LoadAsync(CancellationToken ct)
     {

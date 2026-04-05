@@ -56,10 +56,59 @@ else if (Model.CanEdit)
             <a class="btn btn-secondary" asp-page="/Admin/Draws">Back</a>
         </div>
     </form>
+
+    <div class="card mt-4">
+        <div class="card-body">
+            <h5 class="card-title">Execute draw</h5>
+            <p class="text-muted mb-3">You can execute using manual numbers or execute with randomized numbers.</p>
+
+            @if (Model.State != "active")
+            {
+                <div class="alert alert-secondary mb-0">Only active draws can be executed. Set state to <strong>active</strong>, save, then execute.</div>
+            }
+            else
+            {
+                <form method="post" asp-page-handler="Execute" class="row g-3 align-items-end">
+                    <input type="hidden" name="ticketPage" value="@Model.TicketsPage" />
+                    <input type="hidden" name="ticketNumbers" value="@Model.SelectedTicketNumbers" />
+                    <div class="col-md-6">
+                        <label asp-for="ExecuteNumbers" class="form-label">Manual result numbers</label>
+                        <input asp-for="ExecuteNumbers" class="form-control" placeholder="1,5,12,23,36" />
+                        <div class="form-text">Enter 5 unique numbers between 1 and 36 separated by commas.</div>
+                    </div>
+                    <div class="col-md-6 d-flex gap-2 flex-wrap">
+                        <button type="button" id="randomizePreviewBtn" class="btn btn-outline-secondary">Randomize</button>
+                        <button type="submit" class="btn btn-danger" onclick="return confirm('Execute draw #@Model.SelectedDraw.Id with these numbers?');">Execute with manual numbers</button>
+                        <button type="submit" name="randomize" value="true" class="btn btn-danger" onclick="return confirm('Execute draw #@Model.SelectedDraw.Id with randomized numbers?');">Execute randomized</button>
+                    </div>
+                </form>
+            }
+        </div>
+    </div>
 }
 else
 {
     <a class="btn btn-secondary mt-3" asp-page="/Admin/Draws">Back</a>
+}
+
+@section Scripts {
+    <script>
+        (function () {
+            var btn = document.getElementById('randomizePreviewBtn');
+            var input = document.getElementById('ExecuteNumbers');
+            if (!btn || !input) return;
+
+            btn.addEventListener('click', function () {
+                var numbers = new Set();
+                while (numbers.size < 5) {
+                    numbers.add(Math.floor(Math.random() * 36) + 1);
+                }
+
+                var arr = Array.from(numbers).sort(function (a, b) { return a - b; });
+                input.value = arr.join(',');
+            });
+        })();
+    </script>
 }
 
 @if (Model.SelectedDraw is not null)

@@ -62,7 +62,7 @@ internal static class DrawManagement
         await db.SaveChangesAsync(ct);
     }
 
-    public static async Task ExecuteDrawAsync(AppDbContext db, Draw draw, CancellationToken ct)
+    public static async Task ExecuteDrawAsync(AppDbContext db, Draw draw, string? manualNumbers, CancellationToken ct)
     {
         if (draw.State == DrawState.Finished)
             throw new InvalidOperationException("This draw is already finished.");
@@ -70,7 +70,9 @@ internal static class DrawManagement
         if (draw.State != DrawState.Active)
             throw new InvalidOperationException("Only the active draw can be executed.");
 
-        draw.Numbers = GenerateDrawNumbers();
+        draw.Numbers = string.IsNullOrWhiteSpace(manualNumbers)
+            ? GenerateDrawNumbers()
+            : NormalizeManualDrawNumbers(manualNumbers);
         draw.State = DrawState.Finished;
         await db.SaveChangesAsync(ct);
     }
@@ -123,6 +125,33 @@ internal static class DrawManagement
         var set = new HashSet<int>();
         while (set.Count < NumbersPerDraw)
             set.Add(Random.Shared.Next(MinNumber, MaxNumber + 1));
+
+        var arr = set.ToArray();
+        Array.Sort(arr);
+        return string.Join(',', arr);
+    }
+
+    private static string NormalizeManualDrawNumbers(string manualNumbers)
+    {
+        var parts = manualNumbers
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToArray();
+
+        if (parts.Length != NumbersPerDraw)
+            throw new InvalidOperationException($"Provide exactly {NumbersPerDraw} numbers separated by commas.");
+
+        var set = new HashSet<int>();
+        foreach (var part in parts)
+        {
+            if (!int.TryParse(part, out var value))
+                throw new InvalidOperationException("Manual draw numbers must be valid integers.");
+
+            if (value < MinNumber || value > MaxNumber)
+                throw new InvalidOperationException($"Each draw number must be between {MinNumber} and {MaxNumber}.");
+
+            if (!set.Add(value))
+                throw new InvalidOperationException("Manual draw numbers must be unique.");
+        }
 
         var arr = set.ToArray();
         Array.Sort(arr);

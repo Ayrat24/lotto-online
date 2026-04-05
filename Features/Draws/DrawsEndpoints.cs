@@ -76,7 +76,7 @@ public static class DrawsEndpoints
 
             try
             {
-                await DrawManagement.ExecuteDrawAsync(db, draw, ct);
+                await DrawManagement.ExecuteDrawAsync(db, draw, null, ct);
                 return Results.Ok(new { ok = true, draw = DrawManagement.ToDto(draw) });
             }
             catch (InvalidOperationException ex)

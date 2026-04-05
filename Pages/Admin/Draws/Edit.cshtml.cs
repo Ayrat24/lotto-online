@@ -51,6 +51,9 @@ public sealed class EditModel : PageModel
     [BindProperty]
     public string State { get; set; } = "upcoming";
 
+    [BindProperty]
+    public string? ExecuteNumbers { get; set; }
+
     public string? StatusMessage { get; private set; }
     public bool StatusIsError { get; private set; }
 
@@ -119,6 +122,36 @@ public sealed class EditModel : PageModel
         }
     }
 
+    public async Task<IActionResult> OnPostExecuteAsync(long id, bool randomize = false, int ticketPage = 1, string? ticketNumbers = null, CancellationToken ct = default)
+    {
+        await EnsureDebugSeedAsync(ct);
+
+        var draw = await _db.Draws.SingleOrDefaultAsync(x => x.Id == id, ct);
+        if (draw is null)
+            return NotFound();
+
+        try
+        {
+            var manualNumbers = randomize ? null : ExecuteNumbers;
+            await DrawManagement.ExecuteDrawAsync(_db, draw, manualNumbers, ct);
+            FlashMessage = $"Executed draw #{draw.Id}: {draw.Numbers}.";
+            FlashIsError = false;
+            return RedirectToPage("/Admin/Draws");
+        }
+        catch (InvalidOperationException ex)
+        {
+            StatusMessage = ex.Message;
+            StatusIsError = true;
+            SelectedDraw = draw;
+            PrizePoolMatch3 = draw.PrizePoolMatch3;
+            PrizePoolMatch4 = draw.PrizePoolMatch4;
+            PrizePoolMatch5 = draw.PrizePoolMatch5;
+            State = DrawManagement.ToStateValue(draw.State);
+            await SafeLoadTicketsAsync(id, ticketPage, ticketNumbers, ct);
+            return Page();
+        }
+    }
+
     private async Task SafeLoadTicketsAsync(long drawId, int requestedPage, string? ticketNumbers, CancellationToken ct)
     {
         try
@@ -182,30 +215,29 @@ public sealed class EditModel : PageModel
             return;
         }
 
-        var ticketUsersQuery = _db.Tickets
+        var ticketUserRows = await _db.Tickets
             .AsNoTracking()
             .Where(x => x.DrawId == drawId && x.Numbers == SelectedTicketNumbers)
-            .GroupBy(x => new { x.UserId, x.User.TelegramUserId, x.User.Number })
             .Select(g => new
             {
+                g.UserId,
+                g.User.TelegramUserId,
+                g.User.Number,
+                g.PurchasedAtUtc
+            })
+            .ToListAsync(ct);
+
+        TicketUsers = ticketUserRows
+            .GroupBy(x => new { x.UserId, x.TelegramUserId, x.Number })
+            .Select(g => new DrawTicketUserRow(
                 g.Key.UserId,
                 g.Key.TelegramUserId,
                 g.Key.Number,
-                TicketCount = g.LongCount(),
-                LastPurchasedAtUtc = g.Max(x => x.PurchasedAtUtc)
-            })
+                g.LongCount(),
+                g.Max(x => x.PurchasedAtUtc)))
             .OrderByDescending(x => x.TicketCount)
             .ThenByDescending(x => x.LastPurchasedAtUtc)
-            .ThenBy(x => x.UserId);
-
-        var ticketUsers = await ticketUsersQuery.ToArrayAsync(ct);
-        TicketUsers = ticketUsers
-            .Select(x => new DrawTicketUserRow(
-                x.UserId,
-                x.TelegramUserId,
-                x.Number,
-                x.TicketCount,
-                x.LastPurchasedAtUtc))
+            .ThenBy(x => x.UserId)
             .ToArray();
     }
 
