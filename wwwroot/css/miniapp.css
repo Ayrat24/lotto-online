@@ -340,8 +340,8 @@ button:disabled {
   width: 100%;
   max-width: 100%;
   margin: 0;
-  min-height: clamp(300px, 50dvh, 560px);
-  height: clamp(300px, 50dvh, 560px);
+  min-height: clamp(360px, 75dvh, 780px);
+  height: clamp(360px, 75dvh, 780px);
   max-height: calc(100dvh - env(safe-area-inset-bottom, 0px) - 8px);
   padding: 8px 6px calc(10px + env(safe-area-inset-bottom, 0px));
   border-radius: 18px 18px 0 0;
@@ -353,13 +353,14 @@ button:disabled {
 .ticket-picker-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 4px;
+  gap: 2px;
   min-height: 0;
   align-items: stretch;
+  justify-items: stretch;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.03);
-  padding: 3px;
+  padding: 2px;
 }
 
 .picker-slot {
@@ -370,8 +371,9 @@ button:disabled {
   display: grid;
   grid-template-rows: auto 1fr auto;
   gap: 8px;
-  justify-items: center;
+  justify-items: stretch;
   min-height: 0;
+  width: 100%;
 }
 
 .picker-arrow {
@@ -544,8 +546,8 @@ button:disabled {
 
 @media (max-height: 720px) {
   .ticket-picker-panel {
-    min-height: 56dvh;
-    height: 56dvh;
+    min-height: 75dvh;
+    height: 75dvh;
   }
 
   .ticket-picker-grid {
@@ -742,11 +744,12 @@ button:disabled {
   }
 
   .ticket-picker-grid {
-    gap: 8px;
+    gap: 2px;
+    padding: 2px;
   }
 
   .picker-slot {
-    padding: 6px;
+    padding: 0;
   }
 
   .picker-value {
