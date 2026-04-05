@@ -92,6 +92,10 @@ else
                                 {
                                     <a class="btn btn-sm btn-outline-primary" asp-page="/Admin/Draws/Edit" asp-route-id="@d.Id">Edit</a>
                                 }
+                                else if (d.State == "finished")
+                                {
+                                    <a class="btn btn-sm btn-outline-dark" asp-page="/Admin/Draws/Result" asp-route-id="@d.Id">Results</a>
+                                }
                                 else
                                 {
                                     <span class="text-muted">—</span>

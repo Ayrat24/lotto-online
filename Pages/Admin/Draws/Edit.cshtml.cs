@@ -136,7 +136,7 @@ public sealed class EditModel : PageModel
             await DrawManagement.ExecuteDrawAsync(_db, draw, manualNumbers, ct);
             FlashMessage = $"Executed draw #{draw.Id}: {draw.Numbers}.";
             FlashIsError = false;
-            return RedirectToPage("/Admin/Draws");
+            return RedirectToPage("/Admin/Draws/Result", new { id = draw.Id });
         }
         catch (InvalidOperationException ex)
         {
