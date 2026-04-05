@@ -208,28 +208,22 @@
   }
 
   function computeWheelItemHeight(wheelState) {
-    if (!wheelState || !wheelState.slot) return 40;
+    if (!wheelState || !wheelState.root) return 40;
 
-    var slotHeight = wheelState.slot.clientHeight || 0;
-    var arrows = wheelState.slot.querySelectorAll('.picker-arrow');
-    var arrowsHeight = 0;
-    for (var i = 0; i < arrows.length; i++) {
-      arrowsHeight += arrows[i].offsetHeight || 0;
-    }
-
-    // Account for slot paddings/gaps so center wheel always fits exactly 5 rows.
-    var wheelBudget = slotHeight - arrowsHeight - 22;
-    var target = wheelBudget > 0 ? Math.floor(wheelBudget / 5) : 40;
-    return Math.max(28, Math.min(58, target));
+    // Keep wheel inside the slot's middle row so status/confirm rows never get overlapped.
+    var visibleHeight = wheelState.root.clientHeight || 0;
+    var target = visibleHeight > 0 ? Math.floor(visibleHeight / 5) : 40;
+    return Math.max(26, Math.min(56, target));
   }
 
   function applyWheelLayout(wheelState) {
     if (!wheelState || !wheelState.viewport || !wheelState.root) return;
 
+    var visibleHeight = wheelState.root.clientHeight || 0;
     var itemHeight = computeWheelItemHeight(wheelState);
     wheelState.itemHeight = itemHeight;
     wheelState.root.style.setProperty('--wheel-item-height', itemHeight.toFixed(2) + 'px');
-    wheelState.root.style.setProperty('--wheel-visible-height', (itemHeight * 5).toFixed(2) + 'px');
+    wheelState.root.style.setProperty('--wheel-visible-height', (visibleHeight > 0 ? visibleHeight : itemHeight * 5).toFixed(2) + 'px');
   }
 
   function syncAllWheelLayouts() {
@@ -385,14 +379,13 @@
       ticketPickerGridEl.appendChild(slot);
 
       // Delay wheel metrics until after layout is committed.
-      (function (idx, slotEl, rootEl, vp, tr) {
+      (function (idx, rootEl, vp, tr) {
         requestAnimationFrame(function () {
           var items = tr.querySelectorAll('.picker-wheel-item');
           if (!items || items.length === 0) return;
 
           var wheelState = {
             root: rootEl,
-            slot: slotEl,
             viewport: vp,
             track: tr,
             items: items,
@@ -420,7 +413,7 @@
           normalizeWheelToMiddleCycle(idx, 'auto');
           renderWheelVisual(idx);
         });
-      })(i, slot, value, viewport, track);
+      })(i, value, viewport, track);
     }
 
     if (!pickerWheelResizeBound) {
