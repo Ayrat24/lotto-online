@@ -67,6 +67,7 @@
   var ticketPickerCloseTimer = null;
   var pickerApplyingSeed = false;
   var pickerOpenAnimationTimer = null;
+  var pollingIntervalId = null;
 
   function setPurchaseStatus(text) {
     if (purchaseStatusEl) purchaseStatusEl.textContent = text || '';
@@ -1109,11 +1110,14 @@
   }
 
   function startPolling() {
+    if (pollingIntervalId) return;
+
     try {
-      setInterval(function () {
+      pollingIntervalId = setInterval(function () {
         refreshState();
       }, 4000);
     } catch (e) {
+      pollingIntervalId = null;
     }
   }
 
@@ -1182,7 +1186,6 @@
   setDebugModeBadge('');
   clientIsLocalDebug = false;
 
-  startPolling();
 
   try {
     Telegram.WebApp.setHeaderColor('#0b1019');
