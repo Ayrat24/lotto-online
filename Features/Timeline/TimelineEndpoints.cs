@@ -45,24 +45,59 @@ public static class TimelineEndpoints
 
             var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.TelegramUserId == telegramUserId, ct);
 
-            var currentDrawEntity = await db.Draws
+            var activeDrawEntity = await db.Draws
                 .Where(x => x.State == DrawState.Active)
                 .OrderByDescending(x => x.Id)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(ct);
 
-            var currentDraw = currentDrawEntity is null
-                ? null
-                : DrawManagement.ToDto(currentDrawEntity);
+            Draw? featuredDrawEntity = activeDrawEntity;
+            if (featuredDrawEntity is null)
+            {
+                if (user is not null)
+                {
+                    var winningDrawId = await db.Tickets
+                        .AsNoTracking()
+                        .Where(x => x.UserId == user.Id && x.Status == TicketStatus.WinningsAvailable)
+                        .Select(x => (long?)x.DrawId)
+                        .MaxAsync(ct);
 
-            var tickets = user is null
-                ? new List<TicketForDrawDto>()
+                    if (winningDrawId.HasValue)
+                    {
+                        featuredDrawEntity = await db.Draws
+                            .Where(x => x.Id == winningDrawId.Value && x.State == DrawState.Finished)
+                            .AsNoTracking()
+                            .FirstOrDefaultAsync(ct);
+                    }
+                }
+
+                featuredDrawEntity ??= await db.Draws
+                    .Where(x => x.State == DrawState.Finished)
+                    .OrderByDescending(x => x.Id)
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(ct);
+            }
+
+            var currentDraw = featuredDrawEntity is null
+                ? null
+                : DrawManagement.ToDto(featuredDrawEntity);
+
+            var ticketRows = user is null
+                ? new List<Ticket>()
                 : await db.Tickets
                     .Where(x => x.UserId == user.Id)
                     .OrderByDescending(x => x.PurchasedAtUtc)
-                    .Select(x => new TicketForDrawDto(x.Id, x.DrawId, x.Numbers, x.PurchasedAtUtc))
                     .AsNoTracking()
                     .ToListAsync(ct);
+
+            var tickets = ticketRows
+                .Select(x => new TicketForDrawDto(
+                    x.Id,
+                    x.DrawId,
+                    x.Numbers,
+                    DrawManagement.ToTicketStatusValue(x.Status),
+                    x.PurchasedAtUtc))
+                .ToList();
 
             var currentTickets = currentDraw is null
                 ? Array.Empty<TicketForDrawDto>()

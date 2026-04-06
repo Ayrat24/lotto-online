@@ -108,12 +108,19 @@ namespace MiniApp.Migrations
                     b.Property<DateTimeOffset>("PurchasedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.Property<long>("UserId")
                         .HasColumnType("bigint");
 
                     b.HasKey("Id");
 
                     b.HasIndex("DrawId", "PurchasedAtUtc");
+
+                    b.HasIndex("UserId", "Status", "DrawId");
 
                     b.HasIndex("UserId", "PurchasedAtUtc");
 

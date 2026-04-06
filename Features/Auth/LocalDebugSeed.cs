@@ -107,11 +107,56 @@ public static class LocalDebugSeed
                 UserId = debugUser.Id,
                 DrawId = finishedId,
                 Numbers = DrawManagement.GenerateDrawNumbers(),
+                Status = TicketStatus.AwaitingDraw,
                 PurchasedAtUtc = now.AddMinutes(-Random.Shared.Next(10, 180))
             });
         }
 
+        var allTickets = await db.Tickets
+            .Where(x => x.UserId == debugUser.Id)
+            .ToListAsync(ct);
+
+        var drawsById = draws.ToDictionary(x => x.Id);
+        foreach (var ticket in allTickets)
+        {
+            if (!drawsById.TryGetValue(ticket.DrawId, out var drawForTicket))
+                continue;
+
+            if (drawForTicket.State != DrawState.Finished || string.IsNullOrWhiteSpace(drawForTicket.Numbers))
+            {
+                ticket.Status = TicketStatus.AwaitingDraw;
+                continue;
+            }
+
+            var matchCount = CountMatches(ticket.Numbers, drawForTicket.Numbers);
+            ticket.Status = matchCount >= 3
+                ? TicketStatus.WinningsAvailable
+                : TicketStatus.ExpiredNoWin;
+        }
+
         await db.SaveChangesAsync(ct);
+    }
+
+    private static int CountMatches(string ticketNumbers, string drawNumbers)
+    {
+        var drawSet = drawNumbers
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(int.Parse)
+            .ToHashSet();
+
+        var ticketSet = ticketNumbers
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(int.Parse)
+            .ToHashSet();
+
+        var matches = 0;
+        foreach (var n in ticketSet)
+        {
+            if (drawSet.Contains(n))
+                matches++;
+        }
+
+        return matches;
     }
 
     private static async Task EnsureUserAsync(AppDbContext db, long telegramUserId, string number, DateTimeOffset now, CancellationToken ct)

@@ -46,12 +46,16 @@ public static class TicketsEndpoints
             if (u is null)
                 return Results.Ok(new { ok = true, tickets = Array.Empty<TicketDto>() });
 
-            var tickets = await db.Tickets
+            var ticketRows = await db.Tickets
                 .Where(x => x.UserId == u.Id)
                 .OrderByDescending(x => x.PurchasedAtUtc)
-                .Select(x => new TicketDto(x.Id, x.DrawId, x.Numbers, x.PurchasedAtUtc))
+                .Select(x => new { x.Id, x.DrawId, x.Numbers, x.Status, x.PurchasedAtUtc })
                 .AsNoTracking()
                 .ToListAsync(ct);
+
+            var tickets = ticketRows
+                .Select(x => new TicketDto(x.Id, x.DrawId, x.Numbers, DrawManagement.ToTicketStatusValue(x.Status), x.PurchasedAtUtc))
+                .ToArray();
 
             return Results.Ok(new { ok = true, tickets });
         });
@@ -108,13 +112,14 @@ public static class TicketsEndpoints
                 UserId = u.Id,
                 DrawId = currentDraw.Id,
                 Numbers = numbers,
+                Status = TicketStatus.AwaitingDraw,
                 PurchasedAtUtc = DateTimeOffset.UtcNow
             };
 
             db.Tickets.Add(ticket);
             await db.SaveChangesAsync(ct);
 
-            return Results.Ok(new { ok = true, ticket = new TicketDto(ticket.Id, ticket.DrawId, ticket.Numbers, ticket.PurchasedAtUtc) });
+            return Results.Ok(new { ok = true, ticket = new TicketDto(ticket.Id, ticket.DrawId, ticket.Numbers, DrawManagement.ToTicketStatusValue(ticket.Status), ticket.PurchasedAtUtc) });
         });
 
         return endpoints;

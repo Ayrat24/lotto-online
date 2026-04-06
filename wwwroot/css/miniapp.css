@@ -301,7 +301,7 @@ button:disabled {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .ticket-title {
@@ -312,6 +312,41 @@ button:disabled {
 .ticket-meta {
   font-size: 0.9rem;
   color: var(--muted);
+  margin-top: 10px;
+}
+
+.ticket-status {
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+
+.ticket-status-awaiting {
+  color: #d0d9e9;
+  background: rgba(148, 164, 189, 0.12);
+  border-color: rgba(148, 164, 189, 0.34);
+}
+
+.ticket-status-expired {
+  color: #ffd1de;
+  background: rgba(255, 111, 152, 0.12);
+  border-color: rgba(255, 111, 152, 0.3);
+}
+
+.ticket-status-win {
+  color: #95ffc2;
+  background: rgba(71, 209, 123, 0.14);
+  border-color: rgba(71, 209, 123, 0.4);
+}
+
+.ticket-status-claimed {
+  color: #9be2ff;
+  background: rgba(33, 144, 255, 0.14);
+  border-color: rgba(33, 144, 255, 0.38);
 }
 
 .ticket-numbers {
@@ -331,6 +366,17 @@ button:disabled {
   color: #dbe8fc;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
+}
+
+.ball-result-ready {
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.ball-match {
+  background: radial-gradient(circle at 30% 30%, rgba(255, 232, 138, 0.34), rgba(241, 190, 55, 0.18));
+  border-color: rgba(241, 190, 55, 0.72);
+  color: #ffefbc;
+  box-shadow: 0 0 0 1px rgba(241, 190, 55, 0.24) inset;
 }
 
 .ticket-picker-panel {
