@@ -52,6 +52,8 @@
   var LOTTO_MIN = 1;
   var LOTTO_MAX = 36;
   var PICKER_VALUE_RANGE = LOTTO_MAX - LOTTO_MIN + 1;
+  var PICKER_SEED_OFFSET_MIN = 2;
+  var PICKER_SEED_OFFSET_MAX = 5;
   var WHEEL_REPEAT_CYCLES = 7;
 
   var pickerWheels = [];
@@ -159,13 +161,26 @@
     ticketPickerBuilt = false;
   }
 
-  function setWheelRandomStartPosition(index) {
+  function setWheelStartNearSeed(index) {
     var wheelState = pickerWheels[index];
     if (!wheelState || !wheelState.items || wheelState.items.length === 0) return;
 
-    var randomItemIndex = Math.floor(Math.random() * wheelState.items.length);
-    centerWheelOnItem(wheelState, wheelState.items[randomItemIndex], 'auto');
-    renderWheelVisual(index);
+    var seedValue = Math.min(LOTTO_MAX, Math.max(LOTTO_MIN, parseInt(pickerNumbers[index], 10) || PICKER_START_VALUE));
+    var offset = PICKER_SEED_OFFSET_MIN + Math.floor(Math.random() * (PICKER_SEED_OFFSET_MAX - PICKER_SEED_OFFSET_MIN + 1));
+    var direction = Math.random() < 0.5 ? -1 : 1;
+    var startValue = seedValue + (offset * direction);
+
+    if (startValue < LOTTO_MIN || startValue > LOTTO_MAX) {
+      direction *= -1;
+      startValue = seedValue + (offset * direction);
+    }
+
+    startValue = Math.min(LOTTO_MAX, Math.max(LOTTO_MIN, startValue));
+
+    var itemIndex = wheelState.middleCycleStart + (wheelOrderDescending ? (LOTTO_MAX - startValue) : (startValue - LOTTO_MIN));
+    itemIndex = Math.max(0, Math.min(wheelState.items.length - 1, itemIndex));
+
+    centerWheelOnItem(wheelState, wheelState.items[itemIndex], 'auto');
   }
 
   function startPickerOpenAnimation() {
@@ -177,14 +192,19 @@
     }
 
     for (var i = 0; i < pickerWheels.length; i++) {
+      var wheelState = pickerWheels[i];
+      if (wheelState) wheelState.isOpening = true;
       normalizeWheelToMiddleCycle(i, 'smooth');
     }
 
     pickerOpenAnimationTimer = setTimeout(function () {
       pickerOpenAnimationTimer = null;
+      for (var i = 0; i < pickerWheels.length; i++) {
+        if (pickerWheels[i]) pickerWheels[i].isOpening = false;
+      }
       pickerApplyingSeed = false;
       updatePickerUi();
-    }, 620 + pickerWheels.length * 40);
+    }, 403 + pickerWheels.length * 26);
   }
 
   function setSheetOpenClass() {
@@ -337,6 +357,8 @@
     pickerWheelSnapTimers[index] = setTimeout(function () {
       var wheelState = pickerWheels[index];
       if (!wheelState) return;
+
+      if (wheelState.isOpening) return;
 
       var nearestInfo = getWheelNearestItemInfo(wheelState);
       if (!nearestInfo || !nearestInfo.item) return;
@@ -538,12 +560,13 @@
           rootEl.addEventListener('wheel', function (e) {
             e.preventDefault();
             vp.scrollTop += e.deltaY;
+            if (wheelState.isOpening) return;
             renderWheelVisual(idx);
             scheduleWheelSnap(idx);
           }, { passive: false });
 
           if (pickerApplyingSeed) {
-            setWheelRandomStartPosition(idx);
+            setWheelStartNearSeed(idx);
           } else {
             normalizeWheelToMiddleCycle(idx, 'auto');
             renderWheelVisual(idx);
@@ -572,7 +595,9 @@
 
     ticketPickerBuilt = true;
 
-    updatePickerUi();
+    if (!pickerApplyingSeed) {
+      updatePickerUi();
+    }
   }
 
   function createNumbersRow(numbersStr, drawNumbersStr) {
@@ -851,7 +876,7 @@
       buildTicketPickerSlots();
     } else {
       for (var i = 0; i < pickerWheels.length; i++) {
-        setWheelRandomStartPosition(i);
+        setWheelStartNearSeed(i);
       }
 
       if (pickerOpenAnimationTimer) {
@@ -862,7 +887,7 @@
       pickerOpenAnimationTimer = setTimeout(function () {
         pickerOpenAnimationTimer = null;
         startPickerOpenAnimation();
-      }, 30);
+      }, 72);
     }
 
     if (ticketPickerCloseTimer) {

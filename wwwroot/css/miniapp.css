@@ -617,7 +617,7 @@ button:disabled {
 
 #ticketPickerSheet .sheet-backdrop {
   opacity: 0;
-  transition: opacity 260ms ease;
+  transition: opacity 169ms ease;
 }
 
 #ticketPickerSheet.ticket-picker-open .sheet-backdrop,
@@ -628,7 +628,7 @@ button:disabled {
 #ticketPickerSheet .ticket-picker-panel {
   transform: translateY(100%);
   opacity: 0;
-  transition: transform 260ms cubic-bezier(.2, .75, .17, 1), opacity 220ms ease;
+  transition: transform 169ms cubic-bezier(.2, .75, .17, 1), opacity 143ms ease;
   will-change: transform, opacity;
 }
 
