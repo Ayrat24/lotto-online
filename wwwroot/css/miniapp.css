@@ -591,6 +591,7 @@ button:disabled {
 
 @media (max-height: 720px) {
   .picker-value {
+    min-height: 180px;
     --wheel-item-height: clamp(30px, 6.8dvh, 44px);
     --wheel-row-gap: 5px;
   }
