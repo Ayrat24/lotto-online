@@ -177,19 +177,14 @@
     }
 
     for (var i = 0; i < pickerWheels.length; i++) {
-      (function (idx) {
-        setTimeout(function () {
-          if (!pickerApplyingSeed) return;
-          normalizeWheelToMiddleCycle(idx, 'smooth');
-        }, idx * 55);
-      })(i);
+      normalizeWheelToMiddleCycle(i, 'smooth');
     }
 
     pickerOpenAnimationTimer = setTimeout(function () {
       pickerOpenAnimationTimer = null;
       pickerApplyingSeed = false;
       updatePickerUi();
-    }, 460 + pickerWheels.length * 55);
+    }, 620 + pickerWheels.length * 40);
   }
 
   function setSheetOpenClass() {
@@ -562,7 +557,7 @@
             pickerOpenAnimationTimer = setTimeout(function () {
               pickerOpenAnimationTimer = null;
               startPickerOpenAnimation();
-            }, 30);
+            }, 70);
           }
         });
       })(i, value, viewport, track);
