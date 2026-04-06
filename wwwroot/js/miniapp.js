@@ -62,6 +62,8 @@
   var pickerArrowHoldState = [];
   var wheelOrderDescending = true;
   var ticketPickerBuilt = false;
+  var ticketPickerReady = false;
+  var ticketPickerPendingOpen = false;
   var ticketPickerCloseTimer = null;
   var pickerApplyingSeed = false;
   var pickerOpenAnimationTimer = null;
@@ -159,6 +161,13 @@
     pickerWheels = [];
     pickerWheelSnapTimers = [];
     ticketPickerBuilt = false;
+    ticketPickerReady = false;
+  }
+
+  function preloadTicketPicker() {
+    if (!ticketPickerBuilt) {
+      buildTicketPickerSlots();
+    }
   }
 
   function setWheelStartNearSeed(index) {
@@ -459,6 +468,7 @@
       return;
     }
 
+    ticketPickerReady = false;
     normalizePickerNumbers();
     ticketPickerGridEl.innerHTML = '';
     pickerWheels = [];
@@ -581,6 +591,16 @@
               pickerOpenAnimationTimer = null;
               startPickerOpenAnimation();
             }, 70);
+          }
+
+          if (!ticketPickerReady && pickerWheels.filter(Boolean).length === LOTTO_NUMBERS_COUNT) {
+            ticketPickerReady = true;
+            if (ticketPickerPendingOpen) {
+              ticketPickerPendingOpen = false;
+              requestAnimationFrame(function () {
+                openTicketPicker();
+              });
+            }
           }
         });
       })(i, value, viewport, track);
@@ -869,26 +889,29 @@
   function openTicketPicker() {
     if (!ticketPickerSheetEl) return;
 
+    if (!ticketPickerReady) {
+      ticketPickerPendingOpen = true;
+      setTicketPickerStatus('Preparing numbers...');
+      preloadTicketPicker();
+      return;
+    }
+
     randomizePickerNumbers();
     pickerApplyingSeed = true;
 
-    if (!ticketPickerBuilt) {
-      buildTicketPickerSlots();
-    } else {
-      for (var i = 0; i < pickerWheels.length; i++) {
-        setWheelStartNearSeed(i);
-      }
-
-      if (pickerOpenAnimationTimer) {
-        clearTimeout(pickerOpenAnimationTimer);
-        pickerOpenAnimationTimer = null;
-      }
-
-      pickerOpenAnimationTimer = setTimeout(function () {
-        pickerOpenAnimationTimer = null;
-        startPickerOpenAnimation();
-      }, 72);
+    for (var i = 0; i < pickerWheels.length; i++) {
+      setWheelStartNearSeed(i);
     }
+
+    if (pickerOpenAnimationTimer) {
+      clearTimeout(pickerOpenAnimationTimer);
+      pickerOpenAnimationTimer = null;
+    }
+
+    pickerOpenAnimationTimer = setTimeout(function () {
+      pickerOpenAnimationTimer = null;
+      startPickerOpenAnimation();
+    }, 72);
 
     if (ticketPickerCloseTimer) {
       clearTimeout(ticketPickerCloseTimer);
@@ -1116,10 +1139,10 @@
   if (ticketPickerBackdropEl) ticketPickerBackdropEl.addEventListener('click', closeTicketPicker);
   if (confirmTicketNumbersBtn) confirmTicketNumbersBtn.addEventListener('click', confirmSelectedTicketNumbers);
 
+  preloadTicketPicker();
   setActiveTab('lottery');
   renderCurrentDraw(null, []);
   renderMyTickets({ currentDraw: null, currentTickets: [], history: [] });
-  buildTicketPickerSlots();
 
   var search = '';
   try {
