@@ -4,9 +4,11 @@
   var timelineStatusEl = document.getElementById('timelineStatus');
 
   var lotteryTabBtn = document.getElementById('lotteryTabBtn');
-  var accountTabBtn = document.getElementById('accountTabBtn');
+  var ticketsTabBtn = document.getElementById('ticketsTabBtn');
+  var profileTabBtn = document.getElementById('profileTabBtn');
   var lotteryTabPanel = document.getElementById('lotteryTabPanel');
-  var accountTabPanel = document.getElementById('accountTabPanel');
+  var ticketsTabPanel = document.getElementById('ticketsTabPanel');
+  var profileTabPanel = document.getElementById('profileTabPanel');
 
   var currentDrawStateBadgeEl = document.getElementById('currentDrawStateBadge');
   var currentDrawEmptyEl = document.getElementById('currentDrawEmpty');
@@ -17,21 +19,17 @@
   var currentDrawCreatedAtEl = document.getElementById('currentDrawCreatedAt');
   var jackpotAmountEl = document.getElementById('jackpotAmount');
   var jackpotSubtitleEl = document.getElementById('jackpotSubtitle');
+  var currentDrawPrizeTiersEl = document.getElementById('currentDrawPrizeTiers');
+  var currentDrawPrizePool3El = document.getElementById('currentDrawPrizePool3');
+  var currentDrawPrizePool4El = document.getElementById('currentDrawPrizePool4');
+  var currentDrawPrizePool5El = document.getElementById('currentDrawPrizePool5');
   var currentDrawNumbersWrapEl = document.getElementById('currentDrawNumbersWrap');
   var currentDrawNumbersEl = document.getElementById('currentDrawNumbers');
   var currentDrawTicketPriceRowEl = document.getElementById('currentDrawTicketPriceRow');
   var currentDrawPurchaseBlockEl = document.getElementById('currentDrawPurchaseBlock');
 
-  var currentTicketsEmptyEl = document.getElementById('currentTicketsEmpty');
-  var currentTicketsListEl = document.getElementById('currentTicketsList');
-  var currentTicketsTitleEl = document.getElementById('currentTicketsTitle');
-
-  var openHistoryBtn = document.getElementById('openHistoryBtn');
-  var historySheetEl = document.getElementById('historySheet');
-  var historyBackdropEl = document.getElementById('historyBackdrop');
-  var closeHistoryBtn = document.getElementById('closeHistoryBtn');
-  var historyEmptyEl = document.getElementById('historyEmpty');
-  var historyListEl = document.getElementById('historyList');
+  var myTicketsEmptyEl = document.getElementById('myTicketsEmpty');
+  var myTicketsListEl = document.getElementById('myTicketsList');
   var debugModeBadgeEl = document.getElementById('debugModeBadge');
 
   var ticketPickerSheetEl = document.getElementById('ticketPickerSheet');
@@ -45,6 +43,9 @@
   var lastStateSig = null;
   var latestState = { currentDraw: null, currentTickets: [], history: [] };
   var initData = null;
+  var clientIsLocalDebug = false;
+  var autoOpenedTicketsTab = false;
+  var activeTabName = 'lottery';
   var pickerNumbers = [1, 2, 3, 4, 5];
 
   var LOTTO_NUMBERS_COUNT = 5;
@@ -137,9 +138,17 @@
     });
   }
 
+  function randomizePickerNumbers() {
+    var set = new Set();
+    while (set.size < LOTTO_NUMBERS_COUNT) {
+      set.add(LOTTO_MIN + Math.floor(Math.random() * PICKER_VALUE_RANGE));
+    }
+
+    pickerNumbers = Array.from(set).sort(function (a, b) { return a - b; });
+  }
+
   function setSheetOpenClass() {
     var hasOpenSheet = !!(
-      (historySheetEl && !historySheetEl.hidden) ||
       (ticketPickerSheetEl && !ticketPickerSheetEl.hidden)
     );
 
@@ -614,7 +623,7 @@
       header.appendChild(info);
 
       if (draw.numbers) {
-        header.appendChild(createNumbersRow(draw.numbers, draw.numbers));
+        header.appendChild(createNumbersRow(draw.numbers));
       }
     }
 
@@ -651,6 +660,10 @@
       if (currentDrawCreatedAtEl) currentDrawCreatedAtEl.textContent = 'Ends in --:--:--';
       if (jackpotAmountEl) jackpotAmountEl.textContent = '$0';
       if (jackpotSubtitleEl) jackpotSubtitleEl.textContent = 'The next draw is coming soon. Get your tickets now.';
+      if (currentDrawPrizeTiersEl) currentDrawPrizeTiersEl.hidden = true;
+      if (currentDrawPrizePool3El) currentDrawPrizePool3El.textContent = '$0.00';
+      if (currentDrawPrizePool4El) currentDrawPrizePool4El.textContent = '$0.00';
+      if (currentDrawPrizePool5El) currentDrawPrizePool5El.textContent = '$0.00';
       if (purchaseBtn) {
         purchaseBtn.disabled = true;
         purchaseBtn.hidden = false;
@@ -659,7 +672,6 @@
       if (currentDrawSubtitleEl) currentDrawSubtitleEl.hidden = false;
       if (currentDrawTicketPriceRowEl) currentDrawTicketPriceRowEl.hidden = false;
       if (currentDrawPurchaseBlockEl) currentDrawPurchaseBlockEl.hidden = false;
-      if (currentTicketsTitleEl) currentTicketsTitleEl.textContent = 'Active tickets';
       return;
     }
 
@@ -674,6 +686,10 @@
     if (currentDrawPrizePoolEl) currentDrawPrizePoolEl.textContent = '$' + formatPrizePool(draw.prizePool);
     if (currentDrawCreatedAtEl) currentDrawCreatedAtEl.textContent = (draw.state === 'finished' ? 'Concluded ' : 'Opened ') + formatUtc(draw.createdAtUtc);
     if (jackpotAmountEl) jackpotAmountEl.textContent = formatJackpot(draw.prizePool);
+    if (currentDrawPrizeTiersEl) currentDrawPrizeTiersEl.hidden = false;
+    if (currentDrawPrizePool3El) currentDrawPrizePool3El.textContent = '$' + formatPrizePool(draw.prizePoolMatch3);
+    if (currentDrawPrizePool4El) currentDrawPrizePool4El.textContent = '$' + formatPrizePool(draw.prizePoolMatch4);
+    if (currentDrawPrizePool5El) currentDrawPrizePool5El.textContent = '$' + formatPrizePool(draw.prizePoolMatch5);
 
     var hasWinningsAvailable = false;
     (currentTickets || []).forEach(function (ticket) {
@@ -708,68 +724,76 @@
     if (currentDrawSubtitleEl) currentDrawSubtitleEl.hidden = isFinishedDraw;
     if (currentDrawTicketPriceRowEl) currentDrawTicketPriceRowEl.hidden = isFinishedDraw;
     if (currentDrawPurchaseBlockEl) currentDrawPurchaseBlockEl.hidden = isFinishedDraw;
-
-    if (currentTicketsTitleEl) currentTicketsTitleEl.textContent = draw.state === 'active' ? 'Active tickets' : 'Draw tickets';
   }
 
-  function renderCurrentTickets(tickets, draw) {
-    if (!currentTicketsListEl || !currentTicketsEmptyEl) return;
+  function buildMyTicketGroups(state) {
+    var groups = [];
+    var seenDraw = {};
 
-    currentTicketsListEl.innerHTML = '';
+    var currentDraw = state && state.currentDraw ? state.currentDraw : null;
+    var currentTickets = state && state.currentTickets ? state.currentTickets : [];
+    if (currentDraw && currentTickets.length > 0) {
+      groups.push({ drawId: currentDraw.id, draw: currentDraw, tickets: currentTickets.slice() });
+      seenDraw[currentDraw.id] = true;
+    }
 
-    var list = tickets || [];
-    currentTicketsEmptyEl.hidden = list.length > 0;
-    currentTicketsEmptyEl.textContent = draw && draw.state === 'finished'
-      ? 'You have no tickets for this draw.'
-      : 'You have not bought any tickets for the current draw yet.';
-
-    list.forEach(function (ticket) {
-      currentTicketsListEl.appendChild(createTicketEl(ticket, draw || null));
+    var history = state && state.history ? state.history : [];
+    history.forEach(function (group) {
+      if (!group) return;
+      if (seenDraw[group.drawId]) return;
+      if (!group.tickets || group.tickets.length === 0) return;
+      groups.push(group);
+      seenDraw[group.drawId] = true;
     });
+
+    groups.sort(function (a, b) {
+      return (Number(b.drawId) || 0) - (Number(a.drawId) || 0);
+    });
+
+    return groups;
   }
 
-  function renderHistory(groups) {
-    if (!historyListEl || !historyEmptyEl) return;
+  function renderMyTickets(state) {
+    if (!myTicketsListEl || !myTicketsEmptyEl) return;
 
-    historyListEl.innerHTML = '';
+    myTicketsListEl.innerHTML = '';
 
-    var list = groups || [];
-    historyEmptyEl.hidden = list.length > 0;
+    var groups = buildMyTicketGroups(state);
+    myTicketsEmptyEl.hidden = groups.length > 0;
 
-    list.forEach(function (group) {
-      historyListEl.appendChild(createHistoryGroupEl(group));
+    groups.forEach(function (group) {
+      myTicketsListEl.appendChild(createHistoryGroupEl(group));
     });
   }
 
   function setActiveTab(name) {
-    var isLottery = name !== 'account';
+    var tab = name || 'lottery';
+    activeTabName = tab;
+    var isLottery = tab === 'lottery';
+    var isTickets = tab === 'tickets';
+    var isProfile = tab === 'profile';
 
     if (lotteryTabPanel) lotteryTabPanel.hidden = !isLottery;
-    if (accountTabPanel) accountTabPanel.hidden = isLottery;
+    if (ticketsTabPanel) ticketsTabPanel.hidden = !isTickets;
+    if (profileTabPanel) profileTabPanel.hidden = !isProfile;
 
     if (lotteryTabBtn) lotteryTabBtn.classList.toggle('tabbar-btn-active', isLottery);
-    if (accountTabBtn) accountTabBtn.classList.toggle('tabbar-btn-active', !isLottery);
-  }
+    if (ticketsTabBtn) ticketsTabBtn.classList.toggle('tabbar-btn-active', isTickets);
+    if (profileTabBtn) profileTabBtn.classList.toggle('tabbar-btn-active', isProfile);
 
-  function openHistory() {
-    if (!historySheetEl) return;
-    historySheetEl.hidden = false;
-    setSheetOpenClass();
-  }
-
-  function closeHistory() {
-    if (!historySheetEl) return;
-    historySheetEl.hidden = true;
-    setSheetOpenClass();
+    if (isTickets) {
+      renderMyTickets(latestState);
+    }
   }
 
   function openTicketPicker() {
     if (!ticketPickerSheetEl) return;
 
+    randomizePickerNumbers();
+
     if (!ticketPickerBuilt) {
       buildTicketPickerSlots();
     } else {
-      normalizePickerNumbers();
       updatePickerUi();
     }
 
@@ -914,14 +938,20 @@
     latestState = state || { currentDraw: null, currentTickets: [], history: [] };
 
     renderCurrentDraw(latestState.currentDraw || null, latestState.currentTickets || []);
-    renderCurrentTickets(latestState.currentTickets || [], latestState.currentDraw || null);
-    renderHistory(latestState.history || []);
+    renderMyTickets(latestState);
+
+    if (clientIsLocalDebug && !autoOpenedTicketsTab) {
+      var ticketGroups = buildMyTicketGroups(latestState);
+      if (ticketGroups.length > 0 && activeTabName !== 'tickets') {
+        autoOpenedTicketsTab = true;
+        setActiveTab('tickets');
+      }
+    }
   }
 
   function refreshState() {
     if (!initData) return;
 
-    setTimelineStatus('Loading timeline...');
 
     return postJson('/api/timeline', { initData: initData || '' }, null)
       .then(function (res) {
@@ -971,18 +1001,15 @@
 
   if (purchaseBtn) purchaseBtn.addEventListener('click', purchaseTicket);
   if (lotteryTabBtn) lotteryTabBtn.addEventListener('click', function () { setActiveTab('lottery'); });
-  if (accountTabBtn) accountTabBtn.addEventListener('click', function () { setActiveTab('account'); });
-  if (openHistoryBtn) openHistoryBtn.addEventListener('click', openHistory);
-  if (closeHistoryBtn) closeHistoryBtn.addEventListener('click', closeHistory);
-  if (historyBackdropEl) historyBackdropEl.addEventListener('click', closeHistory);
+  if (ticketsTabBtn) ticketsTabBtn.addEventListener('click', function () { setActiveTab('tickets'); });
+  if (profileTabBtn) profileTabBtn.addEventListener('click', function () { setActiveTab('profile'); });
   if (closeTicketPickerBtn) closeTicketPickerBtn.addEventListener('click', closeTicketPicker);
   if (ticketPickerBackdropEl) ticketPickerBackdropEl.addEventListener('click', closeTicketPicker);
   if (confirmTicketNumbersBtn) confirmTicketNumbersBtn.addEventListener('click', confirmSelectedTicketNumbers);
 
   setActiveTab('lottery');
   renderCurrentDraw(null, []);
-  renderCurrentTickets([], null);
-  renderHistory([]);
+  renderMyTickets({ currentDraw: null, currentTickets: [], history: [] });
   buildTicketPickerSlots();
 
   var search = '';
@@ -1003,6 +1030,7 @@
   }
 
   if (forceLocalDebug || !hasTelegramInitData) {
+    clientIsLocalDebug = true;
     setDebugModeBadge(forceLocalDebug
       ? 'Client debug mode: forced local debug via query parameter.'
       : 'Client debug mode: Telegram initData is missing, using local debug.');
@@ -1023,6 +1051,7 @@
   }
 
   setDebugModeBadge('');
+  clientIsLocalDebug = false;
 
   startPolling();
 

@@ -23,6 +23,10 @@ body {
   min-height: 100%;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
@@ -165,6 +169,52 @@ body.sheet-open {
   color: #ffd8e2;
   font-size: 1.2rem;
   line-height: 1.4;
+}
+
+.prize-tier-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.prize-tier-pill {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.prize-tier-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 800;
+  color: #ffdbe5;
+}
+
+.prize-tier-value {
+  font-size: 0.92rem;
+  font-weight: 900;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 560px) {
+  .prize-tier-row {
+    gap: 6px;
+  }
+
+  .prize-tier-pill {
+    padding: 7px 8px;
+  }
+
+  .prize-tier-value {
+    font-size: 0.84rem;
+  }
 }
 
 .current-draw-card {
@@ -554,12 +604,13 @@ button:disabled {
 }
 
 #ticketPickerSheet {
-  display: block;
+  display: none;
   pointer-events: none;
 }
 
 #ticketPickerSheet.ticket-picker-open,
 #ticketPickerSheet.ticket-picker-closing {
+  display: block;
   pointer-events: auto;
 }
 
@@ -633,6 +684,29 @@ button:disabled {
   padding: 10px;
 }
 
+#myTicketsList .draw-header {
+  background: linear-gradient(135deg, #670019, #4f0016);
+  border: 1px solid rgba(255, 111, 152, 0.24);
+  display: grid;
+  gap: 6px;
+}
+
+#myTicketsList .draw-header-meta,
+#myTicketsList .draw-header-label,
+#myTicketsList .draw-header-title {
+  color: #ffe4ec;
+}
+
+#myTicketsList .draw-header .ball {
+  background: #ffffff;
+  border-color: rgba(255, 95, 141, 0.34);
+  color: #ff5f8d;
+}
+
+#myTicketsList .draw-header-top {
+  gap: 6px;
+}
+
 .draw-header-top {
   display: flex;
   justify-content: space-between;
@@ -703,7 +777,7 @@ button:disabled {
   bottom: 0;
   z-index: 40;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   max-width: 820px;
   margin: 0 auto;

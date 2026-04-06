@@ -39,6 +39,20 @@
         </div>
         <div class="jackpot-amount" id="jackpotAmount">$0.00</div>
         <p class="jackpot-copy" id="jackpotSubtitle">The next draw is coming soon. Get your tickets now.</p>
+        <div id="currentDrawPrizeTiers" class="prize-tier-row" hidden>
+          <div class="prize-tier-pill">
+            <span class="prize-tier-label">3/5</span>
+            <span class="prize-tier-value" id="currentDrawPrizePool3">$0.00</span>
+          </div>
+          <div class="prize-tier-pill">
+            <span class="prize-tier-label">4/5</span>
+            <span class="prize-tier-value" id="currentDrawPrizePool4">$0.00</span>
+          </div>
+          <div class="prize-tier-pill">
+            <span class="prize-tier-label">5/5</span>
+            <span class="prize-tier-value" id="currentDrawPrizePool5">$0.00</span>
+          </div>
+        </div>
       </section>
 
       <section id="currentDrawCard" class="card stack current-draw-card">
@@ -70,40 +84,26 @@
         </div>
       </section>
 
-      <section class="stack">
-        <div class="section-header tickets-header">
-          <div class="section-title" id="currentTicketsTitle">Active tickets</div>
-          <button id="openHistoryBtn" type="button" class="link-btn">View all</button>
-        </div>
-        <div id="timelineStatus" class="section-subtitle"></div>
-        <div id="currentTicketsEmpty" class="empty-card">You have not bought any tickets for the current draw yet.</div>
-        <div id="currentTicketsList" class="ticket-list"></div>
-      </section>
     </section>
 
-    <section id="accountTabPanel" class="tab-panel stack" hidden>
+    <section id="ticketsTabPanel" class="tab-panel stack" hidden>
       <div class="card stack">
-        <div class="section-title">My tickets</div>
-        <div class="section-subtitle">Tap View all in Active tickets for the complete history.</div>
+        <div class="section-header tickets-header">
+          <div class="section-title">My tickets</div>
+        </div>
+        <div id="timelineStatus" class="section-subtitle"></div>
+        <div id="myTicketsEmpty" class="empty-card">You have not bought any tickets yet.</div>
+        <div id="myTicketsList" class="history-list"></div>
+      </div>
+    </section>
+
+    <section id="profileTabPanel" class="tab-panel stack" hidden>
+      <div class="card stack">
+        <div class="section-title">Profile</div>
+        <div class="section-subtitle">Coming soon.</div>
       </div>
     </section>
   </main>
-
-  <div id="historySheet" class="sheet" hidden>
-    <div id="historyBackdrop" class="sheet-backdrop"></div>
-    <div class="sheet-panel">
-      <div class="sheet-header">
-        <div>
-          <div class="section-title">History</div>
-          <div class="section-subtitle">Your past draws and purchased tickets.</div>
-        </div>
-        <button id="closeHistoryBtn" type="button" class="sheet-close-btn" aria-label="Close history">×</button>
-      </div>
-
-      <div id="historyEmpty" class="empty-card">No ticket history yet.</div>
-      <div id="historyList" class="history-list"></div>
-    </div>
-  </div>
 
   <div id="ticketPickerSheet" class="sheet" hidden>
     <div id="ticketPickerBackdrop" class="sheet-backdrop"></div>
@@ -125,10 +125,8 @@
 
   <nav class="tabbar" aria-label="Bottom tabs">
     <button id="lotteryTabBtn" type="button" class="tabbar-btn tabbar-btn-active">Home</button>
-    <button id="accountTabBtn" type="button" class="tabbar-btn">My Tickets</button>
-    <button type="button" class="tabbar-btn" disabled>Results</button>
-    <button type="button" class="tabbar-btn" disabled>History</button>
-    <button type="button" class="tabbar-btn" disabled>Profile</button>
+    <button id="ticketsTabBtn" type="button" class="tabbar-btn">My Tickets</button>
+    <button id="profileTabBtn" type="button" class="tabbar-btn">Profile</button>
   </nav>
 
   <script src="~/js/miniapp.js" asp-append-version="true"></script>
