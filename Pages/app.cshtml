@@ -46,7 +46,7 @@
         <div class="section-header">
           <div>
             <div class="section-title" id="currentDrawId">PowerBall Global</div>
-            <div class="section-subtitle">Next draw and ticket purchase</div>
+            <div class="section-subtitle" id="currentDrawSubtitle">Next draw and ticket purchase</div>
           </div>
           <div id="currentDrawStateBadge" class="state-badge state-badge-muted">waiting</div>
         </div>
@@ -54,8 +54,13 @@
         <div id="currentDrawEmpty" class="empty-card">There is no active draw right now.</div>
 
         <div id="currentDrawContent" class="stack" hidden>
-          <div class="draw-meta-row">
-            <span>Tickets start at <strong>$2.00</strong> per entry.</span>
+          <div id="currentDrawPurchaseBlock" class="stack">
+            <div id="currentDrawTicketPriceRow" class="draw-meta-row">
+              <span>Tickets start at <strong>$2.00</strong> per entry.</span>
+            </div>
+
+            <button id="purchaseTicketBtn" type="button">Purchase ticket</button>
+            <div id="purchaseStatus" class="muted"></div>
           </div>
 
           <div id="currentDrawNumbersWrap" class="stack" hidden>
@@ -63,9 +68,6 @@
             <div id="currentDrawNumbers"></div>
           </div>
         </div>
-
-        <button id="purchaseTicketBtn" type="button">Purchase ticket</button>
-        <div id="purchaseStatus" class="muted"></div>
       </section>
 
       <section class="stack">

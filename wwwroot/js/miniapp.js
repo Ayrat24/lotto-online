@@ -12,12 +12,15 @@
   var currentDrawEmptyEl = document.getElementById('currentDrawEmpty');
   var currentDrawContentEl = document.getElementById('currentDrawContent');
   var currentDrawIdEl = document.getElementById('currentDrawId');
+  var currentDrawSubtitleEl = document.getElementById('currentDrawSubtitle');
   var currentDrawPrizePoolEl = document.getElementById('currentDrawPrizePool');
   var currentDrawCreatedAtEl = document.getElementById('currentDrawCreatedAt');
   var jackpotAmountEl = document.getElementById('jackpotAmount');
   var jackpotSubtitleEl = document.getElementById('jackpotSubtitle');
   var currentDrawNumbersWrapEl = document.getElementById('currentDrawNumbersWrap');
   var currentDrawNumbersEl = document.getElementById('currentDrawNumbers');
+  var currentDrawTicketPriceRowEl = document.getElementById('currentDrawTicketPriceRow');
+  var currentDrawPurchaseBlockEl = document.getElementById('currentDrawPurchaseBlock');
 
   var currentTicketsEmptyEl = document.getElementById('currentTicketsEmpty');
   var currentTicketsListEl = document.getElementById('currentTicketsList');
@@ -650,11 +653,17 @@
       if (jackpotSubtitleEl) jackpotSubtitleEl.textContent = 'The next draw is coming soon. Get your tickets now.';
       if (purchaseBtn) {
         purchaseBtn.disabled = true;
+        purchaseBtn.hidden = false;
         purchaseBtn.title = 'No active draw available.';
       }
+      if (currentDrawSubtitleEl) currentDrawSubtitleEl.hidden = false;
+      if (currentDrawTicketPriceRowEl) currentDrawTicketPriceRowEl.hidden = false;
+      if (currentDrawPurchaseBlockEl) currentDrawPurchaseBlockEl.hidden = false;
       if (currentTicketsTitleEl) currentTicketsTitleEl.textContent = 'Active tickets';
       return;
     }
+
+    var isFinishedDraw = draw.state === 'finished';
 
     currentDrawStateBadgeEl.textContent = draw.state;
     currentDrawStateBadgeEl.className = 'state-badge ' + (draw.state === 'active' ? 'state-badge-active' : draw.state === 'finished' ? 'state-badge-finished' : 'state-badge-upcoming');
@@ -692,8 +701,13 @@
 
     if (purchaseBtn) {
       purchaseBtn.disabled = draw.state !== 'active';
+      purchaseBtn.hidden = isFinishedDraw;
       purchaseBtn.title = draw.state === 'active' ? '' : 'Only the active draw accepts purchases.';
     }
+
+    if (currentDrawSubtitleEl) currentDrawSubtitleEl.hidden = isFinishedDraw;
+    if (currentDrawTicketPriceRowEl) currentDrawTicketPriceRowEl.hidden = isFinishedDraw;
+    if (currentDrawPurchaseBlockEl) currentDrawPurchaseBlockEl.hidden = isFinishedDraw;
 
     if (currentTicketsTitleEl) currentTicketsTitleEl.textContent = draw.state === 'active' ? 'Active tickets' : 'Draw tickets';
   }
