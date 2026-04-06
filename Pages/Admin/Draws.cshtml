@@ -65,10 +65,10 @@ else
                         <tr>
                             <td><strong>@d.Id</strong></td>
                             <td>
-                                <span class="badge text-bg-light border">@d.TicketCount</span>
+                                <span class="badge bg-light text-dark border">@d.TicketCount</span>
                             </td>
                             <td>
-                                <span class="badge @(d.State == "active" ? "text-bg-success" : d.State == "finished" ? "text-bg-dark" : "text-bg-secondary") text-uppercase">
+                                <span class="badge @(d.State == "active" ? "bg-success-subtle text-dark border border-success-subtle" : d.State == "finished" ? "bg-dark text-white" : "bg-secondary-subtle text-dark border border-secondary-subtle") text-uppercase">
                                     @d.State
                                 </span>
                             </td>

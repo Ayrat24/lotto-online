@@ -61,6 +61,8 @@
   var wheelOrderDescending = true;
   var ticketPickerBuilt = false;
   var ticketPickerCloseTimer = null;
+  var pickerApplyingSeed = false;
+  var pickerOpenAnimationTimer = null;
 
   function setPurchaseStatus(text) {
     if (purchaseStatusEl) purchaseStatusEl.textContent = text || '';
@@ -145,6 +147,49 @@
     }
 
     pickerNumbers = Array.from(set).sort(function (a, b) { return a - b; });
+  }
+
+  function resetTicketPickerGrid() {
+    if (ticketPickerGridEl) {
+      ticketPickerGridEl.innerHTML = '';
+    }
+
+    pickerWheels = [];
+    pickerWheelSnapTimers = [];
+    ticketPickerBuilt = false;
+  }
+
+  function setWheelRandomStartPosition(index) {
+    var wheelState = pickerWheels[index];
+    if (!wheelState || !wheelState.items || wheelState.items.length === 0) return;
+
+    var randomItemIndex = Math.floor(Math.random() * wheelState.items.length);
+    centerWheelOnItem(wheelState, wheelState.items[randomItemIndex], 'auto');
+    renderWheelVisual(index);
+  }
+
+  function startPickerOpenAnimation() {
+    if (!pickerApplyingSeed) return;
+
+    if (pickerOpenAnimationTimer) {
+      clearTimeout(pickerOpenAnimationTimer);
+      pickerOpenAnimationTimer = null;
+    }
+
+    for (var i = 0; i < pickerWheels.length; i++) {
+      (function (idx) {
+        setTimeout(function () {
+          if (!pickerApplyingSeed) return;
+          normalizeWheelToMiddleCycle(idx, 'smooth');
+        }, idx * 55);
+      })(i);
+    }
+
+    pickerOpenAnimationTimer = setTimeout(function () {
+      pickerOpenAnimationTimer = null;
+      pickerApplyingSeed = false;
+      updatePickerUi();
+    }, 460 + pickerWheels.length * 55);
   }
 
   function setSheetOpenClass() {
@@ -283,7 +328,7 @@
       item.classList.toggle('picker-wheel-selected', !!nearestInfo && i === nearestInfo.index);
     }
 
-    if (nearestInfo && nearestInfo.item) {
+    if (!pickerApplyingSeed && nearestInfo && nearestInfo.item) {
       var nextValue = parseInt(nearestInfo.item.getAttribute('data-value'), 10);
       if (Number.isFinite(nextValue)) pickerNumbers[index] = nextValue;
     }
@@ -502,8 +547,23 @@
             scheduleWheelSnap(idx);
           }, { passive: false });
 
-          normalizeWheelToMiddleCycle(idx, 'auto');
-          renderWheelVisual(idx);
+          if (pickerApplyingSeed) {
+            setWheelRandomStartPosition(idx);
+          } else {
+            normalizeWheelToMiddleCycle(idx, 'auto');
+            renderWheelVisual(idx);
+          }
+
+          if (pickerApplyingSeed && pickerWheels.filter(Boolean).length === LOTTO_NUMBERS_COUNT) {
+            if (pickerOpenAnimationTimer) {
+              clearTimeout(pickerOpenAnimationTimer);
+            }
+
+            pickerOpenAnimationTimer = setTimeout(function () {
+              pickerOpenAnimationTimer = null;
+              startPickerOpenAnimation();
+            }, 30);
+          }
         });
       })(i, value, viewport, track);
     }
@@ -790,11 +850,24 @@
     if (!ticketPickerSheetEl) return;
 
     randomizePickerNumbers();
+    pickerApplyingSeed = true;
 
     if (!ticketPickerBuilt) {
       buildTicketPickerSlots();
     } else {
-      updatePickerUi();
+      for (var i = 0; i < pickerWheels.length; i++) {
+        setWheelRandomStartPosition(i);
+      }
+
+      if (pickerOpenAnimationTimer) {
+        clearTimeout(pickerOpenAnimationTimer);
+        pickerOpenAnimationTimer = null;
+      }
+
+      pickerOpenAnimationTimer = setTimeout(function () {
+        pickerOpenAnimationTimer = null;
+        startPickerOpenAnimation();
+      }, 30);
     }
 
     if (ticketPickerCloseTimer) {
@@ -807,14 +880,17 @@
     ticketPickerSheetEl.offsetHeight;
     ticketPickerSheetEl.classList.add('ticket-picker-open');
     setSheetOpenClass();
-
-    requestAnimationFrame(function () {
-      syncAllWheelLayouts();
-    });
   }
 
   function closeTicketPicker() {
     if (!ticketPickerSheetEl) return;
+
+    if (pickerOpenAnimationTimer) {
+      clearTimeout(pickerOpenAnimationTimer);
+      pickerOpenAnimationTimer = null;
+    }
+
+    pickerApplyingSeed = false;
 
     ticketPickerSheetEl.classList.remove('ticket-picker-open');
     ticketPickerSheetEl.classList.add('ticket-picker-closing');
