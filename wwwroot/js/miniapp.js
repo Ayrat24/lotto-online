@@ -977,12 +977,25 @@
       if (!r.ok) {
         return r.json().catch(function () { return null; }).then(function (body) {
           var msg = (body && body.error) ? body.error : ('HTTP ' + r.status);
-          throw new Error(msg);
+          var err = new Error(msg);
+          err.status = r.status;
+          throw err;
         });
       }
 
       return r.json();
     });
+  }
+
+  function handleAuthFailure(err) {
+    var status = err && err.status;
+    if (status === 401) {
+      setTimelineStatus('Authentication failed. Open this app from Telegram, or use the local debug profile in Development.');
+      setPurchaseStatus('Authentication failed.');
+      return;
+    }
+
+    setPurchaseStatus(err && err.message ? err.message : 'Authentication failed.');
   }
 
   function computeStateSig(state) {
@@ -1135,12 +1148,12 @@
 
     postJson('/api/auth/telegram', { initData: initData })
       .then(function () { return refreshState(); })
+      .then(function () {
+        startPolling();
+      })
       .catch(function (err) {
         console.warn('Failed local debug auth', err);
-        setPurchaseStatus(err.message);
-      })
-      .finally(function () {
-        startPolling();
+        handleAuthFailure(err);
       });
 
     return;
@@ -1164,9 +1177,12 @@
     initData = Telegram.WebApp.initData;
     postJson('/api/auth/telegram', { initData: initData })
       .then(function () { return refreshState(); })
+      .then(function () {
+        startPolling();
+      })
       .catch(function (err) {
         console.warn('Failed to auth with Telegram initData', err);
-        setPurchaseStatus(err.message);
+        handleAuthFailure(err);
       });
   } catch (e) {
     console.warn('Telegram auth initData error', e);
