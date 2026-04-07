@@ -66,6 +66,8 @@
   var ticketPickerPendingOpen = false;
   var ticketPickerCloseTimer = null;
   var pickerApplyingSeed = false;
+  var pickerHasAnimatedOpen = false;
+  var pickerWheelSyncLockedUntil = 0;
   var pickerOpenAnimationTimer = null;
   var pollingIntervalId = null;
 
@@ -201,6 +203,8 @@
       pickerOpenAnimationTimer = null;
     }
 
+    lockPickerWheelSync(650);
+
     for (var i = 0; i < pickerWheels.length; i++) {
       var wheelState = pickerWheels[i];
       if (wheelState) wheelState.isOpening = true;
@@ -209,12 +213,23 @@
 
     pickerOpenAnimationTimer = setTimeout(function () {
       pickerOpenAnimationTimer = null;
+      lockPickerWheelSync(180);
       for (var i = 0; i < pickerWheels.length; i++) {
         if (pickerWheels[i]) pickerWheels[i].isOpening = false;
       }
       pickerApplyingSeed = false;
       updatePickerUi();
     }, 403 + pickerWheels.length * 26);
+  }
+
+  function restorePickerWheelPositions() {
+    for (var i = 0; i < pickerWheels.length; i++) {
+      normalizeWheelToMiddleCycle(i, 'auto');
+    }
+  }
+
+  function lockPickerWheelSync(ms) {
+    pickerWheelSyncLockedUntil = Math.max(pickerWheelSyncLockedUntil, Date.now() + Math.max(0, ms || 0));
   }
 
   function setSheetOpenClass() {
@@ -280,7 +295,13 @@
     if (!wheelState || !item) return;
     var viewport = wheelState.viewport;
     var targetTop = item.offsetTop - (viewport.clientHeight - item.offsetHeight) / 2;
-    viewport.scrollTo({ top: Math.max(0, targetTop), behavior: behavior || 'auto' });
+
+    if ((behavior || 'auto') === 'smooth') {
+      viewport.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+      return;
+    }
+
+    viewport.scrollTop = Math.max(0, targetTop);
   }
 
   function normalizeWheelToMiddleCycle(index, behavior) {
@@ -292,6 +313,17 @@
     var preferredItemIndex = wheelState.middleCycleStart + (wheelOrderDescending ? (LOTTO_MAX - inRange) : (inRange - LOTTO_MIN));
     preferredItemIndex = Math.max(0, Math.min(wheelState.items.length - 1, preferredItemIndex));
     centerWheelOnItem(wheelState, wheelState.items[preferredItemIndex], behavior || 'auto');
+  }
+
+  function commitPickerNumberFromWheel(index) {
+    var wheelState = pickerWheels[index];
+    if (!wheelState || !wheelState.items || wheelState.items.length === 0) return;
+
+    var nearestInfo = getWheelNearestItemInfo(wheelState);
+    if (!nearestInfo || !nearestInfo.item) return;
+
+    var nextValue = parseInt(nearestInfo.item.getAttribute('data-value'), 10);
+    if (Number.isFinite(nextValue)) pickerNumbers[index] = nextValue;
   }
 
   function computeWheelItemHeight(wheelState) {
@@ -353,10 +385,6 @@
       item.classList.toggle('picker-wheel-selected', !!nearestInfo && i === nearestInfo.index);
     }
 
-    if (!pickerApplyingSeed && nearestInfo && nearestInfo.item) {
-      var nextValue = parseInt(nearestInfo.item.getAttribute('data-value'), 10);
-      if (Number.isFinite(nextValue)) pickerNumbers[index] = nextValue;
-    }
   }
 
   function scheduleWheelSnap(index) {
@@ -368,7 +396,7 @@
       var wheelState = pickerWheels[index];
       if (!wheelState) return;
 
-      if (wheelState.isOpening) return;
+      if (wheelState.isOpening || Date.now() < pickerWheelSyncLockedUntil) return;
 
       var nearestInfo = getWheelNearestItemInfo(wheelState);
       if (!nearestInfo || !nearestInfo.item) return;
@@ -386,6 +414,7 @@
           normalizeWheelToMiddleCycle(index, 'auto');
         }
 
+        commitPickerNumberFromWheel(index);
         renderWheelVisual(index);
         updatePickerUi();
       }, 180);
@@ -414,6 +443,7 @@
     }
 
     centerWheelOnItem(wheelState, wheelState.items[targetIndex], 'smooth');
+    commitPickerNumberFromWheel(index);
     scheduleWheelSnap(index);
   }
 
@@ -909,17 +939,28 @@
         pickerOpenAnimationTimer = null;
       }
 
-      randomizePickerNumbers();
-      pickerApplyingSeed = true;
+      if (!pickerHasAnimatedOpen) {
+        pickerApplyingSeed = true;
+        lockPickerWheelSync(900);
 
-      for (var i = 0; i < pickerWheels.length; i++) {
-        setWheelStartNearSeed(i);
+        for (var i = 0; i < pickerWheels.length; i++) {
+          setWheelStartNearSeed(i);
+        }
+
+        pickerHasAnimatedOpen = true;
+
+        pickerOpenAnimationTimer = setTimeout(function () {
+          pickerOpenAnimationTimer = null;
+          startPickerOpenAnimation();
+        }, 72);
+
+        return;
       }
 
-      pickerOpenAnimationTimer = setTimeout(function () {
-        pickerOpenAnimationTimer = null;
-        startPickerOpenAnimation();
-      }, 72);
+      pickerApplyingSeed = false;
+      lockPickerWheelSync(200);
+      restorePickerWheelPositions();
+      updatePickerUi();
     });
   }
 
@@ -968,6 +1009,9 @@
           highlightTicketId = res.ticket.id;
           setPurchaseStatus('Ticket purchased.');
           closeTicketPicker();
+          randomizePickerNumbers();
+          pickerHasAnimatedOpen = false;
+          if (ticketPickerReady) updatePickerUi();
           return refreshState();
         }
 
@@ -1140,6 +1184,7 @@
   if (ticketPickerBackdropEl) ticketPickerBackdropEl.addEventListener('click', closeTicketPicker);
   if (confirmTicketNumbersBtn) confirmTicketNumbersBtn.addEventListener('click', confirmSelectedTicketNumbers);
 
+  randomizePickerNumbers();
   preloadTicketPicker();
   setActiveTab('lottery');
   renderCurrentDraw(null, []);
