@@ -27,6 +27,8 @@
   var currentDrawNumbersEl = document.getElementById('currentDrawNumbers');
   var currentDrawTicketPriceRowEl = document.getElementById('currentDrawTicketPriceRow');
   var currentDrawPurchaseBlockEl = document.getElementById('currentDrawPurchaseBlock');
+  var appShellEl = document.getElementById('appShell');
+  var appLoadingShellEl = document.getElementById('appLoadingShell');
 
   var myTicketsEmptyEl = document.getElementById('myTicketsEmpty');
   var myTicketsListEl = document.getElementById('myTicketsList');
@@ -42,6 +44,7 @@
   var highlightTicketId = null;
   var lastStateSig = null;
   var latestState = { currentDraw: null, currentTickets: [], history: [] };
+  var appHasLoadedState = false;
   var initData = null;
   var clientIsLocalDebug = false;
   var autoOpenedTicketsTab = false;
@@ -85,6 +88,24 @@
     var value = String(text || '').trim();
     debugModeBadgeEl.hidden = value.length === 0;
     debugModeBadgeEl.textContent = value;
+  }
+
+  function markAppReady() {
+    if (appHasLoadedState) return;
+    appHasLoadedState = true;
+
+    if (document.body) {
+      document.body.classList.remove('app-loading');
+      document.body.classList.add('app-ready');
+    }
+
+    if (appShellEl) {
+      appShellEl.setAttribute('aria-busy', 'false');
+    }
+
+    if (appLoadingShellEl) {
+      appLoadingShellEl.setAttribute('aria-hidden', 'true');
+    }
   }
 
   function formatUtc(iso) {
@@ -1054,6 +1075,7 @@
 
   function handleAuthFailure(err) {
     var status = err && err.status;
+    markAppReady();
     if (status === 401) {
       setTimelineStatus('Authentication failed. Open this app from Telegram, or use the local debug profile in Development.');
       setPurchaseStatus('Authentication failed.');
@@ -1144,6 +1166,8 @@
           lastStateSig = sig;
           applyState(res.state);
         }
+
+        markAppReady();
 
         setTimelineStatus('');
       })

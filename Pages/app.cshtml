@@ -16,8 +16,56 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link rel="stylesheet" href="~/css/miniapp.css" asp-append-version="true" />
 </head>
-<body>
-  <main class="container app-shell">
+<body class="app-loading">
+  <div id="appLoadingShell" class="loading-shell" aria-hidden="true">
+    <div class="container loading-shell-inner">
+      <div class="loading-shell-topbar">
+        <div class="loading-skeleton loading-skeleton-circle"></div>
+        <div class="loading-skeleton loading-skeleton-title"></div>
+      </div>
+
+      <section class="loading-shell-card loading-shell-hero">
+        <div class="loading-shell-row">
+          <div class="loading-skeleton loading-skeleton-chip"></div>
+          <div class="loading-skeleton loading-skeleton-time"></div>
+        </div>
+        <div class="loading-skeleton loading-skeleton-amount"></div>
+        <div class="loading-skeleton loading-skeleton-copy"></div>
+        <div class="loading-shell-pills">
+          <div class="loading-skeleton loading-skeleton-pill"></div>
+          <div class="loading-skeleton loading-skeleton-pill"></div>
+          <div class="loading-skeleton loading-skeleton-pill"></div>
+        </div>
+      </section>
+
+      <section class="loading-shell-card loading-shell-main">
+        <div class="loading-shell-row">
+          <div class="loading-skeleton loading-skeleton-title loading-skeleton-title-sm"></div>
+          <div class="loading-skeleton loading-skeleton-badge"></div>
+        </div>
+        <div class="loading-skeleton loading-skeleton-line"></div>
+        <div class="loading-skeleton loading-skeleton-button"></div>
+        <div class="loading-skeleton loading-skeleton-line loading-skeleton-line-wide"></div>
+      </section>
+
+      <section class="loading-shell-card loading-shell-list">
+        <div class="loading-shell-row">
+          <div class="loading-skeleton loading-skeleton-title loading-skeleton-title-sm"></div>
+          <div class="loading-skeleton loading-skeleton-badge"></div>
+        </div>
+        <div class="loading-skeleton loading-skeleton-ticket"></div>
+        <div class="loading-skeleton loading-skeleton-ticket"></div>
+      </section>
+
+      <nav class="loading-shell-tabbar" aria-label="Loading tabs">
+        <div class="loading-skeleton loading-skeleton-tab"></div>
+        <div class="loading-skeleton loading-skeleton-tab"></div>
+        <div class="loading-skeleton loading-skeleton-tab"></div>
+      </nav>
+    </div>
+  </div>
+
+  <main id="appShell" class="container app-shell" aria-busy="true">
     <section id="lotteryTabPanel" class="tab-panel stack">
       <header class="topbar">
         <div class="brand">
