@@ -990,6 +990,43 @@ button:disabled {
   line-height: 1;
 }
 
+.center-popup {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+}
+
+.center-popup-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 8, 14, 0.64);
+}
+
+.center-popup-card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(90vw, 360px);
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, #151e2e 0%, #111a29 100%);
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.45);
+}
+
+.center-popup-message {
+  font-size: 1rem;
+  line-height: 1.35;
+  color: #e8f0ff;
+}
+
+.center-popup-confirm {
+  width: 100%;
+}
+
 .tabbar {
   position: fixed;
   left: 0;

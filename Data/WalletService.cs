@@ -102,6 +102,7 @@ public sealed class WalletService : IWalletService
             UserId = user.Id,
             DrawId = draw.Id,
             Numbers = numbers,
+            NumbersSignature = candidateSignature,
             Status = TicketStatus.AwaitingDraw,
             PurchasedAtUtc = now
         };
@@ -119,7 +120,15 @@ public sealed class WalletService : IWalletService
             CreatedAtUtc = now
         });
 
-        await _db.SaveChangesAsync(ct);
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException?.Message?.Contains("IX_tickets_UserId_DrawId_NumbersSignature", StringComparison.OrdinalIgnoreCase) == true
+                                        || ex.Message.Contains("IX_tickets_UserId_DrawId_NumbersSignature", StringComparison.OrdinalIgnoreCase))
+        {
+            return new WalletPurchaseResult(false, user.Balance, "You already purchased this ticket for the current draw.");
+        }
         return new WalletPurchaseResult(true, user.Balance, null, ticket);
     }
 

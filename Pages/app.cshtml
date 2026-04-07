@@ -186,6 +186,14 @@
     <button id="profileTabBtn" type="button" class="tabbar-btn">Profile</button>
   </nav>
 
+  <div id="centerPopup" class="center-popup" hidden>
+    <div id="centerPopupBackdrop" class="center-popup-backdrop"></div>
+    <div class="center-popup-card" role="dialog" aria-modal="true" aria-labelledby="centerPopupMessage">
+      <div id="centerPopupMessage" class="center-popup-message"></div>
+      <button id="centerPopupConfirmBtn" type="button" class="center-popup-confirm">Confirm</button>
+    </div>
+  </div>
+
   <script src="~/js/miniapp.js" asp-append-version="true"></script>
 </body>
 </html>

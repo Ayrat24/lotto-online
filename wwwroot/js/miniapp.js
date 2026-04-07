@@ -50,6 +50,10 @@
   var ticketPickerGridEl = document.getElementById('ticketPickerGrid');
   var ticketPickerStatusEl = document.getElementById('ticketPickerStatus');
   var confirmTicketNumbersBtn = document.getElementById('confirmTicketNumbersBtn');
+  var centerPopupEl = document.getElementById('centerPopup');
+  var centerPopupBackdropEl = document.getElementById('centerPopupBackdrop');
+  var centerPopupMessageEl = document.getElementById('centerPopupMessage');
+  var centerPopupConfirmBtn = document.getElementById('centerPopupConfirmBtn');
 
   var highlightTicketId = null;
   var lastStateSig = null;
@@ -176,6 +180,25 @@
 
   function setTicketPickerStatus(text) {
     if (ticketPickerStatusEl) ticketPickerStatusEl.textContent = text || '';
+  }
+
+  function showCenterPopup(message) {
+    if (!centerPopupEl || !centerPopupMessageEl) return;
+
+    centerPopupMessageEl.textContent = String(message || '').trim() || 'Action cannot be completed.';
+    centerPopupEl.hidden = false;
+  }
+
+  function hideCenterPopup() {
+    if (!centerPopupEl) return;
+    centerPopupEl.hidden = true;
+  }
+
+  function shouldShowInvalidTicketPopup(message) {
+    var value = String(message || '').toLowerCase();
+    return value.indexOf('already purchased this ticket') >= 0
+      || value.indexOf('numbers must be unique') >= 0
+      || value.indexOf('choose 5 unique numbers') >= 0;
   }
 
   function formatPickerNumber(n) {
@@ -1076,6 +1099,7 @@
     var validation = validatePickerSelection();
     if (!validation.ok) {
       setTicketPickerStatus(validation.message);
+      showCenterPopup(validation.message);
       return;
     }
 
@@ -1102,6 +1126,9 @@
       })
       .catch(function (err) {
         setTicketPickerStatus(err.message);
+        if (shouldShowInvalidTicketPopup(err && err.message)) {
+          showCenterPopup(err.message);
+        }
       })
       .finally(function () {
         updatePickerUi();
@@ -1396,6 +1423,8 @@
   if (closeTicketPickerBtn) closeTicketPickerBtn.addEventListener('click', closeTicketPicker);
   if (ticketPickerBackdropEl) ticketPickerBackdropEl.addEventListener('click', closeTicketPicker);
   if (confirmTicketNumbersBtn) confirmTicketNumbersBtn.addEventListener('click', confirmSelectedTicketNumbers);
+  if (centerPopupConfirmBtn) centerPopupConfirmBtn.addEventListener('click', hideCenterPopup);
+  if (centerPopupBackdropEl) centerPopupBackdropEl.addEventListener('click', hideCenterPopup);
   if (topUpBtn) topUpBtn.addEventListener('click', topUpBalance);
   if (withdrawBtn) withdrawBtn.addEventListener('click', withdrawBalance);
 

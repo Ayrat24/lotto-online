@@ -23,6 +23,8 @@ public sealed class Ticket
     /// </summary>
     public string Numbers { get; set; } = null!;
 
+    public string? NumbersSignature { get; set; }
+
     public TicketStatus Status { get; set; } = TicketStatus.AwaitingDraw;
 
     public DateTimeOffset PurchasedAtUtc { get; set; } = DateTimeOffset.UtcNow;

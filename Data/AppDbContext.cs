@@ -73,9 +73,13 @@ public sealed class AppDbContext : DbContext
             b.HasIndex(x => new { x.UserId, x.PurchasedAtUtc });
             b.HasIndex(x => new { x.DrawId, x.PurchasedAtUtc });
             b.HasIndex(x => new { x.UserId, x.Status, x.DrawId });
+            b.HasIndex(x => new { x.UserId, x.DrawId, x.NumbersSignature })
+                .IsUnique()
+                .HasFilter("\"NumbersSignature\" IS NOT NULL");
 
             b.Property(x => x.DrawId).IsRequired();
             b.Property(x => x.Numbers).HasMaxLength(64).IsRequired();
+            b.Property(x => x.NumbersSignature).HasMaxLength(64);
             b.Property(x => x.Status)
                 .HasConversion<string>()
                 .HasMaxLength(32)
