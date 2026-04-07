@@ -130,7 +130,7 @@ public static class TimelineEndpoints
                 })
                 .ToArray();
 
-            var state = new MiniAppStateDto(currentDraw, currentTickets, history);
+            var state = new MiniAppStateDto(user?.Balance ?? 0m, currentDraw, currentTickets, history);
             return Results.Ok(new { ok = true, state });
         });
 

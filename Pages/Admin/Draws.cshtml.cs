@@ -17,6 +17,7 @@ public sealed class DrawsModel : PageModel
         decimal PrizePoolMatch3,
         decimal PrizePoolMatch4,
         decimal PrizePoolMatch5,
+        decimal TicketCost,
         string State,
         string? Numbers,
         DateTimeOffset CreatedAtUtc,
@@ -57,12 +58,12 @@ public sealed class DrawsModel : PageModel
         await LoadAsync(ct);
     }
 
-    public async Task<IActionResult> OnPostCreateAsync(decimal prizePoolMatch3, decimal prizePoolMatch4, decimal prizePoolMatch5, CancellationToken ct)
+    public async Task<IActionResult> OnPostCreateAsync(decimal prizePoolMatch3, decimal prizePoolMatch4, decimal prizePoolMatch5, decimal ticketCost, CancellationToken ct)
     {
         await EnsureDebugSeedAsync(ct);
         try
         {
-            var draw = await DrawManagement.CreateDrawAsync(_db, prizePoolMatch3, prizePoolMatch4, prizePoolMatch5, ct);
+            var draw = await DrawManagement.CreateDrawAsync(_db, prizePoolMatch3, prizePoolMatch4, prizePoolMatch5, ticketCost, ct);
             StatusMessage = $"Created draw #{draw.Id} in {DrawManagement.ToStateValue(draw.State)} state.";
             StatusIsError = false;
         }
@@ -101,6 +102,7 @@ public sealed class DrawsModel : PageModel
                 draw.PrizePoolMatch3,
                 draw.PrizePoolMatch4,
                 draw.PrizePoolMatch5,
+                draw.TicketCost,
                 DrawManagement.ToStateValue(draw.State),
                 draw.Numbers,
                 draw.CreatedAtUtc,

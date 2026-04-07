@@ -68,6 +68,7 @@ public static class TicketsEndpoints
             IWebHostEnvironment env,
             AppDbContext db,
             IUserService users,
+            IWalletService wallet,
             CancellationToken ct) =>
         {
             long telegramUserId;
@@ -107,19 +108,17 @@ public static class TicketsEndpoints
             if (!TryNormalizeSelectedNumbers(req.Numbers, out var numbers, out var validationError))
                 return Results.BadRequest(new { ok = false, error = validationError });
 
-            var ticket = new Ticket
+            var purchaseResult = await wallet.TryPurchaseTicketAsync(u.Id, currentDraw.Id, numbers, ct);
+            if (!purchaseResult.Success || purchaseResult.Ticket is null)
+                return Results.BadRequest(new { ok = false, error = purchaseResult.Error ?? "Purchase failed.", balance = purchaseResult.UserBalance });
+
+            var ticket = purchaseResult.Ticket;
+            return Results.Ok(new
             {
-                UserId = u.Id,
-                DrawId = currentDraw.Id,
-                Numbers = numbers,
-                Status = TicketStatus.AwaitingDraw,
-                PurchasedAtUtc = DateTimeOffset.UtcNow
-            };
-
-            db.Tickets.Add(ticket);
-            await db.SaveChangesAsync(ct);
-
-            return Results.Ok(new { ok = true, ticket = new TicketDto(ticket.Id, ticket.DrawId, ticket.Numbers, DrawManagement.ToTicketStatusValue(ticket.Status), ticket.PurchasedAtUtc) });
+                ok = true,
+                balance = purchaseResult.UserBalance,
+                ticket = new TicketDto(ticket.Id, ticket.DrawId, ticket.Numbers, DrawManagement.ToTicketStatusValue(ticket.Status), ticket.PurchasedAtUtc)
+            });
         });
 
         return endpoints;

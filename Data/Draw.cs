@@ -17,6 +17,8 @@ public sealed class Draw
 
     public decimal PrizePoolMatch5 { get; set; }
 
+    public decimal TicketCost { get; set; } = 2m;
+
     public DrawState State { get; set; } = DrawState.Upcoming;
 
     /// <summary>

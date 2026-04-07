@@ -1,0 +1,166 @@
+@page
+@model MiniApp.Pages.Admin.WalletModel
+@{
+    ViewData["Title"] = "Wallet";
+}
+
+<h1>Wallet</h1>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <div class="alert @(Model.StatusIsError ? "alert-danger" : "alert-info") mt-3">@Model.StatusMessage</div>
+}
+
+<div class="card mt-3">
+    <div class="card-body">
+        <h5 class="card-title">Server balance</h5>
+        <div class="display-6">@Model.ServerBalance.ToString("0.00")</div>
+    </div>
+</div>
+
+<div class="card mt-3">
+    <div class="card-body">
+        <h5 class="card-title">Withdrawal requests</h5>
+
+        @if (Model.PendingWithdrawalRequests.Count == 0)
+        {
+            <div class="alert alert-secondary">No pending withdrawal requests.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                    <tr>
+                        <th>Id</th>
+                        <th>User</th>
+                        <th>Amount</th>
+                        <th>Number</th>
+                        <th>Created (UTC)</th>
+                        <th>Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var wr in Model.PendingWithdrawalRequests)
+                    {
+                        <tr>
+                            <td>@wr.Id</td>
+                            <td><code>@wr.UserId</code> / <code>@wr.TelegramUserId</code></td>
+                            <td>@wr.Amount.ToString("0.00")</td>
+                            <td><code>@wr.Number</code></td>
+                            <td>@wr.CreatedAtUtc.ToString("u")</td>
+                            <td>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <form method="post" asp-page-handler="ConfirmWithdrawal" asp-route-id="@wr.Id" onsubmit="return confirm('Confirm withdrawal request #@wr.Id?');">
+                                        @Html.AntiForgeryToken()
+                                        <button class="btn btn-sm btn-success" type="submit">Confirm</button>
+                                    </form>
+                                    <form method="post" asp-page-handler="DenyWithdrawal" asp-route-id="@wr.Id" class="d-flex gap-2" onsubmit="return confirm('Deny withdrawal request #@wr.Id and refund user?');">
+                                        @Html.AntiForgeryToken()
+                                        <input type="text" name="note" class="form-control form-control-sm" placeholder="Optional note" maxlength="256" />
+                                        <button class="btn btn-sm btn-outline-danger" type="submit">Deny</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+<div class="card mt-3">
+    <div class="card-body">
+        <h5 class="card-title">Recent withdrawal history</h5>
+
+        @if (Model.RecentWithdrawalRequests.Count == 0)
+        {
+            <div class="alert alert-secondary mb-0">No withdrawal requests yet.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                    <tr>
+                        <th>Id</th>
+                        <th>User</th>
+                        <th>Amount</th>
+                        <th>Number</th>
+                        <th>Status</th>
+                        <th>Created (UTC)</th>
+                        <th>Reviewed (UTC)</th>
+                        <th>Admin</th>
+                        <th>Note</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var wr in Model.RecentWithdrawalRequests)
+                    {
+                        <tr>
+                            <td>@wr.Id</td>
+                            <td><code>@wr.UserId</code> / <code>@wr.TelegramUserId</code></td>
+                            <td>@wr.Amount.ToString("0.00")</td>
+                            <td><code>@wr.Number</code></td>
+                            <td>@wr.Status</td>
+                            <td>@wr.CreatedAtUtc.ToString("u")</td>
+                            <td>@(wr.ReviewedAtUtc?.ToString("u") ?? "-")</td>
+                            <td>@(string.IsNullOrWhiteSpace(wr.ReviewedByAdmin) ? "-" : wr.ReviewedByAdmin)</td>
+                            <td>@(string.IsNullOrWhiteSpace(wr.ReviewNote) ? "-" : wr.ReviewNote)</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+<div class="card mt-3">
+    <div class="card-body">
+        <h5 class="card-title">Transaction history</h5>
+
+        @if (Model.Transactions.Count == 0)
+        {
+            <div class="alert alert-secondary mb-0">No wallet transactions yet.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                    <tr>
+                        <th>Time (UTC)</th>
+                        <th>Type</th>
+                        <th>User</th>
+                        <th>User delta</th>
+                        <th>User balance after</th>
+                        <th>Server delta</th>
+                        <th>Server balance after</th>
+                        <th>Reference</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var tx in Model.Transactions)
+                    {
+                        <tr>
+                            <td>@tx.CreatedAtUtc.ToString("u")</td>
+                            <td>@tx.Type</td>
+                            <td><code>@tx.UserId</code> / <code>@tx.TelegramUserId</code></td>
+                            <td>@tx.UserDelta.ToString("0.00")</td>
+                            <td>@tx.UserBalanceAfter.ToString("0.00")</td>
+                            <td>@tx.ServerDelta.ToString("0.00")</td>
+                            <td>@tx.ServerBalanceAfter.ToString("0.00")</td>
+                            <td>@(string.IsNullOrWhiteSpace(tx.Reference) ? "-" : tx.Reference)</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+

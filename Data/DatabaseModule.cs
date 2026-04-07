@@ -50,6 +50,7 @@ public static class DatabaseModule
         // Data access services
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IUserService, UserService>();
+        services.AddScoped<IWalletService, WalletService>();
 
         return services;
     }

@@ -13,15 +13,21 @@ public static class LocalDebugSeed
     {
         var now = DateTimeOffset.UtcNow;
 
-        await EnsureUserAsync(db, debugTelegramUserId, "+10000000001", now, ct);
-        await EnsureUserAsync(db, FakeUserA, "+10000000002", now, ct);
-        await EnsureUserAsync(db, FakeUserB, "+10000000003", now, ct);
+        await EnsureUserAsync(db, debugTelegramUserId, "+10000000001", 100m, now, ct);
+        await EnsureUserAsync(db, FakeUserA, "+10000000002", 25m, now, ct);
+        await EnsureUserAsync(db, FakeUserB, "+10000000003", 25m, now, ct);
 
         var debugUser = await db.Users.SingleAsync(x => x.TelegramUserId == debugTelegramUserId, ct);
 
         var draws = await db.Draws
             .OrderBy(x => x.Id)
             .ToListAsync(ct);
+
+        foreach (var draw in draws)
+        {
+            if (draw.TicketCost <= 0)
+                draw.TicketCost = 2m;
+        }
 
         long nextId = draws.Count == 0 ? 1 : draws[^1].Id + 1;
 
@@ -34,6 +40,7 @@ public static class LocalDebugSeed
                 PrizePoolMatch3 = 40m + finishedDraws.Count * 10m,
                 PrizePoolMatch4 = 25m + finishedDraws.Count * 10m,
                 PrizePoolMatch5 = 35m + finishedDraws.Count * 30m,
+                TicketCost = 2m,
                 State = DrawState.Finished,
                 Numbers = DrawManagement.GenerateDrawNumbers(),
                 CreatedAtUtc = now.AddHours(-3 + finishedDraws.Count)
@@ -57,6 +64,7 @@ public static class LocalDebugSeed
                 PrizePoolMatch3 = 80m,
                 PrizePoolMatch4 = 50m,
                 PrizePoolMatch5 = 70m,
+                TicketCost = 2m,
                 State = DrawState.Active,
                 CreatedAtUtc = now.AddHours(-1)
             };
@@ -81,6 +89,7 @@ public static class LocalDebugSeed
                 PrizePoolMatch3 = 120m,
                 PrizePoolMatch4 = 70m,
                 PrizePoolMatch5 = 110m,
+                TicketCost = 2m,
                 State = DrawState.Upcoming,
                 CreatedAtUtc = now
             };
@@ -159,16 +168,24 @@ public static class LocalDebugSeed
         return matches;
     }
 
-    private static async Task EnsureUserAsync(AppDbContext db, long telegramUserId, string number, DateTimeOffset now, CancellationToken ct)
+    private static async Task EnsureUserAsync(AppDbContext db, long telegramUserId, string number, decimal minBalance, DateTimeOffset now, CancellationToken ct)
     {
         var user = await db.Users.SingleOrDefaultAsync(x => x.TelegramUserId == telegramUserId, ct);
         if (user is not null)
+        {
+            if (user.Balance < minBalance)
+            {
+                user.Balance = minBalance;
+                await db.SaveChangesAsync(ct);
+            }
             return;
+        }
 
         db.Users.Add(new MiniAppUser
         {
             TelegramUserId = telegramUserId,
             Number = number,
+            Balance = minBalance,
             CreatedAtUtc = now,
             LastSeenAtUtc = now
         });

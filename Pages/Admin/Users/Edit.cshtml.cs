@@ -26,6 +26,9 @@ public sealed class EditModel : PageModel
     public string? Number { get; set; }
 
     [BindProperty]
+    public decimal Balance { get; set; }
+
+    [BindProperty]
     public DateTimeOffset LastSeenAtUtc { get; set; }
 
     public async Task OnGetAsync(long id)
@@ -35,6 +38,7 @@ public sealed class EditModel : PageModel
 
         TelegramUserId = SelectedUser.TelegramUserId;
         Number = SelectedUser.Number;
+        Balance = SelectedUser.Balance;
         LastSeenAtUtc = SelectedUser.LastSeenAtUtc;
     }
 
@@ -45,6 +49,7 @@ public sealed class EditModel : PageModel
 
         u.TelegramUserId = TelegramUserId;
         u.Number = string.IsNullOrWhiteSpace(Number) ? null : Number.Trim();
+        u.Balance = decimal.Round(Balance, 2, MidpointRounding.AwayFromZero);
         u.LastSeenAtUtc = LastSeenAtUtc;
 
         await _db.SaveChangesAsync();

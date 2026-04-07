@@ -8,13 +8,14 @@ public sealed record DrawDto(
 	decimal PrizePoolMatch3,
 	decimal PrizePoolMatch4,
 	decimal PrizePoolMatch5,
+	decimal TicketCost,
 	string State,
 	string? Numbers,
 	DateTimeOffset CreatedAtUtc);
 
-public sealed record CreateDrawRequest(decimal PrizePoolMatch3, decimal PrizePoolMatch4, decimal PrizePoolMatch5);
+public sealed record CreateDrawRequest(decimal PrizePoolMatch3, decimal PrizePoolMatch4, decimal PrizePoolMatch5, decimal TicketCost);
 
-public sealed record UpdateDrawRequest(decimal PrizePoolMatch3, decimal PrizePoolMatch4, decimal PrizePoolMatch5, string State);
+public sealed record UpdateDrawRequest(decimal PrizePoolMatch3, decimal PrizePoolMatch4, decimal PrizePoolMatch5, decimal TicketCost, string State);
 
 public sealed record TicketForDrawDto(long Id, long DrawId, string Numbers, string Status, DateTimeOffset PurchasedAtUtc);
 

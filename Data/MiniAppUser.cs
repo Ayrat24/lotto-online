@@ -14,6 +14,8 @@ public sealed class MiniAppUser
     /// </summary>
     public string? Number { get; set; }
 
+    public decimal Balance { get; set; }
+
     public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
 
     public DateTimeOffset LastSeenAtUtc { get; set; } = DateTimeOffset.UtcNow;

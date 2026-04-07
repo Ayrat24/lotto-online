@@ -451,6 +451,21 @@ body.app-loading .loading-shell {
   color: #ffffff;
 }
 
+.profile-input {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  padding: 11px 12px;
+  font-size: 1rem;
+}
+
+.profile-input::placeholder {
+  color: #95a3ba;
+}
+
 .empty-card {
   border-radius: 14px;
   padding: 12px;

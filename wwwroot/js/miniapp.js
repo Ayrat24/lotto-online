@@ -2,6 +2,14 @@
   var purchaseBtn = document.getElementById('purchaseTicketBtn');
   var purchaseStatusEl = document.getElementById('purchaseStatus');
   var timelineStatusEl = document.getElementById('timelineStatus');
+  var topUpBtn = document.getElementById('topUpBtn');
+  var topUpStatusEl = document.getElementById('topUpStatus');
+  var withdrawBtn = document.getElementById('withdrawBtn');
+  var withdrawStatusEl = document.getElementById('withdrawStatus');
+  var withdrawAmountInputEl = document.getElementById('withdrawAmountInput');
+  var withdrawNumberInputEl = document.getElementById('withdrawNumberInput');
+  var userBalanceTextEl = document.getElementById('userBalanceText');
+  var profileBalanceTextEl = document.getElementById('profileBalanceText');
 
   var lotteryTabBtn = document.getElementById('lotteryTabBtn');
   var ticketsTabBtn = document.getElementById('ticketsTabBtn');
@@ -26,6 +34,7 @@
   var currentDrawNumbersWrapEl = document.getElementById('currentDrawNumbersWrap');
   var currentDrawNumbersEl = document.getElementById('currentDrawNumbers');
   var currentDrawTicketPriceRowEl = document.getElementById('currentDrawTicketPriceRow');
+  var currentDrawTicketCostEl = document.getElementById('currentDrawTicketCost');
   var currentDrawPurchaseBlockEl = document.getElementById('currentDrawPurchaseBlock');
   var appShellEl = document.getElementById('appShell');
   var appLoadingShellEl = document.getElementById('appLoadingShell');
@@ -43,7 +52,7 @@
 
   var highlightTicketId = null;
   var lastStateSig = null;
-  var latestState = { currentDraw: null, currentTickets: [], history: [] };
+  var latestState = { balance: 0, currentDraw: null, currentTickets: [], history: [] };
   var appHasLoadedState = false;
   var initData = null;
   var clientIsLocalDebug = false;
@@ -80,6 +89,14 @@
 
   function setTimelineStatus(text) {
     if (timelineStatusEl) timelineStatusEl.textContent = text || '';
+  }
+
+  function setTopUpStatus(text) {
+    if (topUpStatusEl) topUpStatusEl.textContent = text || '';
+  }
+
+  function setWithdrawStatus(text) {
+    if (withdrawStatusEl) withdrawStatusEl.textContent = text || '';
   }
 
   function setDebugModeBadge(text) {
@@ -126,6 +143,18 @@
     var amount = Number(value || 0);
     if (!Number.isFinite(amount)) amount = 0;
     return '$' + Math.round(amount).toLocaleString();
+  }
+
+  function formatCurrency(value) {
+    var amount = Number(value || 0);
+    if (!Number.isFinite(amount)) amount = 0;
+    return '$' + amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function renderBalance(balanceValue) {
+    var formatted = formatCurrency(balanceValue);
+    if (userBalanceTextEl) userBalanceTextEl.textContent = formatted;
+    if (profileBalanceTextEl) profileBalanceTextEl.textContent = formatted;
   }
 
   function parseNumbers(numbersStr) {
@@ -812,6 +841,7 @@
       }
       if (currentDrawSubtitleEl) currentDrawSubtitleEl.hidden = false;
       if (currentDrawTicketPriceRowEl) currentDrawTicketPriceRowEl.hidden = false;
+      if (currentDrawTicketCostEl) currentDrawTicketCostEl.textContent = '$2.00';
       if (currentDrawPurchaseBlockEl) currentDrawPurchaseBlockEl.hidden = false;
       return;
     }
@@ -831,6 +861,7 @@
     if (currentDrawPrizePool3El) currentDrawPrizePool3El.textContent = '$' + formatPrizePool(draw.prizePoolMatch3);
     if (currentDrawPrizePool4El) currentDrawPrizePool4El.textContent = '$' + formatPrizePool(draw.prizePoolMatch4);
     if (currentDrawPrizePool5El) currentDrawPrizePool5El.textContent = '$' + formatPrizePool(draw.prizePoolMatch5);
+    if (currentDrawTicketCostEl) currentDrawTicketCostEl.textContent = formatCurrency(draw.ticketCost);
 
     var hasWinningsAvailable = false;
     (currentTickets || []).forEach(function (ticket) {
@@ -1091,6 +1122,7 @@
         currentDraw: state && state.currentDraw ? {
           id: state.currentDraw.id,
           prizePool: state.currentDraw.prizePool,
+          ticketCost: state.currentDraw.ticketCost,
           state: state.currentDraw.state,
           numbers: state.currentDraw.numbers || null,
           createdAtUtc: state.currentDraw.createdAtUtc || null
@@ -1124,6 +1156,8 @@
             })
           };
         })
+        ,
+        balance: state && Number.isFinite(Number(state.balance)) ? Number(state.balance) : 0
       });
     } catch (e) {
       return String(Math.random());
@@ -1131,7 +1165,9 @@
   }
 
   function applyState(state) {
-    latestState = state || { currentDraw: null, currentTickets: [], history: [] };
+    latestState = state || { balance: 0, currentDraw: null, currentTickets: [], history: [] };
+
+    renderBalance(latestState.balance);
 
     renderCurrentDraw(latestState.currentDraw || null, latestState.currentTickets || []);
     renderMyTickets(latestState);
@@ -1177,6 +1213,76 @@
       });
   }
 
+  function topUpBalance() {
+    if (!initData) return;
+
+    if (topUpBtn) topUpBtn.disabled = true;
+    setTopUpStatus('Processing top-up...');
+    setWithdrawStatus('');
+
+    postJson('/api/wallet/topup', { initData: initData || '' }, null)
+      .then(function (res) {
+        if (!(res && res.ok)) {
+          setTopUpStatus('Top-up failed.');
+          return;
+        }
+
+        latestState.balance = Number(res.balance || 0);
+        renderBalance(latestState.balance);
+        setTopUpStatus('Top-up successful: +' + formatCurrency(res.added || 10));
+      })
+      .catch(function (err) {
+        setTopUpStatus(err.message || 'Top-up failed.');
+      })
+      .finally(function () {
+        if (topUpBtn) topUpBtn.disabled = false;
+      });
+  }
+
+  function withdrawBalance() {
+    if (!initData) return;
+
+    var amount = withdrawAmountInputEl ? Number(withdrawAmountInputEl.value) : NaN;
+    var number = withdrawNumberInputEl ? String(withdrawNumberInputEl.value || '').trim() : '';
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setWithdrawStatus('Enter a valid withdrawal amount.');
+      return;
+    }
+
+    if (!number) {
+      setWithdrawStatus('Enter a payout number.');
+      return;
+    }
+
+    if (withdrawBtn) withdrawBtn.disabled = true;
+    setTopUpStatus('');
+    setWithdrawStatus('Submitting withdrawal request...');
+
+    postJson('/api/wallet/withdraw', {
+      initData: initData || '',
+      amount: amount,
+      number: number
+    }, null)
+      .then(function (res) {
+        if (!(res && res.ok)) {
+          setWithdrawStatus('Withdrawal request failed.');
+          return;
+        }
+
+        latestState.balance = Number(res.balance || 0);
+        renderBalance(latestState.balance);
+        if (withdrawAmountInputEl) withdrawAmountInputEl.value = '';
+        setWithdrawStatus('Withdrawal request #' + res.requestId + ' submitted for ' + formatCurrency(res.amount) + '.');
+      })
+      .catch(function (err) {
+        setWithdrawStatus(err.message || 'Withdrawal request failed.');
+      })
+      .finally(function () {
+        if (withdrawBtn) withdrawBtn.disabled = false;
+      });
+  }
+
   function startPolling() {
     if (pollingIntervalId) return;
 
@@ -1207,12 +1313,15 @@
   if (closeTicketPickerBtn) closeTicketPickerBtn.addEventListener('click', closeTicketPicker);
   if (ticketPickerBackdropEl) ticketPickerBackdropEl.addEventListener('click', closeTicketPicker);
   if (confirmTicketNumbersBtn) confirmTicketNumbersBtn.addEventListener('click', confirmSelectedTicketNumbers);
+  if (topUpBtn) topUpBtn.addEventListener('click', topUpBalance);
+  if (withdrawBtn) withdrawBtn.addEventListener('click', withdrawBalance);
 
   randomizePickerNumbers();
   preloadTicketPicker();
   setActiveTab('lottery');
   renderCurrentDraw(null, []);
-  renderMyTickets({ currentDraw: null, currentTickets: [], history: [] });
+  renderMyTickets({ balance: 0, currentDraw: null, currentTickets: [], history: [] });
+  renderBalance(0);
 
   var search = '';
   try {

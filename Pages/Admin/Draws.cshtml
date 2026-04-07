@@ -25,6 +25,10 @@
                 <input id="createPrizePoolMatch5" name="prizePoolMatch5" type="number" min="0" step="0.01" value="0" class="form-control" />
             </div>
             <div class="col-sm-6 col-md-4">
+                <label for="createTicketCost" class="form-label">Ticket cost</label>
+                <input id="createTicketCost" name="ticketCost" type="number" min="0.01" step="0.01" value="2" class="form-control" />
+            </div>
+            <div class="col-sm-6 col-md-4">
                 <button type="submit" class="btn btn-danger w-100">Create draw</button>
             </div>
         </form>
@@ -52,6 +56,7 @@ else
                         <th>Id</th>
                         <th>Tickets</th>
                         <th>State</th>
+                        <th>Ticket cost</th>
                         <th>Total pool</th>
                         <th>Pools (3/5, 4/5, 5/5)</th>
                         <th>Created (UTC)</th>
@@ -72,6 +77,7 @@ else
                                     @d.State
                                 </span>
                             </td>
+                            <td><code>@d.TicketCost.ToString("0.00")</code></td>
                             <td>
                                 @d.TotalPrizePool.ToString("0.00")
                             </td>

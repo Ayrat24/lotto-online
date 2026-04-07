@@ -26,6 +26,7 @@ public static class TelegramAuthEndpoints
                 return Results.Ok(new TelegramAuthResult(
                     Ok: true,
                     TelegramUserId: debugUser.TelegramUserId,
+                    Balance: debugUser.Balance,
                     Username: "debug-user",
                     FirstName: "Debug",
                     LastName: "User",
@@ -42,7 +43,7 @@ public static class TelegramAuthEndpoints
 
                 // In development, return the error so you can debug quickly.
                 if (env.IsDevelopment())
-                    return Results.Json(new TelegramAuthResult(false, null, null, null, null, error), statusCode: StatusCodes.Status401Unauthorized);
+                    return Results.Json(new TelegramAuthResult(false, null, null, null, null, null, error), statusCode: StatusCodes.Status401Unauthorized);
 
                 return Results.Unauthorized();
             }
@@ -53,6 +54,7 @@ public static class TelegramAuthEndpoints
             return Results.Ok(new TelegramAuthResult(
                 Ok: true,
                 TelegramUserId: u.TelegramUserId,
+                Balance: u.Balance,
                 Username: tgUser.Username,
                 FirstName: tgUser.First_Name,
                 LastName: tgUser.Last_Name,

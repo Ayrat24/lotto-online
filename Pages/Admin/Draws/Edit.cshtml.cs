@@ -49,6 +49,9 @@ public sealed class EditModel : PageModel
     public decimal PrizePoolMatch5 { get; set; }
 
     [BindProperty]
+    public decimal TicketCost { get; set; }
+
+    [BindProperty]
     public string State { get; set; } = "upcoming";
 
     [BindProperty]
@@ -77,6 +80,7 @@ public sealed class EditModel : PageModel
         PrizePoolMatch3 = SelectedDraw.PrizePoolMatch3;
         PrizePoolMatch4 = SelectedDraw.PrizePoolMatch4;
         PrizePoolMatch5 = SelectedDraw.PrizePoolMatch5;
+        TicketCost = SelectedDraw.TicketCost;
         State = DrawManagement.ToStateValue(SelectedDraw.State);
 
         if (SelectedDraw.State == DrawState.Finished)
@@ -107,7 +111,7 @@ public sealed class EditModel : PageModel
 
         try
         {
-            await DrawManagement.UpdateDrawAsync(_db, draw, PrizePoolMatch3, PrizePoolMatch4, PrizePoolMatch5, parsedState, ct);
+            await DrawManagement.UpdateDrawAsync(_db, draw, PrizePoolMatch3, PrizePoolMatch4, PrizePoolMatch5, TicketCost, parsedState, ct);
             FlashMessage = $"Updated draw #{draw.Id}.";
             FlashIsError = false;
             return RedirectToPage("/Admin/Draws");
@@ -146,6 +150,7 @@ public sealed class EditModel : PageModel
             PrizePoolMatch3 = draw.PrizePoolMatch3;
             PrizePoolMatch4 = draw.PrizePoolMatch4;
             PrizePoolMatch5 = draw.PrizePoolMatch5;
+            TicketCost = draw.TicketCost;
             State = DrawManagement.ToStateValue(draw.State);
             await SafeLoadTicketsAsync(id, ticketPage, ticketNumbers, ct);
             return Page();
