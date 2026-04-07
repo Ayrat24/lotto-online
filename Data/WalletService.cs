@@ -113,6 +113,55 @@ public sealed class WalletService : IWalletService
         return new WalletPurchaseResult(true, user.Balance, null, ticket);
     }
 
+    public async Task<WalletClaimResult> ClaimTicketWinningsAsync(long userId, long ticketId, CancellationToken ct)
+    {
+        var ticket = await _db.Tickets
+            .Include(x => x.Draw)
+            .SingleOrDefaultAsync(x => x.Id == ticketId && x.UserId == userId, ct);
+
+        if (ticket is null)
+            return new WalletClaimResult(false, 0m, 0m, "Ticket was not found.");
+
+        if (ticket.Status != TicketStatus.WinningsAvailable)
+            return new WalletClaimResult(false, 0m, 0m, "This ticket is not claimable.");
+
+        if (ticket.Draw.State != DrawState.Finished)
+            return new WalletClaimResult(false, 0m, 0m, "Draw is not finished yet.");
+
+        var amount = TicketWinnings.GetWinningAmount(ticket, ticket.Draw);
+        if (amount <= 0)
+            return new WalletClaimResult(false, 0m, 0m, "Ticket has no winnings to claim.");
+
+        var user = await _db.Users.SingleOrDefaultAsync(x => x.Id == userId, ct);
+        if (user is null)
+            return new WalletClaimResult(false, 0m, 0m, "User was not found.");
+
+        var serverWallet = await EnsureServerWalletAsync(ct);
+        if (serverWallet.Balance < amount)
+            return new WalletClaimResult(false, user.Balance, amount, "Server wallet does not have enough funds right now.");
+
+        var now = DateTimeOffset.UtcNow;
+        user.Balance = RoundAmount(user.Balance + amount);
+        serverWallet.Balance = RoundAmount(serverWallet.Balance - amount);
+        serverWallet.UpdatedAtUtc = now;
+        ticket.Status = TicketStatus.WinningsClaimed;
+
+        _db.WalletTransactions.Add(new WalletTransaction
+        {
+            UserId = user.Id,
+            Type = WalletTransactionType.WinningsClaimed,
+            UserDelta = amount,
+            UserBalanceAfter = user.Balance,
+            ServerDelta = -amount,
+            ServerBalanceAfter = serverWallet.Balance,
+            Reference = $"ticket:{ticket.Id}",
+            CreatedAtUtc = now
+        });
+
+        await _db.SaveChangesAsync(ct);
+        return new WalletClaimResult(true, user.Balance, amount, null);
+    }
+
     public async Task<WalletWithdrawRequestResult> CreateWithdrawalRequestAsync(long userId, decimal amount, string number, CancellationToken ct)
     {
         var normalizedAmount = RoundAmount(amount);

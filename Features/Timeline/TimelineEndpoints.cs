@@ -90,13 +90,27 @@ public static class TimelineEndpoints
                     .AsNoTracking()
                     .ToListAsync(ct);
 
+            var ticketDrawIds = ticketRows.Select(x => x.DrawId).Distinct().ToArray();
+            var ticketDrawsById = ticketDrawIds.Length == 0
+                ? new Dictionary<long, Draw>()
+                : await db.Draws
+                    .Where(x => ticketDrawIds.Contains(x.Id))
+                    .AsNoTracking()
+                    .ToDictionaryAsync(x => x.Id, ct);
+
             var tickets = ticketRows
-                .Select(x => new TicketForDrawDto(
-                    x.Id,
-                    x.DrawId,
-                    x.Numbers,
-                    DrawManagement.ToTicketStatusValue(x.Status),
-                    x.PurchasedAtUtc))
+                .Select(x =>
+                {
+                    ticketDrawsById.TryGetValue(x.DrawId, out var draw);
+                    var winningAmount = draw is null ? 0m : TicketWinnings.GetWinningAmount(x, draw);
+                    return new TicketForDrawDto(
+                        x.Id,
+                        x.DrawId,
+                        x.Numbers,
+                        DrawManagement.ToTicketStatusValue(x.Status),
+                        x.PurchasedAtUtc,
+                        winningAmount);
+                })
                 .ToList();
 
             var currentTickets = currentDraw is null

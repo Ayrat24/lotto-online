@@ -13,6 +13,7 @@
 
   var lotteryTabBtn = document.getElementById('lotteryTabBtn');
   var ticketsTabBtn = document.getElementById('ticketsTabBtn');
+  var ticketsWinningPinEl = document.getElementById('ticketsWinningPin');
   var profileTabBtn = document.getElementById('profileTabBtn');
   var lotteryTabPanel = document.getElementById('lotteryTabPanel');
   var ticketsTabPanel = document.getElementById('ticketsTabPanel');
@@ -155,6 +156,14 @@
     var formatted = formatCurrency(balanceValue);
     if (userBalanceTextEl) userBalanceTextEl.textContent = formatted;
     if (profileBalanceTextEl) profileBalanceTextEl.textContent = formatted;
+  }
+
+  function setTicketsWinningPin(count) {
+    if (!ticketsWinningPinEl) return;
+
+    var amount = Math.max(0, parseInt(count, 10) || 0);
+    ticketsWinningPinEl.hidden = amount <= 0;
+    ticketsWinningPinEl.textContent = amount > 99 ? '99+' : String(amount);
   }
 
   function parseNumbers(numbersStr) {
@@ -757,7 +766,29 @@
 
     el.appendChild(header);
     el.appendChild(createNumbersRow(ticket.numbers, draw && draw.numbers ? draw.numbers : null));
-    el.appendChild(meta);
+
+    var footer = document.createElement('div');
+    footer.className = 'ticket-footer';
+    footer.appendChild(meta);
+
+    var winningAmount = Number(ticket && ticket.winningAmount || 0);
+    if ((ticket && ticket.status === 'winnings_available') && Number.isFinite(winningAmount) && winningAmount > 0) {
+      var claimBtn = document.createElement('button');
+      claimBtn.type = 'button';
+      claimBtn.className = 'ticket-claim-btn';
+      claimBtn.textContent = 'Claim ' + formatCurrency(winningAmount);
+      claimBtn.addEventListener('click', function () {
+        claimTicket(ticket.id, claimBtn);
+      });
+      footer.appendChild(claimBtn);
+    } else if ((ticket && ticket.status === 'winnings_claimed') && Number.isFinite(winningAmount) && winningAmount > 0) {
+      var claimedLabel = document.createElement('div');
+      claimedLabel.className = 'ticket-claimed-label';
+      claimedLabel.textContent = 'Claimed ' + formatCurrency(winningAmount);
+      footer.appendChild(claimedLabel);
+    }
+
+    el.appendChild(footer);
 
     return el;
   }
@@ -1133,7 +1164,8 @@
             drawId: ticket.drawId,
             numbers: ticket.numbers || null,
             status: ticket.status || null,
-            purchasedAtUtc: ticket.purchasedAtUtc || null
+            purchasedAtUtc: ticket.purchasedAtUtc || null,
+            winningAmount: Number(ticket.winningAmount || 0)
           };
         }),
         history: (state && state.history || []).map(function (group) {
@@ -1151,7 +1183,8 @@
                 id: ticket.id,
                 numbers: ticket.numbers || null,
                 status: ticket.status || null,
-                purchasedAtUtc: ticket.purchasedAtUtc || null
+                purchasedAtUtc: ticket.purchasedAtUtc || null,
+                winningAmount: Number(ticket.winningAmount || 0)
               };
             })
           };
@@ -1168,6 +1201,7 @@
     latestState = state || { balance: 0, currentDraw: null, currentTickets: [], history: [] };
 
     renderBalance(latestState.balance);
+    setTicketsWinningPin(countWinningTickets(latestState));
 
     renderCurrentDraw(latestState.currentDraw || null, latestState.currentTickets || []);
     renderMyTickets(latestState);
@@ -1179,6 +1213,55 @@
         setActiveTab('tickets');
       }
     }
+  }
+
+  function countWinningTickets(state) {
+    var count = 0;
+    var currentTickets = state && state.currentTickets ? state.currentTickets : [];
+    currentTickets.forEach(function (ticket) {
+      if (ticket && ticket.status === 'winnings_available') count++;
+    });
+
+    var history = state && state.history ? state.history : [];
+    history.forEach(function (group) {
+      (group && group.tickets ? group.tickets : []).forEach(function (ticket) {
+        if (ticket && ticket.status === 'winnings_available') count++;
+      });
+    });
+
+    return count;
+  }
+
+  function claimTicket(ticketId, buttonEl) {
+    if (!initData) return;
+
+    if (buttonEl) {
+      buttonEl.disabled = true;
+      buttonEl.classList.add('is-loading');
+    }
+    setPurchaseStatus('Claiming winnings...');
+
+    postJson('/api/tickets/claim', { initData: initData || '', ticketId: ticketId }, null)
+      .then(function (res) {
+        if (!(res && res.ok)) {
+          setPurchaseStatus('Claim failed.');
+          return;
+        }
+
+        latestState.balance = Number(res.balance || 0);
+        renderBalance(latestState.balance);
+        setPurchaseStatus('Claimed ' + formatCurrency(res.amount || 0) + '.');
+        return refreshState();
+      })
+      .catch(function (err) {
+        setPurchaseStatus(err.message || 'Claim failed.');
+      })
+      .finally(function () {
+        if (buttonEl) {
+          buttonEl.disabled = false;
+          try { buttonEl.classList.remove('is-loading'); } catch (e) { }
+        }
+      });
   }
 
   function refreshState() {

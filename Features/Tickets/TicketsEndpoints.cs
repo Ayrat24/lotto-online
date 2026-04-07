@@ -53,8 +53,25 @@ public static class TicketsEndpoints
                 .AsNoTracking()
                 .ToListAsync(ct);
 
+            var drawIds = ticketRows.Select(x => x.DrawId).Distinct().ToArray();
+            var drawsById = drawIds.Length == 0
+                ? new Dictionary<long, Draw>()
+                : await db.Draws
+                    .Where(x => drawIds.Contains(x.Id))
+                    .AsNoTracking()
+                    .ToDictionaryAsync(x => x.Id, ct);
+
             var tickets = ticketRows
-                .Select(x => new TicketDto(x.Id, x.DrawId, x.Numbers, DrawManagement.ToTicketStatusValue(x.Status), x.PurchasedAtUtc))
+                .Select(x =>
+                {
+                    drawsById.TryGetValue(x.DrawId, out var draw);
+                    var winningAmount = draw is null
+                        ? 0m
+                        : TicketWinnings.GetWinningAmount(
+                            new Ticket { Numbers = x.Numbers, Status = x.Status },
+                            draw);
+                    return new TicketDto(x.Id, x.DrawId, x.Numbers, DrawManagement.ToTicketStatusValue(x.Status), x.PurchasedAtUtc, winningAmount);
+                })
                 .ToArray();
 
             return Results.Ok(new { ok = true, tickets });
@@ -117,8 +134,49 @@ public static class TicketsEndpoints
             {
                 ok = true,
                 balance = purchaseResult.UserBalance,
-                ticket = new TicketDto(ticket.Id, ticket.DrawId, ticket.Numbers, DrawManagement.ToTicketStatusValue(ticket.Status), ticket.PurchasedAtUtc)
+                ticket = new TicketDto(ticket.Id, ticket.DrawId, ticket.Numbers, DrawManagement.ToTicketStatusValue(ticket.Status), ticket.PurchasedAtUtc, 0m)
             });
+        });
+
+        endpoints.MapPost("/api/tickets/claim", async (
+            ClaimTicketRequest req,
+            HttpContext http,
+            IConfiguration config,
+            IWebHostEnvironment env,
+            AppDbContext db,
+            IUserService users,
+            IWalletService wallet,
+            CancellationToken ct) =>
+        {
+            long telegramUserId;
+
+            if (LocalDebugMode.TryGetDebugTelegramUserId(http, config, env, out var localDebugUserId))
+            {
+                await LocalDebugSeed.EnsureSeededAsync(db, localDebugUserId, ct);
+                telegramUserId = localDebugUserId;
+            }
+            else
+            {
+                var botToken = config["BotToken"];
+                if (string.IsNullOrWhiteSpace(botToken))
+                    return Results.Problem("BotToken is not configured.", statusCode: 500);
+
+                if (!TelegramInitDataValidator.TryValidateInitData(req.InitData, botToken, TimeSpan.FromMinutes(10), out var tgUser, out var error))
+                {
+                    if (env.IsDevelopment())
+                        return Results.Json(new { ok = false, error }, statusCode: StatusCodes.Status401Unauthorized);
+                    return Results.Unauthorized();
+                }
+
+                telegramUserId = tgUser!.Id;
+            }
+
+            var u = await users.TouchUserAsync(telegramUserId, ct);
+            var claim = await wallet.ClaimTicketWinningsAsync(u.Id, req.TicketId, ct);
+            if (!claim.Success)
+                return Results.BadRequest(new { ok = false, error = claim.Error ?? "Claim failed.", balance = claim.UserBalance });
+
+            return Results.Ok(new { ok = true, amount = claim.Amount, balance = claim.UserBalance });
         });
 
         return endpoints;

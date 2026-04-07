@@ -6,7 +6,8 @@ public enum WalletTransactionType
     TicketPurchase = 1,
     WithdrawalRequested = 2,
     WithdrawalConfirmed = 3,
-    WithdrawalDeniedRefund = 4
+    WithdrawalDeniedRefund = 4,
+    WinningsClaimed = 5
 }
 
 public sealed class WalletTransaction

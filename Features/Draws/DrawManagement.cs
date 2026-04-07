@@ -78,14 +78,13 @@ internal static class DrawManagement
             ? GenerateDrawNumbers()
             : NormalizeManualDrawNumbers(manualNumbers);
 
-        var resultNumbers = ParseNumberSet(draw.Numbers);
         var tickets = await db.Tickets
             .Where(x => x.DrawId == draw.Id)
             .ToListAsync(ct);
 
         foreach (var ticket in tickets)
         {
-            var matchedCount = CountMatches(ticket.Numbers, resultNumbers);
+            var matchedCount = TicketWinnings.GetMatchCount(ticket.Numbers, draw.Numbers);
             ticket.Status = matchedCount >= 3
                 ? TicketStatus.WinningsAvailable
                 : TicketStatus.ExpiredNoWin;
@@ -193,29 +192,6 @@ internal static class DrawManagement
     private static decimal RoundMoney(decimal value)
         => decimal.Round(value, 2, MidpointRounding.AwayFromZero);
 
-    private static HashSet<int> ParseNumberSet(string numbers)
-    {
-        var values = numbers
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(int.Parse)
-            .ToHashSet();
-
-        return values;
-    }
-
-    private static int CountMatches(string ticketNumbers, HashSet<int> drawNumbers)
-    {
-        var ticketValues = ParseNumberSet(ticketNumbers);
-
-        var matches = 0;
-        foreach (var n in ticketValues)
-        {
-            if (drawNumbers.Contains(n))
-                matches++;
-        }
-
-        return matches;
-    }
 
     private static void EnsurePrizePool(decimal prizePool, string tier)
     {
