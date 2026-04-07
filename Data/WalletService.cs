@@ -76,6 +76,16 @@ public sealed class WalletService : IWalletService
         if (user is null)
             return new WalletPurchaseResult(false, 0m, "User was not found.");
 
+        var candidateSignature = BuildTicketSignature(numbers);
+        var existingNumbers = await _db.Tickets
+            .Where(x => x.UserId == userId && x.DrawId == drawId)
+            .Select(x => x.Numbers)
+            .AsNoTracking()
+            .ToListAsync(ct);
+
+        if (existingNumbers.Any(x => BuildTicketSignature(x) == candidateSignature))
+            return new WalletPurchaseResult(false, user.Balance, "You already purchased this ticket for the current draw.");
+
         var cost = RoundAmount(draw.TicketCost);
         if (user.Balance < cost)
             return new WalletPurchaseResult(false, user.Balance, "Insufficient balance.");
@@ -296,6 +306,17 @@ public sealed class WalletService : IWalletService
             return null;
 
         return trimmed;
+    }
+
+    private static string BuildTicketSignature(string numbers)
+    {
+        var parsed = numbers
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(int.Parse)
+            .OrderBy(x => x)
+            .ToArray();
+
+        return string.Join(',', parsed);
     }
 
     private static decimal RoundAmount(decimal amount)
