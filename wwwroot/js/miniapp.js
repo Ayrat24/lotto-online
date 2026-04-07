@@ -1323,26 +1323,69 @@
       });
   }
 
+  function pollDepositStatus(depositId, attemptsLeft) {
+    if (!initData || !depositId || attemptsLeft <= 0) {
+      return Promise.resolve(null);
+    }
+
+    return postJson('/api/payments/deposits/status', {
+      initData: initData || '',
+      depositId: depositId
+    }, null)
+      .then(function (res) {
+        if (!(res && res.ok && res.deposit)) {
+          return null;
+        }
+
+        var deposit = res.deposit;
+        var status = String(deposit.status || '').toLowerCase();
+        if (status === 'credited') {
+          setTopUpStatus('Deposit credited: +' + formatCurrency(deposit.amount || 0) + '.');
+          return refreshState();
+        }
+
+        if (status === 'expired' || status === 'invalid') {
+          setTopUpStatus('Deposit ' + status + '. Please create a new one.');
+          return null;
+        }
+
+        return new Promise(function (resolve) {
+          setTimeout(function () {
+            pollDepositStatus(depositId, attemptsLeft - 1).then(resolve);
+          }, 4000);
+        });
+      })
+      .catch(function () {
+        return null;
+      });
+  }
+
   function topUpBalance() {
     if (!initData) return;
 
     if (topUpBtn) topUpBtn.disabled = true;
-    setTopUpStatus('Processing top-up...');
+    setTopUpStatus('Creating crypto invoice...');
     setWithdrawStatus('');
 
-    postJson('/api/wallet/topup', { initData: initData || '' }, null)
+    postJson('/api/payments/deposits/create', { initData: initData || '', amount: 10, currency: 'USD' }, null)
       .then(function (res) {
-        if (!(res && res.ok)) {
-          setTopUpStatus('Top-up failed.');
+        if (!(res && res.ok && res.deposit)) {
+          setTopUpStatus('Failed to create deposit invoice.');
           return;
         }
 
-        latestState.balance = Number(res.balance || 0);
-        renderBalance(latestState.balance);
-        setTopUpStatus('Top-up successful: +' + formatCurrency(res.added || 10));
+        var deposit = res.deposit;
+        if (deposit.checkoutLink) {
+          try {
+            window.open(deposit.checkoutLink, '_blank', 'noopener');
+          } catch (e) { }
+        }
+
+        setTopUpStatus('Invoice created. Complete payment in BTCPay; status updates every 4s.');
+        return pollDepositStatus(deposit.id, 45);
       })
       .catch(function (err) {
-        setTopUpStatus(err.message || 'Top-up failed.');
+        setTopUpStatus(err.message || 'Failed to create deposit invoice.');
       })
       .finally(function () {
         if (topUpBtn) topUpBtn.disabled = false;

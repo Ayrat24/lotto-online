@@ -7,7 +7,8 @@ public enum WalletTransactionType
     WithdrawalRequested = 2,
     WithdrawalConfirmed = 3,
     WithdrawalDeniedRefund = 4,
-    WinningsClaimed = 5
+    WinningsClaimed = 5,
+    CryptoDepositCredited = 6
 }
 
 public sealed class WalletTransaction
@@ -31,5 +32,3 @@ public sealed class WalletTransaction
 
     public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
 }
-
-

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.Extensions.Options;
 using MiniApp.Admin;
 using MiniApp.Data;
 using MiniApp.Features.Auth;
@@ -8,6 +9,7 @@ using MiniApp.Features.Tickets;
 using MiniApp.Features.Users;
 using MiniApp.Features.Timeline;
 using MiniApp.Features.Wallet;
+using MiniApp.Features.Payments;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Polling;
@@ -43,6 +45,21 @@ builder.Services.AddAdminArea(builder.Configuration);
 
 // PostgreSQL + EF Core (modular)
 builder.Services.AddPostgresDatabase(builder.Configuration);
+
+builder.Services
+    .AddOptions<PaymentsOptions>()
+    .Bind(builder.Configuration.GetSection(PaymentsOptions.SectionName))
+    .ValidateOnStart();
+
+builder.Services.AddSingleton<IValidateOptions<PaymentsOptions>, PaymentsOptionsValidator>();
+
+builder.Services.AddHttpClient<IBtcPayClient, BtcPayClient>((sp, http) =>
+{
+    var options = sp.GetRequiredService<IOptions<PaymentsOptions>>().Value.BtcPay;
+    var timeoutSeconds = options.RequestTimeoutSeconds <= 0 ? 15 : options.RequestTimeoutSeconds;
+    http.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
+});
+builder.Services.AddScoped<IPaymentsService, PaymentsService>();
 
 if (telegramEnabled)
 {
@@ -148,6 +165,7 @@ app.MapTicketsEndpoints();
 app.MapDrawsEndpoints();
 app.MapTimelineEndpoints();
 app.MapWalletEndpoints();
+app.MapPaymentsEndpoints();
 
 // Small health check / default landing page
 app.MapGet("/", () => Results.Redirect(localDebugEnabled ? "/local-debug" : "/Admin"));

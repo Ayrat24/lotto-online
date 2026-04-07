@@ -3,7 +3,7 @@
 ## What this project is
 - `MiniApp` is a .NET 10 Telegram Mini App backend + Razor admin panel for a lotto flow.
 - Runtime composition is centralized in `Program.cs`: service registration, middleware, endpoint mapping, Telegram bot mode, and startup migrations.
-- Core domains live in `Data/` (`MiniAppUser`, `Ticket`, `Draw`) with EF Core + PostgreSQL.
+- Core domains live in `Data/` (`MiniAppUser`, `Ticket`, `Draw`, wallet + payments entities) with EF Core + PostgreSQL.
 
 ## Architecture and data flow
 - Mini App client (`Pages/app.cshtml` + `wwwroot/js/miniapp.js`) calls Minimal APIs under `/api/*`.
@@ -11,6 +11,8 @@
 - Ticket purchase (`/api/tickets/purchase`) creates tickets for `nextDrawId = max(draws)+1`, so tickets may exist before a draw is created (`Features/Tickets/TicketsEndpoints.cs`).
 - Draw creation is admin-only (`/api/admin/draws/start` and `Pages/Admin/Draws.cshtml.cs`), generating sequential draw IDs.
 - Timeline (`/api/timeline`) merges user tickets + existing draws + synthetic upcoming draw group (`Features/Timeline/TimelineEndpoints.cs`).
+- Crypto deposit flow uses BTCPay Greenfield API: user endpoints create/poll deposit intents (`/api/payments/deposits/create`, `/api/payments/deposits/status`) and webhook ingestion happens at `/api/webhooks/btcpay` (`Features/Payments/*`).
+- Webhook processing is DB-backed and idempotent: duplicate delivery IDs are deduped via `payment_webhook_events` unique index, and wallet crediting is one-time per invoice reference.
 
 ## Key conventions in this repo
 - Endpoint style: feature extension methods (`MapXEndpoints`) invoked from `Program.cs`.
@@ -26,6 +28,7 @@
 - `BotMode` is `Polling` or `Webhook`; polling hosted service only runs in polling mode.
 - `Database:AutoMigrate` defaults to `true` in Development, `false` otherwise unless overridden.
 - Admin cookie auth uses `Admin:Username` / `Admin:Password` (`Admin/AdminAuth.cs`).
+- If `Payments:Enabled=true`, options validation requires `Payments:BtcPay:BaseUrl`, `Payments:BtcPay:StoreId`, and `Payments:BtcPay:ApiKey`.
 
 ## Developer workflows
 - Local DB only: `docker compose up -d` (from `docker-compose.yml`).
@@ -44,6 +47,8 @@
 - New API features: add `Features/<Area>/...Endpoints.cs`, DTOs in `*Models.cs`, and map in `Program.cs`.
 - Changes to auth/initData handling must be mirrored across auth, tickets, and timeline endpoints.
 - If changing draw/ticket semantics, verify both purchase endpoint and timeline grouping logic together.
+- If changing payments: update `Features/Payments/*`, keep `AppDbContext` mappings aligned with migrations, and verify BTCPay webhook processing still preserves idempotent crediting.
+- Preserve webhook signature handling (`BTCPay-Sig`) and audit trail states in `PaymentWebhookEvent` (`Received`/`Processed`/`Ignored`/`Failed`).
 
 ## Local debug mode maintenance (important)
 - Local debug mode is Development-only and must never affect production behavior; keep guards aligned in `Program.cs`, `appsettings.json`, and `docker-compose.app.yml`.
