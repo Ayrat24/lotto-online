@@ -1007,24 +1007,35 @@ button:disabled {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: min(90vw, 360px);
+  width: 80vw;
+  max-width: 80vw;
   border-radius: 16px;
-  border: 1px solid var(--line);
-  background: linear-gradient(180deg, #151e2e 0%, #111a29 100%);
+  border: 1px solid rgba(255, 111, 111, 0.45);
+  background: linear-gradient(180deg, #7a1520 0%, #5a0d15 100%);
   padding: 16px;
   display: grid;
   gap: 12px;
   box-shadow: 0 16px 44px rgba(0, 0, 0, 0.45);
 }
 
+.center-popup-header {
+  font-size: 0.82rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #ffd7db;
+}
+
 .center-popup-message {
   font-size: 1rem;
   line-height: 1.35;
-  color: #e8f0ff;
+  color: #fff1f3;
 }
 
 .center-popup-confirm {
   width: 100%;
+  background: linear-gradient(180deg, #ff8c8c, #ff6161);
+  color: #ffffff;
 }
 
 .tabbar {
