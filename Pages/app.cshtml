@@ -70,7 +70,7 @@
       <header class="topbar">
         <div class="brand">
           <div class="brand-icon">⚡</div>
-          <div class="brand-title">LottoVibe</div>
+          <div class="brand-title" data-loc="client.brand.title">LottoVibe</div>
         </div>
         <div class="balance-block">
           <div class="balance-label" data-loc="client.balance.label">Money</div>
@@ -82,11 +82,11 @@
 
       <section class="card jackpot-card">
         <div class="jackpot-top">
-          <span class="jackpot-chip">Jackpot alert</span>
-          <span class="jackpot-time" id="currentDrawCreatedAt">Ends in --:--:--</span>
+          <span class="jackpot-chip" data-loc="client.jackpot.alert">Jackpot alert</span>
+          <span class="jackpot-time" id="currentDrawCreatedAt" data-loc="client.jackpot.endsIn">Ends in --:--:--</span>
         </div>
         <div class="jackpot-amount" id="jackpotAmount">$0.00</div>
-        <p class="jackpot-copy" id="jackpotSubtitle">The next draw is coming soon. Get your tickets now.</p>
+        <p class="jackpot-copy" id="jackpotSubtitle" data-loc="client.jackpot.subtitle">The next draw is coming soon. Get your tickets now.</p>
         <div id="currentDrawPrizeTiers" class="prize-tier-row" hidden>
           <div class="prize-tier-pill">
             <span class="prize-tier-label">3/5</span>
@@ -108,17 +108,17 @@
         <div class="section-header">
           <div>
             <div class="section-title" id="currentDrawId">PowerBall Global</div>
-            <div class="section-subtitle" id="currentDrawSubtitle">Next draw and ticket purchase</div>
+            <div class="section-subtitle" id="currentDrawSubtitle" data-loc="client.currentDraw.subtitle">Next draw and ticket purchase</div>
           </div>
-          <div id="currentDrawStateBadge" class="state-badge state-badge-muted">waiting</div>
+          <div id="currentDrawStateBadge" class="state-badge state-badge-muted" data-loc="client.currentDraw.waiting">waiting</div>
         </div>
 
-        <div id="currentDrawEmpty" class="empty-card">There is no active draw right now.</div>
+        <div id="currentDrawEmpty" class="empty-card" data-loc="client.currentDraw.empty">There is no active draw right now.</div>
 
         <div id="currentDrawContent" class="stack" hidden>
           <div id="currentDrawPurchaseBlock" class="stack">
             <div id="currentDrawTicketPriceRow" class="draw-meta-row">
-              <span>Ticket cost: <strong id="currentDrawTicketCost">$2.00</strong> per entry.</span>
+              <span><span data-loc="client.currentDraw.ticketCostPrefix">Ticket cost:</span> <strong id="currentDrawTicketCost">$2.00</strong> <span data-loc="client.currentDraw.ticketCostSuffix">per entry.</span></span>
             </div>
 
             <button id="purchaseTicketBtn" type="button" data-loc="client.button.purchase">Purchase ticket</button>
@@ -126,7 +126,7 @@
           </div>
 
           <div id="currentDrawNumbersWrap" class="stack" hidden>
-            <div class="section-subtitle">Winning numbers</div>
+            <div class="section-subtitle" data-loc="client.currentDraw.winningNumbers">Winning numbers</div>
             <div id="currentDrawNumbers"></div>
           </div>
         </div>
@@ -137,43 +137,43 @@
     <section id="ticketsTabPanel" class="tab-panel stack" hidden>
       <div class="card stack">
         <div class="section-header tickets-header">
-          <div class="section-title">My tickets</div>
+          <div class="section-title" data-loc="client.tickets.title">My tickets</div>
         </div>
         <div id="timelineStatus" class="section-subtitle"></div>
-        <div id="myTicketsEmpty" class="empty-card">You have not bought any tickets yet.</div>
+        <div id="myTicketsEmpty" class="empty-card" data-loc="client.tickets.empty">You have not bought any tickets yet.</div>
         <div id="myTicketsList" class="history-list"></div>
       </div>
     </section>
 
     <section id="profileTabPanel" class="tab-panel stack" hidden>
       <div class="card stack">
-        <div class="section-title">Profile</div>
-        <div class="section-subtitle">Manage your wallet balance.</div>
-        <div class="draw-meta-row">Current balance: <strong id="profileBalanceText">$0.00</strong></div>
+        <div class="section-title" data-loc="client.profile.title">Profile</div>
+        <div class="section-subtitle" data-loc="client.profile.subtitle">Manage your wallet balance.</div>
+        <div class="draw-meta-row"><span data-loc="client.profile.currentBalance">Current balance:</span> <strong id="profileBalanceText">$0.00</strong></div>
         <button id="topUpBtn" type="button" data-loc="client.button.deposit">Deposit crypto</button>
         <div id="topUpStatus" class="muted"></div>
 
-        <div class="section-subtitle">Saved wallet address</div>
-        <input id="walletAddressInput" type="text" maxlength="256" placeholder="Bitcoin wallet address" class="profile-input" />
+        <div class="section-subtitle" data-loc="client.profile.savedWallet">Saved wallet address</div>
+        <input id="walletAddressInput" type="text" maxlength="256" placeholder="Bitcoin wallet address" data-loc-placeholder="client.profile.walletPlaceholder" class="profile-input" />
         <button id="saveWalletAddressBtn" type="button" data-loc="client.button.saveWallet">Save wallet address</button>
         <div id="walletAddressStatus" class="muted"></div>
 
-        <div class="section-subtitle">Request withdrawal</div>
-        <input id="withdrawAmountInput" type="number" min="0.01" step="0.01" placeholder="Amount" class="profile-input" />
-        <input id="withdrawNumberInput" type="text" maxlength="256" placeholder="Wallet address (or leave empty to use saved)" class="profile-input" />
+        <div class="section-subtitle" data-loc="client.profile.withdrawTitle">Request withdrawal</div>
+        <input id="withdrawAmountInput" type="number" min="0.01" step="0.01" placeholder="Amount" data-loc-placeholder="client.profile.amountPlaceholder" class="profile-input" />
+        <input id="withdrawNumberInput" type="text" maxlength="256" placeholder="Wallet address (or leave empty to use saved)" data-loc-placeholder="client.profile.withdrawAddressPlaceholder" class="profile-input" />
         <button id="withdrawBtn" type="button" data-loc="client.button.withdraw">Withdraw</button>
         <div id="withdrawStatus" class="muted"></div>
 
-        <button id="openHistoryBtn" type="button" class="secondary-btn">Transaction history</button>
+        <button id="openHistoryBtn" type="button" class="secondary-btn" data-loc="client.button.openHistory">Transaction history</button>
       </div>
 
       <div id="historyScreen" class="card stack" hidden>
         <div class="section-header">
-          <div class="section-title">Transaction history</div>
-          <button id="closeHistoryBtn" type="button" class="secondary-btn">Back</button>
+          <div class="section-title" data-loc="client.history.title">Transaction history</div>
+          <button id="closeHistoryBtn" type="button" class="secondary-btn" data-loc="client.button.back">Back</button>
         </div>
         <div id="historyStatus" class="muted"></div>
-        <div id="historyEmpty" class="empty-card">No transactions yet.</div>
+        <div id="historyEmpty" class="empty-card" data-loc="client.history.empty">No transactions yet.</div>
         <div id="historyList" class="history-list"></div>
       </div>
     </section>
@@ -184,13 +184,13 @@
     <div class="sheet-panel ticket-picker-panel">
       <div class="sheet-header">
         <div>
-          <div class="section-title">Pick your numbers</div>
-          <div class="section-subtitle">Choose 5 unique numbers from 1 to 36.</div>
+          <div class="section-title" data-loc="client.picker.title">Pick your numbers</div>
+          <div class="section-subtitle" data-loc="client.picker.subtitle">Choose 5 unique numbers from 1 to 36.</div>
         </div>
-        <button id="closeTicketPickerBtn" type="button" class="sheet-close-btn" aria-label="Close picker">x</button>
+        <button id="closeTicketPickerBtn" type="button" class="sheet-close-btn" aria-label="Close picker" data-loc-aria-label="client.picker.closeAria">x</button>
       </div>
 
-      <div id="ticketPickerGrid" class="ticket-picker-grid" aria-label="Number picker"></div>
+      <div id="ticketPickerGrid" class="ticket-picker-grid" aria-label="Number picker" data-loc-aria-label="client.picker.gridAria"></div>
 
       <div id="ticketPickerStatus" class="muted"></div>
       <button id="confirmTicketNumbersBtn" type="button" data-loc="client.picker.confirm">Confirm numbers</button>
@@ -206,9 +206,9 @@
   <div id="centerPopup" class="center-popup" hidden>
     <div id="centerPopupBackdrop" class="center-popup-backdrop"></div>
     <div class="center-popup-card" role="dialog" aria-modal="true" aria-labelledby="centerPopupMessage">
-      <div class="center-popup-header">Error</div>
+      <div class="center-popup-header" data-loc="client.popup.error">Error</div>
       <div id="centerPopupMessage" class="center-popup-message"></div>
-      <button id="centerPopupConfirmBtn" type="button" class="center-popup-confirm">Confirm</button>
+      <button id="centerPopupConfirmBtn" type="button" class="center-popup-confirm" data-loc="client.popup.confirm">Confirm</button>
     </div>
   </div>
 

@@ -160,6 +160,35 @@ app.UseAuthorization();
 
 app.MapRazorPages();
 
+app.MapPost("/Admin/set-language", (HttpContext http, string lang, string? returnUrl) =>
+{
+    var normalized = (lang ?? string.Empty).Trim().ToLowerInvariant();
+    if (normalized != "ru" && normalized != "uz")
+        normalized = "en";
+
+    http.Response.Cookies.Append(
+        "AdminUiLanguage",
+        normalized,
+        new CookieOptions
+        {
+            HttpOnly = false,
+            IsEssential = true,
+            SameSite = SameSiteMode.Lax,
+            Secure = http.Request.IsHttps,
+            Expires = DateTimeOffset.UtcNow.AddYears(1),
+            Path = "/Admin"
+        });
+
+    if (!string.IsNullOrWhiteSpace(returnUrl)
+        && returnUrl.StartsWith("/Admin", StringComparison.OrdinalIgnoreCase)
+        && !returnUrl.StartsWith("//", StringComparison.Ordinal))
+    {
+        return Results.LocalRedirect(returnUrl);
+    }
+
+    return Results.LocalRedirect("/Admin");
+}).RequireAuthorization(AdminAuth.PolicyName);
+
 // ===== Mini app backend APIs =====
 app.MapGet("/api/text", () => Results.Ok(new { text = miniAppText }));
 app.MapUsersEndpoints();

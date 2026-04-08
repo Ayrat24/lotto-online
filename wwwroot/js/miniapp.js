@@ -152,6 +152,24 @@
       node.textContent = t(key, fallback);
     }
 
+    var placeholderNodes = document.querySelectorAll('[data-loc-placeholder]');
+    for (var j = 0; j < placeholderNodes.length; j++) {
+      var placeholderNode = placeholderNodes[j];
+      var placeholderKey = placeholderNode.getAttribute('data-loc-placeholder');
+      if (!placeholderKey) continue;
+      var fallbackPlaceholder = placeholderNode.getAttribute('placeholder') || '';
+      placeholderNode.setAttribute('placeholder', t(placeholderKey, fallbackPlaceholder));
+    }
+
+    var ariaNodes = document.querySelectorAll('[data-loc-aria-label]');
+    for (var k = 0; k < ariaNodes.length; k++) {
+      var ariaNode = ariaNodes[k];
+      var ariaKey = ariaNode.getAttribute('data-loc-aria-label');
+      if (!ariaKey) continue;
+      var fallbackAria = ariaNode.getAttribute('aria-label') || '';
+      ariaNode.setAttribute('aria-label', t(ariaKey, fallbackAria));
+    }
+
     try {
       document.documentElement.lang = localeCode || 'en';
     } catch (e) {
@@ -840,10 +858,10 @@
 
   function getTicketStatusMeta(status) {
     var value = String(status || '').toLowerCase();
-    if (value === 'winnings_available') return { label: 'Winnings available', className: 'ticket-status-win' };
-    if (value === 'winnings_claimed') return { label: 'Winnings claimed', className: 'ticket-status-claimed' };
-    if (value === 'expired_no_win') return { label: 'Expired', className: 'ticket-status-expired' };
-    return { label: 'Waiting for draw', className: 'ticket-status-awaiting' };
+    if (value === 'winnings_available') return { label: t('client.ticket.status.winningsAvailable', 'Winnings available'), className: 'ticket-status-win' };
+    if (value === 'winnings_claimed') return { label: t('client.ticket.status.winningsClaimed', 'Winnings claimed'), className: 'ticket-status-claimed' };
+    if (value === 'expired_no_win') return { label: t('client.ticket.status.expired', 'Expired'), className: 'ticket-status-expired' };
+    return { label: t('client.ticket.status.awaiting', 'Waiting for draw'), className: 'ticket-status-awaiting' };
   }
 
   function createTicketEl(ticket, draw) {
@@ -891,7 +909,7 @@
       var claimBtn = document.createElement('button');
       claimBtn.type = 'button';
       claimBtn.className = 'ticket-claim-btn';
-      claimBtn.textContent = 'Claim ' + formatCurrency(winningAmount);
+      claimBtn.textContent = t('client.ticket.claimPrefix', 'Claim') + ' ' + formatCurrency(winningAmount);
       claimBtn.addEventListener('click', function () {
         claimTicket(ticket.id, claimBtn);
       });
@@ -899,7 +917,7 @@
     } else if ((ticket && ticket.status === 'winnings_claimed') && Number.isFinite(winningAmount) && winningAmount > 0) {
       var claimedLabel = document.createElement('div');
       claimedLabel.className = 'ticket-claimed-label';
-      claimedLabel.textContent = 'Claimed ' + formatCurrency(winningAmount);
+      claimedLabel.textContent = t('client.ticket.claimedPrefix', 'Claimed') + ' ' + formatCurrency(winningAmount);
       footer.appendChild(claimedLabel);
     }
 
@@ -922,11 +940,11 @@
 
     var title = document.createElement('div');
     title.className = 'draw-header-title';
-    title.textContent = 'Draw #' + group.drawId;
+    title.textContent = t('client.history.drawPrefix', 'Draw #') + group.drawId;
 
     var meta = document.createElement('div');
     meta.className = 'draw-header-meta';
-    meta.textContent = draw ? formatUtc(draw.createdAtUtc) : 'Created before current format';
+    meta.textContent = draw ? formatUtc(draw.createdAtUtc) : t('client.history.createdLegacy', 'Created before current format');
 
     top.appendChild(title);
     top.appendChild(meta);
@@ -935,7 +953,7 @@
     if (draw) {
       var info = document.createElement('div');
       info.className = 'draw-header-label';
-      info.textContent = 'State: ' + draw.state + ' • Prize pool: ' + formatPrizePool(draw.prizePool);
+      info.textContent = t('client.history.statePrefix', 'State:') + ' ' + draw.state + ' • ' + t('client.history.prizePoolPrefix', 'Prize pool:') + ' ' + formatPrizePool(draw.prizePool);
       header.appendChild(info);
 
       if (draw.numbers) {
@@ -949,7 +967,7 @@
     if (tickets.length === 0) {
       var empty = document.createElement('div');
       empty.className = 'muted history-empty-row';
-      empty.textContent = 'No tickets for this draw.';
+      empty.textContent = t('client.history.noTicketsForDraw', 'No tickets for this draw.');
       container.appendChild(empty);
     } else {
       var ticketsWrap = document.createElement('div');
@@ -967,15 +985,15 @@
     if (!currentDrawEmptyEl || !currentDrawContentEl || !currentDrawStateBadgeEl) return;
 
     if (!draw) {
-      currentDrawStateBadgeEl.textContent = 'waiting';
+      currentDrawStateBadgeEl.textContent = t('client.currentDraw.waiting', 'waiting');
       currentDrawStateBadgeEl.className = 'state-badge state-badge-muted';
       currentDrawEmptyEl.hidden = false;
       currentDrawContentEl.hidden = true;
       if (currentDrawIdEl) currentDrawIdEl.textContent = 'PowerBall Global';
       if (currentDrawPrizePoolEl) currentDrawPrizePoolEl.textContent = '$0.00';
-      if (currentDrawCreatedAtEl) currentDrawCreatedAtEl.textContent = 'Ends in --:--:--';
+      if (currentDrawCreatedAtEl) currentDrawCreatedAtEl.textContent = t('client.jackpot.endsIn', 'Ends in --:--:--');
       if (jackpotAmountEl) jackpotAmountEl.textContent = '$0';
-      if (jackpotSubtitleEl) jackpotSubtitleEl.textContent = 'The next draw is coming soon. Get your tickets now.';
+      if (jackpotSubtitleEl) jackpotSubtitleEl.textContent = t('client.jackpot.subtitle', 'The next draw is coming soon. Get your tickets now.');
       if (currentDrawPrizeTiersEl) currentDrawPrizeTiersEl.hidden = true;
       if (currentDrawPrizePool3El) currentDrawPrizePool3El.textContent = '$0.00';
       if (currentDrawPrizePool4El) currentDrawPrizePool4El.textContent = '$0.00';
@@ -983,7 +1001,7 @@
       if (purchaseBtn) {
         purchaseBtn.disabled = true;
         purchaseBtn.hidden = false;
-        purchaseBtn.title = 'No active draw available.';
+        purchaseBtn.title = t('client.currentDraw.noActiveTitle', 'No active draw available.');
       }
       if (currentDrawSubtitleEl) currentDrawSubtitleEl.hidden = false;
       if (currentDrawTicketPriceRowEl) currentDrawTicketPriceRowEl.hidden = false;
@@ -1001,7 +1019,7 @@
 
     if (currentDrawIdEl) currentDrawIdEl.textContent = 'PowerBall Global • #' + draw.id;
     if (currentDrawPrizePoolEl) currentDrawPrizePoolEl.textContent = '$' + formatPrizePool(draw.prizePool);
-    if (currentDrawCreatedAtEl) currentDrawCreatedAtEl.textContent = (draw.state === 'finished' ? 'Concluded ' : 'Opened ') + formatUtc(draw.createdAtUtc);
+    if (currentDrawCreatedAtEl) currentDrawCreatedAtEl.textContent = (draw.state === 'finished' ? t('client.currentDraw.concludedPrefix', 'Concluded ') : t('client.currentDraw.openedPrefix', 'Opened ')) + formatUtc(draw.createdAtUtc);
     if (jackpotAmountEl) jackpotAmountEl.textContent = formatJackpot(draw.prizePool);
     if (currentDrawPrizeTiersEl) currentDrawPrizeTiersEl.hidden = false;
     if (currentDrawPrizePool3El) currentDrawPrizePool3El.textContent = '$' + formatPrizePool(draw.prizePoolMatch3);
@@ -1016,13 +1034,13 @@
 
     if (jackpotSubtitleEl) {
       if (draw.state === 'active') {
-        jackpotSubtitleEl.textContent = 'The draw is live. Don\'t miss your chance to become a multi-millionaire!';
+        jackpotSubtitleEl.textContent = t('client.currentDraw.liveSubtitle', 'The draw is live. Don\'t miss your chance to become a multi-millionaire!');
       } else if (draw.state === 'finished' && hasWinningsAvailable) {
-        jackpotSubtitleEl.textContent = 'This draw is finished and your winnings are ready to claim.';
+        jackpotSubtitleEl.textContent = t('client.currentDraw.finishedWithWinnings', 'This draw is finished and your winnings are ready to claim.');
       } else if (draw.state === 'finished') {
-        jackpotSubtitleEl.textContent = 'This draw is finished. Check your tickets against the result numbers.';
+        jackpotSubtitleEl.textContent = t('client.currentDraw.finishedNoWinnings', 'This draw is finished. Check your tickets against the result numbers.');
       } else {
-        jackpotSubtitleEl.textContent = 'The next draw is coming soon. Get your tickets now.';
+        jackpotSubtitleEl.textContent = t('client.jackpot.subtitle', 'The next draw is coming soon. Get your tickets now.');
       }
     }
 
@@ -1036,7 +1054,7 @@
     if (purchaseBtn) {
       purchaseBtn.disabled = draw.state !== 'active';
       purchaseBtn.hidden = isFinishedDraw;
-      purchaseBtn.title = draw.state === 'active' ? '' : 'Only the active draw accepts purchases.';
+      purchaseBtn.title = draw.state === 'active' ? '' : t('client.currentDraw.activeOnlyTitle', 'Only the active draw accepts purchases.');
     }
 
     if (currentDrawSubtitleEl) currentDrawSubtitleEl.hidden = isFinishedDraw;
@@ -1434,22 +1452,22 @@
       buttonEl.disabled = true;
       buttonEl.classList.add('is-loading');
     }
-    setPurchaseStatus('Claiming winnings...');
+    setPurchaseStatus(t('client.ticket.claiming', 'Claiming winnings...'));
 
     postJson('/api/tickets/claim', { initData: initData || '', ticketId: ticketId }, null)
       .then(function (res) {
         if (!(res && res.ok)) {
-          setPurchaseStatus('Claim failed.');
+          setPurchaseStatus(t('client.ticket.claimFailed', 'Claim failed.'));
           return;
         }
 
         latestState.balance = Number(res.balance || 0);
         renderBalance(latestState.balance);
-        setPurchaseStatus('Claimed ' + formatCurrency(res.amount || 0) + '.');
+        setPurchaseStatus(t('client.ticket.claimedPrefix', 'Claimed') + ' ' + formatCurrency(res.amount || 0) + '.');
         return refreshState();
       })
       .catch(function (err) {
-        setPurchaseStatus(err.message || 'Claim failed.');
+        setPurchaseStatus(err.message || t('client.ticket.claimFailed', 'Claim failed.'));
       })
       .finally(function () {
         if (buttonEl) {

@@ -1,5 +1,15 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+﻿@{
+    var isAdminPath = Context?.Request.Path.StartsWithSegments("/Admin", StringComparison.OrdinalIgnoreCase) ?? false;
+    var cookieLang = Context?.Request.Cookies["AdminUiLanguage"];
+    var selectedAdminLang = string.Equals(cookieLang, "ru", StringComparison.OrdinalIgnoreCase)
+        ? "ru"
+        : string.Equals(cookieLang, "uz", StringComparison.OrdinalIgnoreCase)
+            ? "uz"
+            : "en";
+    var currentAdminReturnUrl = (Context?.Request.Path.Value ?? "/Admin") + (Context?.Request.QueryString.Value ?? string.Empty);
+}
+<!DOCTYPE html>
+<html lang="@selectedAdminLang">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -29,6 +39,18 @@
                             <a class="nav-link text-dark" asp-area="" asp-page="/Privacy">Privacy</a>
                         </li>
                     </ul>
+                    @if (isAdminPath)
+                    {
+                        <form class="d-flex align-items-center gap-2" method="post" action="/Admin/set-language">
+                            <input type="hidden" name="returnUrl" value="@currentAdminReturnUrl" />
+                            <label class="small text-muted mb-0" for="adminLangSelect">Language</label>
+                            <select id="adminLangSelect" name="lang" class="form-select form-select-sm" onchange="this.form.submit()">
+                                <option value="en" selected="@(selectedAdminLang == "en")">English</option>
+                                <option value="ru" selected="@(selectedAdminLang == "ru")">Русский</option>
+                                <option value="uz" selected="@(selectedAdminLang == "uz")">O'zbek</option>
+                            </select>
+                        </form>
+                    }
                 </div>
             </div>
         </nav>

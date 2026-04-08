@@ -6,6 +6,42 @@ namespace MiniApp.Features.Localization;
 
 public sealed class LocalizationService : ILocalizationService
 {
+    private static readonly IReadOnlyDictionary<string, string> LegacyRussianValues = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        ["client.tab.home"] = "Glavnaya",
+        ["client.tab.tickets"] = "Moi bilety",
+        ["client.tab.profile"] = "Profil",
+        ["client.balance.label"] = "Balans",
+        ["client.button.purchase"] = "Kupit bilet",
+        ["client.button.deposit"] = "Popolnit crypto",
+        ["client.button.withdraw"] = "Vyvesti",
+        ["client.button.saveWallet"] = "Sohranit adres",
+        ["client.status.loadingHistory"] = "Zagruzka istorii tranzaktsiy...",
+        ["client.status.noActiveDraw"] = "Seychas net aktivnogo tirazha.",
+        ["client.status.ticketPurchased"] = "Bilet kuplen.",
+        ["client.status.purchaseFailed"] = "Pokupka ne udalas.",
+        ["client.status.authenticationFailed"] = "Oshibka avtorizatsii.",
+        ["client.picker.preparing"] = "Podgotovka chisel...",
+        ["client.picker.chooseUnique"] = "Vyberite 5 unikalnyh chisel.",
+        ["client.picker.submitting"] = "Otpravka bileta...",
+        ["client.picker.confirm"] = "Podtverdit chisla",
+        ["admin.nav.localization"] = "Lokalizatsiya",
+        ["admin.localization.title"] = "Lokalizatsiya",
+        ["admin.localization.subtitle"] = "Obnovite stroki en / ru / uz.",
+        ["bot.welcomeBack"] = "S vozvrashcheniem!",
+        ["bot.openMiniApp"] = "Otkryt Mini App",
+        ["bot.changeLanguage"] = "Smenit yazyk",
+        ["bot.tapOpenMiniApp"] = "Nazhmi knopku nizhe chtoby otkryt Mini App.",
+        ["bot.askLanguage"] = "Pozhaluysta vyberite yazyk:",
+        ["bot.askContact"] = "Pozhaluysta otpravte kontakt chtoby prodolzhit.",
+        ["bot.shareContact"] = "Podelitsya kontaktom",
+        ["bot.savedNumber"] = "Spasibo! Sohraneno.",
+        ["bot.invalidNumber"] = "Ne udalos raspoznat nomer. Nazhmite 'Podelitsya kontaktom' ili otpravte nomer tekstom.",
+        ["bot.languageUpdated"] = "Yazyk obnovlen.",
+        ["bot.languageBeforePhone"] = "Snachala vyberite yazyk.",
+        ["bot.askPhonePlaceholder"] = "Nazhmi knopku chtoby podelitsya nomerom"
+    };
+
     private readonly AppDbContext _db;
     private readonly IMemoryCache _cache;
 
@@ -27,24 +63,60 @@ public sealed class LocalizationService : ILocalizationService
 
     public async Task EnsureDefaultsAsync(CancellationToken ct)
     {
-        var hasAny = await _db.LocalizationTexts.AsNoTracking().AnyAsync(ct);
-        if (hasAny)
-            return;
-
         var now = DateTimeOffset.UtcNow;
+        var existing = await _db.LocalizationTexts.ToDictionaryAsync(x => x.Key, StringComparer.Ordinal, ct);
+        var changed = false;
+
         foreach (var pair in LocalizationDefaults.Entries)
         {
-            _db.LocalizationTexts.Add(new LocalizationText
+            if (!existing.TryGetValue(pair.Key, out var row))
             {
-                Key = pair.Key,
-                EnglishValue = pair.Value.En,
-                RussianValue = pair.Value.Ru,
-                UzbekValue = pair.Value.Uz,
-                UpdatedAtUtc = now
-            });
+                _db.LocalizationTexts.Add(new LocalizationText
+                {
+                    Key = pair.Key,
+                    EnglishValue = pair.Value.En,
+                    RussianValue = pair.Value.Ru,
+                    UzbekValue = pair.Value.Uz,
+                    UpdatedAtUtc = now
+                });
+                changed = true;
+                continue;
+            }
+
+            var updated = false;
+            if (string.IsNullOrWhiteSpace(row.EnglishValue))
+            {
+                row.EnglishValue = pair.Value.En;
+                updated = true;
+            }
+
+            if (string.IsNullOrWhiteSpace(row.RussianValue))
+            {
+                row.RussianValue = pair.Value.Ru;
+                updated = true;
+            }
+            else if (LegacyRussianValues.TryGetValue(pair.Key, out var legacyRussian)
+                     && string.Equals(row.RussianValue, legacyRussian, StringComparison.Ordinal))
+            {
+                row.RussianValue = pair.Value.Ru;
+                updated = true;
+            }
+
+            if (string.IsNullOrWhiteSpace(row.UzbekValue))
+            {
+                row.UzbekValue = pair.Value.Uz;
+                updated = true;
+            }
+
+            if (updated)
+            {
+                row.UpdatedAtUtc = now;
+                changed = true;
+            }
         }
 
-        await _db.SaveChangesAsync(ct);
+        if (changed)
+            await _db.SaveChangesAsync(ct);
     }
 
     public async Task<IReadOnlyDictionary<string, string>> GetDictionaryAsync(string locale, CancellationToken ct)
@@ -101,6 +173,7 @@ public sealed class LocalizationService : ILocalizationService
 
         var items = await _db.LocalizationTexts
             .AsNoTracking()
+            .Where(x => !x.Key.StartsWith("admin."))
             .OrderBy(x => x.Key)
             .Select(x => new LocalizationAdminItem(
                 x.Key,
@@ -118,6 +191,9 @@ public sealed class LocalizationService : ILocalizationService
         var key = request.Key.Trim();
         if (string.IsNullOrWhiteSpace(key) || key.Length > 128)
             return new LocalizationAdminUpdateResult(false, "Localization key is invalid.");
+
+        if (key.StartsWith("admin.", StringComparison.OrdinalIgnoreCase))
+            return new LocalizationAdminUpdateResult(false, "Admin UI localization keys are read-only.");
 
         var english = request.EnglishValue.Trim();
         var russian = request.RussianValue.Trim();
