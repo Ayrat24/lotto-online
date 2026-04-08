@@ -24,6 +24,12 @@ services:
       Admin__Username: ${ADMIN_USERNAME}
       Admin__Password: ${ADMIN_PASSWORD}
 
+      # Payments / BTCPay config (set these via .env on server!)
+      Payments__Enabled: ${PAYMENTS_ENABLED:-false}
+      Payments__BtcPay__BaseUrl: ${BTCPAY_BASE_URL}
+      Payments__BtcPay__StoreId: ${BTCPAY_STORE_ID}
+      Payments__BtcPay__ApiKey: ${BTCPAY_API_KEY}
+
     ports:
       - "8080:8080"
 
@@ -45,4 +51,3 @@ services:
 
 volumes:
   miniapp_pgdata:
-
