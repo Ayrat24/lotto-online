@@ -132,17 +132,18 @@ public sealed class BtcPayClient : IBtcPayClient
         if (!TryGetConfiguration(out var btcPay, out var configError))
             return new BtcPayCreatePayoutResult(false, configError, BtcPayErrorCode.Configuration);
 
-        var pullPaymentId = btcPay.WithdrawalsPullPaymentId?.Trim();
+        var pullPaymentId = NormalizePullPaymentId(btcPay.WithdrawalsPullPaymentId);
         if (string.IsNullOrWhiteSpace(pullPaymentId))
             return new BtcPayCreatePayoutResult(false, "BTCPay withdrawals pull payment id is not configured.", BtcPayErrorCode.Configuration);
 
         var url = BuildPullPaymentPayoutsPath(btcPay.StoreId, pullPaymentId);
+        var payoutMethod = string.IsNullOrWhiteSpace(btcPay.WithdrawalsPaymentMethod) ? "BTC-CHAIN" : btcPay.WithdrawalsPaymentMethod.Trim();
         var payload = new
         {
             amount = request.Amount,
             currency = string.IsNullOrWhiteSpace(request.Currency) ? "USD" : request.Currency.Trim().ToUpperInvariant(),
             destination = request.Destination.Trim(),
-            paymentMethod = string.IsNullOrWhiteSpace(btcPay.WithdrawalsPaymentMethod) ? "BTC-CHAIN" : btcPay.WithdrawalsPaymentMethod.Trim(),
+            paymentMethod = payoutMethod,
             notificationUrl = string.IsNullOrWhiteSpace(request.NotificationUrl) ? null : request.NotificationUrl.Trim(),
             metadata = string.IsNullOrWhiteSpace(request.Reference)
                 ? null
@@ -158,6 +159,35 @@ public sealed class BtcPayClient : IBtcPayClient
             message.Headers.Authorization = new AuthenticationHeaderValue("token", btcPay.ApiKey.Trim());
             return message;
         }, ct);
+
+        // Some BTCPay versions expose payout creation at /stores/{storeId}/payouts.
+        if (!responseResult.Success && responseResult.ErrorCode == BtcPayErrorCode.NotFound)
+        {
+            var fallbackUrl = BuildStorePayoutsPath(btcPay.StoreId);
+            var fallbackPayload = new
+            {
+                pullPaymentId,
+                amount = request.Amount,
+                currency = string.IsNullOrWhiteSpace(request.Currency) ? "USD" : request.Currency.Trim().ToUpperInvariant(),
+                destination = request.Destination.Trim(),
+                paymentMethod = payoutMethod,
+                paymentMethodId = payoutMethod,
+                notificationUrl = string.IsNullOrWhiteSpace(request.NotificationUrl) ? null : request.NotificationUrl.Trim(),
+                metadata = string.IsNullOrWhiteSpace(request.Reference)
+                    ? null
+                    : new { reference = request.Reference.Trim() }
+            };
+
+            responseResult = await SendWithRetryAsync(() =>
+            {
+                var message = new HttpRequestMessage(HttpMethod.Post, fallbackUrl)
+                {
+                    Content = JsonContent.Create(fallbackPayload)
+                };
+                message.Headers.Authorization = new AuthenticationHeaderValue("token", btcPay.ApiKey.Trim());
+                return message;
+            }, ct);
+        }
 
         if (!responseResult.Success)
             return new BtcPayCreatePayoutResult(false, responseResult.Error, responseResult.ErrorCode);
@@ -214,6 +244,9 @@ public sealed class BtcPayClient : IBtcPayClient
 
     private static string BuildPullPaymentPayoutsPath(string storeId, string pullPaymentId)
         => $"{BuildStorePath(storeId)}/pull-payments/{Uri.EscapeDataString(pullPaymentId)}/payouts";
+
+    private static string BuildStorePayoutsPath(string storeId)
+        => $"{BuildStorePath(storeId)}/payouts";
 
     private static string BuildStorePath(string storeId)
         => $"{NormalizeApiBasePath()}/stores/{Uri.EscapeDataString(storeId)}";
@@ -350,6 +383,56 @@ public sealed class BtcPayClient : IBtcPayClient
             return parsed;
 
         return null;
+    }
+
+    private static string? NormalizePullPaymentId(string? raw)
+    {
+        var value = raw?.Trim();
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        if (Uri.TryCreate(value, UriKind.Absolute, out var uri))
+        {
+            var query = uri.Query;
+            if (!string.IsNullOrWhiteSpace(query))
+            {
+                var q = query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries);
+                foreach (var part in q)
+                {
+                    var kv = part.Split('=', 2);
+                    if (kv.Length == 2 && string.Equals(kv[0], "pullPaymentId", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var idFromQuery = Uri.UnescapeDataString(kv[1]).Trim();
+                        if (!string.IsNullOrWhiteSpace(idFromQuery))
+                            return idFromQuery;
+                    }
+                }
+            }
+
+            var segments = uri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            for (var i = 0; i < segments.Length; i++)
+            {
+                if (!string.Equals(segments[i], "pull-payments", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                if (i + 1 < segments.Length)
+                {
+                    var idFromPath = Uri.UnescapeDataString(segments[i + 1]).Trim();
+                    if (!string.IsNullOrWhiteSpace(idFromPath))
+                        return idFromPath;
+                }
+            }
+
+            var last = uri.Segments.LastOrDefault();
+            if (!string.IsNullOrWhiteSpace(last))
+            {
+                var idFromLast = Uri.UnescapeDataString(last).Trim('/').Trim();
+                if (!string.IsNullOrWhiteSpace(idFromLast))
+                    return idFromLast;
+            }
+        }
+
+        return value;
     }
 
     private sealed record BtcPayHttpResult(bool Success, string? Body, BtcPayErrorCode ErrorCode, string? Error)
