@@ -14,4 +14,7 @@ public sealed class UserService : IUserService
 
     public Task<MiniAppUser> SetNumberAsync(long telegramUserId, string number, CancellationToken ct)
         => _repo.SetNumberAsync(telegramUserId, number, ct);
+
+    public Task<MiniAppUser> SetPreferredLanguageAsync(long telegramUserId, string preferredLanguage, CancellationToken ct)
+        => _repo.SetPreferredLanguageAsync(telegramUserId, preferredLanguage, ct);
 }

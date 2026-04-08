@@ -44,4 +44,13 @@ public sealed class UserRepository : IUserRepository
         await _db.SaveChangesAsync(ct);
         return user;
     }
+
+    public async Task<MiniAppUser> SetPreferredLanguageAsync(long telegramUserId, string preferredLanguage, CancellationToken ct)
+    {
+        var user = await UpsertByTelegramUserIdAsync(telegramUserId, ct);
+        user.PreferredLanguage = preferredLanguage;
+        user.LastSeenAtUtc = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        return user;
+    }
 }

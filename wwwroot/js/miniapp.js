@@ -70,6 +70,9 @@
   var appHasLoadedState = false;
   var initData = null;
   var clientIsLocalDebug = false;
+  var localeCode = 'en';
+  var localeVersion = '0';
+  var localeStrings = {};
   var autoOpenedTicketsTab = false;
   var activeTabName = 'lottery';
   var historyEntries = [];
@@ -128,6 +131,77 @@
     var value = String(text || '').trim();
     debugModeBadgeEl.hidden = value.length === 0;
     debugModeBadgeEl.textContent = value;
+  }
+
+  function t(key, fallback) {
+    var value = localeStrings && Object.prototype.hasOwnProperty.call(localeStrings, key)
+      ? localeStrings[key]
+      : null;
+
+    if (value == null || String(value).trim().length === 0) return String(fallback || '');
+    return String(value);
+  }
+
+  function applyLocalizedDomTexts() {
+    var nodes = document.querySelectorAll('[data-loc]');
+    for (var i = 0; i < nodes.length; i++) {
+      var node = nodes[i];
+      var key = node.getAttribute('data-loc');
+      if (!key) continue;
+      var fallback = node.textContent || '';
+      node.textContent = t(key, fallback);
+    }
+
+    try {
+      document.documentElement.lang = localeCode || 'en';
+    } catch (e) {
+    }
+  }
+
+  function loadLocaleFromCache() {
+    try {
+      var raw = localStorage.getItem('miniapp.locale.bootstrap.v1');
+      if (!raw) return;
+
+      var parsed = JSON.parse(raw);
+      if (!parsed || !parsed.locale || !parsed.strings) return;
+
+      localeCode = String(parsed.locale || 'en');
+      localeVersion = String(parsed.version || '0');
+      localeStrings = parsed.strings || {};
+      applyLocalizedDomTexts();
+    } catch (e) {
+    }
+  }
+
+  function saveLocaleToCache() {
+    try {
+      localStorage.setItem('miniapp.locale.bootstrap.v1', JSON.stringify({
+        locale: localeCode,
+        version: localeVersion,
+        strings: localeStrings
+      }));
+    } catch (e) {
+    }
+  }
+
+  function loadRemoteLocale(initDataValue) {
+    return postJson('/api/localization/bootstrap', {
+      initData: initDataValue || '',
+      locale: localeCode
+    }, null)
+      .then(function (res) {
+        if (!(res && res.ok && res.locale && res.strings)) return;
+
+        localeCode = String(res.locale || 'en');
+        localeVersion = String(res.version || '0');
+        localeStrings = res.strings || {};
+        saveLocaleToCache();
+        applyLocalizedDomTexts();
+      })
+      .catch(function () {
+        // Keep cached/fallback locale silently.
+      });
   }
 
   function markAppReady() {
@@ -353,7 +427,7 @@
       seen[n] = true;
     }
 
-    if (duplicates) return { ok: false, message: 'Please choose 5 unique numbers.' };
+    if (duplicates) return { ok: false, message: t('client.picker.chooseUnique', 'Please choose 5 unique numbers.') };
     return { ok: true, message: '' };
   }
 
@@ -1111,7 +1185,7 @@
 
     if (!ticketPickerReady) {
       ticketPickerPendingOpen = true;
-      setTicketPickerStatus('Preparing numbers...');
+      setTicketPickerStatus(t('client.picker.preparing', 'Preparing numbers...'));
       preloadTicketPicker();
       return;
     }
@@ -1199,7 +1273,7 @@
 
     if (confirmTicketNumbersBtn) confirmTicketNumbersBtn.disabled = true;
     if (purchaseBtn) purchaseBtn.disabled = true;
-    setTicketPickerStatus('Submitting ticket...');
+    setTicketPickerStatus(t('client.picker.submitting', 'Submitting ticket...'));
 
     postJson('/api/tickets/purchase', {
       initData: initData || '',
@@ -1208,7 +1282,7 @@
       .then(function (res) {
         if (res && res.ok && res.ticket) {
           highlightTicketId = res.ticket.id;
-          setPurchaseStatus('Ticket purchased.');
+          setPurchaseStatus(t('client.status.ticketPurchased', 'Ticket purchased.'));
           closeTicketPicker();
           randomizePickerNumbers();
           pickerHasAnimatedOpen = false;
@@ -1216,7 +1290,7 @@
           return refreshState();
         }
 
-        setTicketPickerStatus('Purchase failed.');
+        setTicketPickerStatus(t('client.status.purchaseFailed', 'Purchase failed.'));
       })
       .catch(function (err) {
         setTicketPickerStatus(err.message);
@@ -1261,11 +1335,11 @@
     markAppReady();
     if (status === 401) {
       setTimelineStatus('Authentication failed. Open this app from Telegram, or use the local debug profile in Development.');
-      setPurchaseStatus('Authentication failed.');
+      setPurchaseStatus(t('client.status.authenticationFailed', 'Authentication failed.'));
       return;
     }
 
-    setPurchaseStatus(err && err.message ? err.message : 'Authentication failed.');
+    setPurchaseStatus(err && err.message ? err.message : t('client.status.authenticationFailed', 'Authentication failed.'));
   }
 
   function computeStateSig(state) {
@@ -1471,7 +1545,7 @@
   function loadHistory() {
     if (!initData) return Promise.resolve(null);
 
-    setHistoryStatus('Loading transaction history...');
+    setHistoryStatus(t('client.status.loadingHistory', 'Loading transaction history...'));
     return postJson('/api/wallet/history', { initData: initData || '', limit: 100 }, null)
       .then(function (res) {
         if (!(res && res.ok && Array.isArray(res.entries))) {
@@ -1620,7 +1694,7 @@
   function purchaseTicket() {
     if (!initData) return;
     if (!latestState.currentDraw || latestState.currentDraw.state !== 'active') {
-      setPurchaseStatus('There is no active draw right now.');
+      setPurchaseStatus(t('client.status.noActiveDraw', 'There is no active draw right now.'));
       return;
     }
 
@@ -1647,6 +1721,8 @@
   if (closeHistoryBtn) closeHistoryBtn.addEventListener('click', function () {
     setHistoryOpen(false);
   });
+
+  loadLocaleFromCache();
 
   randomizePickerNumbers();
   preloadTicketPicker();
@@ -1682,7 +1758,8 @@
 
     initData = 'local-debug';
 
-    postJson('/api/auth/telegram', { initData: initData })
+    loadRemoteLocale(initData)
+      .then(function () { return postJson('/api/auth/telegram', { initData: initData }); })
       .then(function () { return refreshState(); })
       .then(function () { return loadWalletAddress(); })
       .then(function () { return loadHistory(); })
@@ -1712,7 +1789,8 @@
 
   try {
     initData = Telegram.WebApp.initData;
-    postJson('/api/auth/telegram', { initData: initData })
+    loadRemoteLocale(initData)
+      .then(function () { return postJson('/api/auth/telegram', { initData: initData }); })
       .then(function () { return refreshState(); })
       .then(function () { return loadWalletAddress(); })
       .then(function () { return loadHistory(); })

@@ -173,11 +173,15 @@ public static class LocalDebugSeed
         var user = await db.Users.SingleOrDefaultAsync(x => x.TelegramUserId == telegramUserId, ct);
         if (user is not null)
         {
+            user.PreferredLanguage ??= "en";
             if (user.Balance < minBalance)
             {
                 user.Balance = minBalance;
                 await db.SaveChangesAsync(ct);
+                return;
             }
+
+            await db.SaveChangesAsync(ct);
             return;
         }
 
@@ -185,6 +189,7 @@ public static class LocalDebugSeed
         {
             TelegramUserId = telegramUserId,
             Number = number,
+            PreferredLanguage = "en",
             Balance = minBalance,
             CreatedAtUtc = now,
             LastSeenAtUtc = now

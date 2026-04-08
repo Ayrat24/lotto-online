@@ -14,6 +14,11 @@ public sealed class MiniAppUser
     /// </summary>
     public string? Number { get; set; }
 
+    /// <summary>
+    /// UI locale selected by the user (en, ru, uz).
+    /// </summary>
+    public string? PreferredLanguage { get; set; }
+
     public string? WalletAddress { get; set; }
 
     public decimal Balance { get; set; }

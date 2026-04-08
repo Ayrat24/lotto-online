@@ -73,7 +73,7 @@
           <div class="brand-title">LottoVibe</div>
         </div>
         <div class="balance-block">
-          <div class="balance-label">Money</div>
+          <div class="balance-label" data-loc="client.balance.label">Money</div>
           <div id="userBalanceText" class="balance-value">$0.00</div>
         </div>
       </header>
@@ -121,7 +121,7 @@
               <span>Ticket cost: <strong id="currentDrawTicketCost">$2.00</strong> per entry.</span>
             </div>
 
-            <button id="purchaseTicketBtn" type="button">Purchase ticket</button>
+            <button id="purchaseTicketBtn" type="button" data-loc="client.button.purchase">Purchase ticket</button>
             <div id="purchaseStatus" class="muted"></div>
           </div>
 
@@ -150,18 +150,18 @@
         <div class="section-title">Profile</div>
         <div class="section-subtitle">Manage your wallet balance.</div>
         <div class="draw-meta-row">Current balance: <strong id="profileBalanceText">$0.00</strong></div>
-        <button id="topUpBtn" type="button">Deposit crypto</button>
+        <button id="topUpBtn" type="button" data-loc="client.button.deposit">Deposit crypto</button>
         <div id="topUpStatus" class="muted"></div>
 
         <div class="section-subtitle">Saved wallet address</div>
         <input id="walletAddressInput" type="text" maxlength="256" placeholder="Bitcoin wallet address" class="profile-input" />
-        <button id="saveWalletAddressBtn" type="button">Save wallet address</button>
+        <button id="saveWalletAddressBtn" type="button" data-loc="client.button.saveWallet">Save wallet address</button>
         <div id="walletAddressStatus" class="muted"></div>
 
         <div class="section-subtitle">Request withdrawal</div>
         <input id="withdrawAmountInput" type="number" min="0.01" step="0.01" placeholder="Amount" class="profile-input" />
         <input id="withdrawNumberInput" type="text" maxlength="256" placeholder="Wallet address (or leave empty to use saved)" class="profile-input" />
-        <button id="withdrawBtn" type="button">Withdraw</button>
+        <button id="withdrawBtn" type="button" data-loc="client.button.withdraw">Withdraw</button>
         <div id="withdrawStatus" class="muted"></div>
 
         <button id="openHistoryBtn" type="button" class="secondary-btn">Transaction history</button>
@@ -193,14 +193,14 @@
       <div id="ticketPickerGrid" class="ticket-picker-grid" aria-label="Number picker"></div>
 
       <div id="ticketPickerStatus" class="muted"></div>
-      <button id="confirmTicketNumbersBtn" type="button">Confirm numbers</button>
+      <button id="confirmTicketNumbersBtn" type="button" data-loc="client.picker.confirm">Confirm numbers</button>
     </div>
   </div>
 
   <nav class="tabbar" aria-label="Bottom tabs">
-    <button id="lotteryTabBtn" type="button" class="tabbar-btn tabbar-btn-active">Home</button>
-    <button id="ticketsTabBtn" type="button" class="tabbar-btn">My Tickets <span id="ticketsWinningPin" class="tickets-winning-pin" hidden>0</span></button>
-    <button id="profileTabBtn" type="button" class="tabbar-btn">Profile</button>
+    <button id="lotteryTabBtn" type="button" class="tabbar-btn tabbar-btn-active"><span data-loc="client.tab.home">Home</span></button>
+    <button id="ticketsTabBtn" type="button" class="tabbar-btn"><span data-loc="client.tab.tickets">My Tickets</span> <span id="ticketsWinningPin" class="tickets-winning-pin" hidden>0</span></button>
+    <button id="profileTabBtn" type="button" class="tabbar-btn"><span data-loc="client.tab.profile">Profile</span></button>
   </nav>
 
   <div id="centerPopup" class="center-popup" hidden>

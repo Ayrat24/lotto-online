@@ -50,6 +50,12 @@
 - If changing payments: update `Features/Payments/*`, keep `AppDbContext` mappings aligned with migrations, and verify BTCPay webhook processing still preserves idempotent crediting.
 - Preserve webhook signature handling (`BTCPay-Sig`) and audit trail states in `PaymentWebhookEvent` (`Received`/`Processed`/`Ignored`/`Failed`).
 
+## Localization requirements (mandatory)
+- All new user-facing UI text (Mini App, admin Razor pages, and bot messages) must use the localization system; avoid hardcoded strings unless they are transient debug-only diagnostics.
+- When adding/changing UI or bot text, add/update keys in the localization table defaults and verify admin can edit those keys from the localization admin page.
+- Keep locale coverage aligned across all three languages: `en`, `ru`, and `uz`.
+- If you add a new page/component with text, include localization keys at implementation time (not as a follow-up).
+
 ## Local debug mode maintenance (important)
 - Local debug mode is Development-only and must never affect production behavior; keep guards aligned in `Program.cs`, `appsettings.json`, and `docker-compose.app.yml`.
 - Debug data is intentionally synthetic and seeded in `Features/Auth/LocalDebugSeed.cs`; if you change draw/ticket/user semantics, update seed logic so `/app` still has: 1 active draw, 1 upcoming draw, at least 2 finished draws with tickets for the debug user.

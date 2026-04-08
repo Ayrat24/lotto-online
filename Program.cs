@@ -10,6 +10,7 @@ using MiniApp.Features.Users;
 using MiniApp.Features.Timeline;
 using MiniApp.Features.Wallet;
 using MiniApp.Features.Payments;
+using MiniApp.Features.Localization;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Polling;
@@ -39,6 +40,7 @@ var miniAppText = builder.Configuration["MiniApp:Text"] ?? "(No MiniApp:Text con
 
 // ===== Services =====
 builder.Services.AddRazorPages();
+builder.Services.AddMemoryCache();
 
 // Admin panel (cookie auth)
 builder.Services.AddAdminArea(builder.Configuration);
@@ -60,6 +62,7 @@ builder.Services.AddHttpClient<IBtcPayClient, BtcPayClient>((sp, http) =>
     http.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
 });
 builder.Services.AddScoped<IPaymentsService, PaymentsService>();
+builder.Services.AddScoped<ILocalizationService, LocalizationService>();
 
 if (telegramEnabled)
 {
@@ -166,6 +169,7 @@ app.MapDrawsEndpoints();
 app.MapTimelineEndpoints();
 app.MapWalletEndpoints();
 app.MapPaymentsEndpoints();
+app.MapLocalizationEndpoints();
 
 // Small health check / default landing page
 app.MapGet("/", () => Results.Redirect(localDebugEnabled ? "/local-debug" : "/Admin"));
@@ -302,27 +306,25 @@ static class BotUpdateHandler
     // Simple in-memory onboarding state: which telegram users are expected to send their number next.
     // Note: in Webhook mode with multiple instances this should be moved to durable storage.
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<long, byte> AwaitingNumber = new();
+    private static readonly string[] SupportedLanguages = ["en", "ru", "uz"];
 
     public static async Task HandleUpdate(Update update, TelegramBotClient bot, BotSettings settings, ILogger logger, CancellationToken ct)
     {
-        if (update.Type != UpdateType.Message || update.Message is null)
-        {
-            logger.LogInformation("Unhandled update type: {UpdateType}", update.Type);
-            return;
-        }
-
-        var telegramUserId = update.Message.From?.Id;
-        if (telegramUserId is null)
-        {
-            logger.LogWarning("Message without From.Id");
-            return;
-        }
-
-        var text = update.Message.Text?.Trim();
-
         // Resolve services from DI.
         await using var scope = Services.CreateAsyncScope();
         var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
+        var localization = scope.ServiceProvider.GetRequiredService<ILocalizationService>();
+
+        static string NormalizeLanguageCode(string? languageCode)
+        {
+            var value = (languageCode ?? string.Empty).Trim().ToLowerInvariant();
+            if (value.StartsWith("ru", StringComparison.Ordinal)) return "ru";
+            if (value.StartsWith("uz", StringComparison.Ordinal)) return "uz";
+            return "en";
+        }
+
+        async Task<string> GetTextAsync(string locale, string key, string fallback)
+            => await localization.GetTextAsync(locale, key, fallback, ct);
 
         static string? TryNormalizeNumber(string? input)
         {
@@ -344,63 +346,181 @@ static class BotUpdateHandler
             return normalized;
         }
 
-        async Task SendOpenWebAppButtonAsync()
+        async Task SendOpenWebAppButtonAsync(ChatId chatId, string locale)
         {
-            if (string.IsNullOrWhiteSpace(settings.WebAppUrl)) return;
+            var openLabel = await GetTextAsync(locale, "bot.openMiniApp", "Open Mini App");
+            var changeLabel = await GetTextAsync(locale, "bot.changeLanguage", "Change language");
+
+            var rows = new List<InlineKeyboardButton[]>();
+            if (!string.IsNullOrWhiteSpace(settings.WebAppUrl))
+            {
+                rows.Add([
+                    InlineKeyboardButton.WithWebApp(
+                        openLabel,
+                        settings.WebAppUrl.TrimEnd('/') + "/app")
+                ]);
+            }
+
+            rows.Add([
+                InlineKeyboardButton.WithCallbackData(changeLabel, "lang:change")
+            ]);
+
+            var text = await GetTextAsync(locale, "bot.tapOpenMiniApp", "Tap the button below to open the Mini App.");
 
             await bot.SendMessage(
-                chatId: update.Message.Chat,
-                text: "Tap the button below to open the Mini App.",
-                replyMarkup: new InlineKeyboardMarkup(
-                    InlineKeyboardButton.WithWebApp(
-                        "Open Mini App",
-                        settings.WebAppUrl.TrimEnd('/') + "/app")),
+                chatId: chatId,
+                text: text,
+                replyMarkup: new InlineKeyboardMarkup(rows),
                 cancellationToken: ct);
         }
 
-        async Task AskForContactAsync()
+        async Task SendLanguagePickerAsync(ChatId chatId, string locale)
         {
+            var askLanguage = await GetTextAsync(locale, "bot.askLanguage", "Please choose your language:");
+
+            await bot.SendMessage(
+                chatId: chatId,
+                text: askLanguage,
+                replyMarkup: new InlineKeyboardMarkup([
+                    [InlineKeyboardButton.WithCallbackData("English", "lang:set:en")],
+                    [InlineKeyboardButton.WithCallbackData("Russkiy", "lang:set:ru")],
+                    [InlineKeyboardButton.WithCallbackData("Ozbekcha", "lang:set:uz")]
+                ]),
+                cancellationToken: ct);
+        }
+
+        async Task AskForContactAsync(ChatId chatId, string locale)
+        {
+            var shareContact = await GetTextAsync(locale, "bot.shareContact", "Share my contact");
+            var placeholder = await GetTextAsync(locale, "bot.askPhonePlaceholder", "Tap the button to share your phone number");
+            var askContact = await GetTextAsync(locale, "bot.askContact", "Please share your contact to continue.");
+
             var keyboard = new ReplyKeyboardMarkup(new[]
             {
-                new[] { KeyboardButton.WithRequestContact("Share my contact") }
+                new[] { KeyboardButton.WithRequestContact(shareContact) }
             })
             {
                 ResizeKeyboard = true,
                 OneTimeKeyboard = true,
-                InputFieldPlaceholder = "Tap the button to share your phone number"
+                InputFieldPlaceholder = placeholder
             };
 
             await bot.SendMessage(
-                chatId: update.Message.Chat,
-                text: "Please share your contact to continue.",
+                chatId: chatId,
+                text: askContact,
                 replyMarkup: keyboard,
                 cancellationToken: ct);
+        }
+
+        if (update.Type == UpdateType.CallbackQuery && update.CallbackQuery is not null)
+        {
+            var callback = update.CallbackQuery;
+            var callbackUserId = callback.From.Id;
+            var callbackChatId = new ChatId(callback.Message?.Chat.Id ?? callback.From.Id);
+            var user = await userService.TouchUserAsync(callbackUserId, ct);
+            var currentLocale = NormalizeLanguageCode(user.PreferredLanguage);
+            var data = callback.Data?.Trim() ?? string.Empty;
+
+            if (string.Equals(data, "lang:change", StringComparison.Ordinal))
+            {
+                await SendLanguagePickerAsync(callbackChatId, currentLocale);
+                await bot.AnswerCallbackQuery(callback.Id, cancellationToken: ct);
+                return;
+            }
+
+            if (data.StartsWith("lang:set:", StringComparison.Ordinal))
+            {
+                var selected = NormalizeLanguageCode(data["lang:set:".Length..]);
+                if (!SupportedLanguages.Contains(selected, StringComparer.Ordinal))
+                    selected = "en";
+
+                user = await userService.SetPreferredLanguageAsync(callbackUserId, selected, ct);
+
+                var updated = await GetTextAsync(selected, "bot.languageUpdated", "Language updated.");
+                await bot.AnswerCallbackQuery(callback.Id, updated, cancellationToken: ct);
+                await bot.SendMessage(callbackChatId, updated, cancellationToken: ct);
+
+                if (string.IsNullOrWhiteSpace(user.Number))
+                {
+                    AwaitingNumber[callbackUserId] = 0;
+                    await AskForContactAsync(callbackChatId, selected);
+                    return;
+                }
+
+                await SendOpenWebAppButtonAsync(callbackChatId, selected);
+                return;
+            }
+
+            logger.LogInformation("Unhandled callback data: {Data}", data);
+            return;
+        }
+
+        if (update.Type != UpdateType.Message || update.Message is null)
+        {
+            logger.LogInformation("Unhandled update type: {UpdateType}", update.Type);
+            return;
+        }
+
+        var telegramUserId = update.Message.From?.Id;
+        if (telegramUserId is null)
+        {
+            logger.LogWarning("Message without From.Id");
+            return;
+        }
+
+        var text = update.Message.Text?.Trim();
+        var touchedUser = await userService.TouchUserAsync(telegramUserId.Value, ct);
+        var locale = NormalizeLanguageCode(touchedUser.PreferredLanguage);
+
+        if (string.Equals(text, "/language", StringComparison.OrdinalIgnoreCase))
+        {
+            await SendLanguagePickerAsync(update.Message.Chat, locale);
+            return;
         }
 
         // /start: ensure user exists, and if number isn't stored -> ask for contact.
         if (string.Equals(text, "/start", StringComparison.OrdinalIgnoreCase))
         {
-            var user = await userService.TouchUserAsync(telegramUserId.Value, ct);
+            var user = touchedUser;
+            if (string.IsNullOrWhiteSpace(user.PreferredLanguage))
+            {
+                await SendLanguagePickerAsync(update.Message.Chat, locale);
+                return;
+            }
+
+            locale = NormalizeLanguageCode(user.PreferredLanguage);
 
             if (string.IsNullOrWhiteSpace(user.Number))
             {
                 AwaitingNumber[telegramUserId.Value] = 0;
-                await AskForContactAsync();
+                await AskForContactAsync(update.Message.Chat, locale);
                 return;
             }
 
+            var welcome = await GetTextAsync(locale, "bot.welcomeBack", "Welcome back!");
+
             await bot.SendMessage(
                 chatId: update.Message.Chat,
-                text: "Welcome back!",
+                text: welcome,
                 cancellationToken: ct);
 
-            await SendOpenWebAppButtonAsync();
+            await SendOpenWebAppButtonAsync(update.Message.Chat, locale);
             return;
         }
 
         // If we're awaiting a number/contact, accept Contact (preferred) or typed text.
         if (AwaitingNumber.TryRemove(telegramUserId.Value, out _))
         {
+            if (string.IsNullOrWhiteSpace(touchedUser.PreferredLanguage))
+            {
+                AwaitingNumber[telegramUserId.Value] = 0;
+                var askLanguageFirst = await GetTextAsync(locale, "bot.languageBeforePhone", "First choose a language.");
+                await bot.SendMessage(update.Message.Chat, askLanguageFirst, cancellationToken: ct);
+                await SendLanguagePickerAsync(update.Message.Chat, locale);
+                return;
+            }
+
+            locale = NormalizeLanguageCode(touchedUser.PreferredLanguage);
             string? candidate = null;
 
             // Prefer contact share.
@@ -420,25 +540,32 @@ static class BotUpdateHandler
                 // Keep waiting.
                 AwaitingNumber[telegramUserId.Value] = 0;
 
+                var invalidNumber = await GetTextAsync(
+                    locale,
+                    "bot.invalidNumber",
+                    "I couldn't read a valid phone number. Please tap 'Share my contact' or send the number as text (digits, optional leading +)." );
+
                 await bot.SendMessage(
                     chatId: update.Message.Chat,
-                    text: "I couldn't read a valid phone number. Please tap 'Share my contact' or send the number as text (digits, optional leading +).",
+                    text: invalidNumber,
                     replyMarkup: new ReplyKeyboardRemove(),
                     cancellationToken: ct);
 
-                await AskForContactAsync();
+                await AskForContactAsync(update.Message.Chat, locale);
                 return;
             }
 
             await userService.SetNumberAsync(telegramUserId.Value, normalized, ct);
 
+            var saved = await GetTextAsync(locale, "bot.savedNumber", "Thanks! Saved.");
+
             await bot.SendMessage(
                 chatId: update.Message.Chat,
-                text: "Thanks! Saved.",
+                text: saved,
                 replyMarkup: new ReplyKeyboardRemove(),
                 cancellationToken: ct);
 
-            await SendOpenWebAppButtonAsync();
+            await SendOpenWebAppButtonAsync(update.Message.Chat, locale);
             return;
         }
 

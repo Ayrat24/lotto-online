@@ -56,8 +56,8 @@ public static class TelegramAuthEndpoints
                 TelegramUserId: u.TelegramUserId,
                 Balance: u.Balance,
                 Username: tgUser.Username,
-                FirstName: tgUser.First_Name,
-                LastName: tgUser.Last_Name,
+                FirstName: tgUser.FirstName,
+                LastName: tgUser.LastName,
                 Error: null));
         });
 

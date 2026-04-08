@@ -1,0 +1,52 @@
+@page
+@model MiniApp.Pages.Admin.LocalizationModel
+@{
+    ViewData["Title"] = "Localization";
+}
+
+<h1>Localization</h1>
+<p class="text-muted">Update en / ru / uz UI strings.</p>
+
+@if (!string.IsNullOrWhiteSpace(Model.Toast))
+{
+    <div class="alert alert-info" role="status">@Model.Toast</div>
+}
+
+<div class="table-responsive">
+    <table class="table table-sm align-middle">
+        <thead>
+        <tr>
+            <th style="width: 20%;">Key</th>
+            <th style="width: 24%;">English</th>
+            <th style="width: 24%;">Russian</th>
+            <th style="width: 24%;">Uzbek</th>
+            <th style="width: 8%;"></th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var item in Model.Items)
+        {
+            <tr>
+                <form method="post" asp-page-handler="Save">
+                    <td>
+                        <input class="form-control form-control-sm" name="key" value="@item.Key" readonly />
+                    </td>
+                    <td>
+                        <textarea class="form-control form-control-sm" name="englishValue" rows="2">@item.EnglishValue</textarea>
+                    </td>
+                    <td>
+                        <textarea class="form-control form-control-sm" name="russianValue" rows="2">@item.RussianValue</textarea>
+                    </td>
+                    <td>
+                        <textarea class="form-control form-control-sm" name="uzbekValue" rows="2">@item.UzbekValue</textarea>
+                    </td>
+                    <td>
+                        <button class="btn btn-primary btn-sm" type="submit">Save</button>
+                    </td>
+                </form>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+

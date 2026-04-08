@@ -16,6 +16,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<WithdrawalRequest> WithdrawalRequests => Set<WithdrawalRequest>();
     public DbSet<CryptoDepositIntent> CryptoDepositIntents => Set<CryptoDepositIntent>();
     public DbSet<PaymentWebhookEvent> PaymentWebhookEvents => Set<PaymentWebhookEvent>();
+    public DbSet<LocalizationText> LocalizationTexts => Set<LocalizationText>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -30,10 +31,26 @@ public sealed class AppDbContext : DbContext
 
             b.Property(x => x.TelegramUserId).IsRequired();
             b.Property(x => x.Number).HasMaxLength(64);
+            b.Property(x => x.PreferredLanguage).HasMaxLength(8);
             b.Property(x => x.WalletAddress).HasMaxLength(256);
             b.Property(x => x.Balance).HasPrecision(18, 2).IsRequired();
             b.Property(x => x.CreatedAtUtc).IsRequired();
             b.Property(x => x.LastSeenAtUtc).IsRequired();
+        });
+
+        modelBuilder.Entity<LocalizationText>(b =>
+        {
+            b.ToTable("localization_texts");
+            b.HasKey(x => x.Id);
+
+            b.HasIndex(x => x.Key).IsUnique();
+            b.HasIndex(x => x.UpdatedAtUtc);
+
+            b.Property(x => x.Key).HasMaxLength(128).IsRequired();
+            b.Property(x => x.EnglishValue).HasMaxLength(2048).IsRequired();
+            b.Property(x => x.RussianValue).HasMaxLength(2048).IsRequired();
+            b.Property(x => x.UzbekValue).HasMaxLength(2048).IsRequired();
+            b.Property(x => x.UpdatedAtUtc).IsRequired();
         });
 
         modelBuilder.Entity<Draw>(b =>
