@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using MiniApp.Features.Payments;
 
 namespace MiniApp.Data;
 
@@ -6,10 +8,14 @@ public sealed class WalletService : IWalletService
 {
     private const decimal DefaultTopUpAmount = 10m;
     private readonly AppDbContext _db;
+    private readonly IBtcPayClient _btcPay;
+    private readonly PaymentsOptions _payments;
 
-    public WalletService(AppDbContext db)
+    public WalletService(AppDbContext db, IBtcPayClient btcPay, IOptions<PaymentsOptions> payments)
     {
         _db = db;
+        _btcPay = btcPay;
+        _payments = payments.Value;
     }
 
     public decimal TopUpAmount => DefaultTopUpAmount;
@@ -187,13 +193,14 @@ public sealed class WalletService : IWalletService
         if (normalizedAmount <= 0)
             return new WalletWithdrawRequestResult(false, 0m, "Withdrawal amount must be greater than zero.");
 
-        var normalizedNumber = NormalizePayoutNumber(number);
-        if (normalizedNumber is null)
-            return new WalletWithdrawRequestResult(false, 0m, "Please enter a valid payout number.");
-
         var user = await _db.Users.SingleOrDefaultAsync(x => x.Id == userId, ct);
         if (user is null)
             return new WalletWithdrawRequestResult(false, 0m, "User was not found.");
+
+        var normalizedNumber = NormalizePayoutNumber(number)
+            ?? NormalizePayoutNumber(user.WalletAddress);
+        if (normalizedNumber is null)
+            return new WalletWithdrawRequestResult(false, 0m, "Please enter a valid payout address.");
 
         if (user.Balance < normalizedAmount)
             return new WalletWithdrawRequestResult(false, user.Balance, "Insufficient balance.");
@@ -201,6 +208,7 @@ public sealed class WalletService : IWalletService
         var serverWallet = await EnsureServerWalletAsync(ct);
         var now = DateTimeOffset.UtcNow;
         user.Balance = RoundAmount(user.Balance - normalizedAmount);
+        user.WalletAddress = normalizedNumber;
 
         var request = new WithdrawalRequest
         {
@@ -228,8 +236,76 @@ public sealed class WalletService : IWalletService
         return new WalletWithdrawRequestResult(true, user.Balance, null, request);
     }
 
+    public async Task<WalletSaveAddressResult> SaveWalletAddressAsync(long userId, string address, CancellationToken ct)
+    {
+        var normalizedAddress = NormalizePayoutNumber(address);
+        if (normalizedAddress is null)
+            return new WalletSaveAddressResult(false, "Please enter a valid wallet address.");
+
+        var user = await _db.Users.SingleOrDefaultAsync(x => x.Id == userId, ct);
+        if (user is null)
+            return new WalletSaveAddressResult(false, "User was not found.");
+
+        user.WalletAddress = normalizedAddress;
+        await _db.SaveChangesAsync(ct);
+        return new WalletSaveAddressResult(true, null, normalizedAddress);
+    }
+
+    public async Task<string?> GetWalletAddressAsync(long userId, CancellationToken ct)
+    {
+        return await _db.Users
+            .AsNoTracking()
+            .Where(x => x.Id == userId)
+            .Select(x => x.WalletAddress)
+            .SingleOrDefaultAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<WalletHistoryEntry>> GetHistoryAsync(long userId, int limit, CancellationToken ct)
+    {
+        var take = Math.Clamp(limit, 1, 200);
+
+        var deposits = await _db.CryptoDepositIntents
+            .AsNoTracking()
+            .Where(x => x.UserId == userId)
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .Take(take)
+            .Select(x => new WalletHistoryEntry(
+                "top_up",
+                MapDepositHistoryStatus(x.Status),
+                x.Amount,
+                x.Currency,
+                x.CreatedAtUtc,
+                x.ProviderInvoiceId,
+                x.LastProviderEventType))
+            .ToListAsync(ct);
+
+        var withdrawals = await _db.WithdrawalRequests
+            .AsNoTracking()
+            .Where(x => x.UserId == userId)
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .Take(take)
+            .Select(x => new WalletHistoryEntry(
+                "payout",
+                MapWithdrawalHistoryStatus(x.Status, x.ExternalPayoutState),
+                x.Amount,
+                "USD",
+                x.CreatedAtUtc,
+                x.ExternalPayoutId,
+                x.ReviewNote))
+            .ToListAsync(ct);
+
+        return deposits
+            .Concat(withdrawals)
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .Take(take)
+            .ToArray();
+    }
+
     public async Task<WalletReviewWithdrawalResult> ConfirmWithdrawalAsync(long withdrawalRequestId, string adminUsername, CancellationToken ct)
     {
+        if (!_payments.Enabled)
+            return new WalletReviewWithdrawalResult(false, "Payments are disabled. Enable BTCPay payouts before confirming withdrawals.");
+
         var request = await _db.WithdrawalRequests
             .Include(x => x.User)
             .SingleOrDefaultAsync(x => x.Id == withdrawalRequestId, ct);
@@ -240,9 +316,20 @@ public sealed class WalletService : IWalletService
         if (request.Status != WithdrawalRequestStatus.Pending)
             return new WalletReviewWithdrawalResult(false, "Only pending requests can be confirmed.");
 
+        if (!string.IsNullOrWhiteSpace(request.ExternalPayoutId))
+            return new WalletReviewWithdrawalResult(false, "This withdrawal already has an external payout id.");
+
         var serverWallet = await EnsureServerWalletAsync(ct);
         if (serverWallet.Balance < request.Amount)
             return new WalletReviewWithdrawalResult(false, "Server wallet does not have enough balance to confirm this withdrawal.");
+
+        var payoutResult = await _btcPay.CreatePayoutAsync(new BtcPayCreatePayoutRequest(
+            request.Amount,
+            _payments.BtcPay.DefaultCurrency,
+            request.Number,
+            Reference: $"withdrawal:{request.Id}"), ct);
+        if (!payoutResult.Success)
+            return new WalletReviewWithdrawalResult(false, payoutResult.Error ?? "Failed to create BTCPay payout.");
 
         var now = DateTimeOffset.UtcNow;
         serverWallet.Balance = RoundAmount(serverWallet.Balance - request.Amount);
@@ -252,6 +339,9 @@ public sealed class WalletService : IWalletService
         request.ReviewedByAdmin = string.IsNullOrWhiteSpace(adminUsername) ? "admin" : adminUsername.Trim();
         request.ReviewNote = null;
         request.ReviewedAtUtc = now;
+        request.ExternalPayoutId = payoutResult.PayoutId;
+        request.ExternalPayoutState = payoutResult.State;
+        request.ExternalPayoutCreatedAtUtc = payoutResult.CreatedAtUtc ?? now;
 
         _db.WalletTransactions.Add(new WalletTransaction
         {
@@ -311,10 +401,38 @@ public sealed class WalletService : IWalletService
         if (string.IsNullOrWhiteSpace(trimmed))
             return null;
 
-        if (trimmed.Length > 64)
+        if (trimmed.Length > 256)
             return null;
 
         return trimmed;
+    }
+
+    private static string MapWithdrawalHistoryStatus(WithdrawalRequestStatus status, string? externalPayoutState)
+    {
+        var payoutState = (externalPayoutState ?? string.Empty).Trim().ToLowerInvariant();
+        var isPaid = payoutState is "completed" or "sent";
+        var isRejected = payoutState is "failed" or "cancelled";
+
+        return status switch
+        {
+            WithdrawalRequestStatus.Confirmed when isPaid => "paid",
+            WithdrawalRequestStatus.Confirmed when isRejected => "rejected",
+            WithdrawalRequestStatus.Pending => "waiting_for_admin_approval",
+            WithdrawalRequestStatus.Denied => "rejected",
+            WithdrawalRequestStatus.Confirmed => "waiting_for_admin_approval",
+            _ => "waiting_for_admin_approval"
+        };
+    }
+
+    private static string MapDepositHistoryStatus(CryptoDepositStatus status)
+    {
+        return status switch
+        {
+            CryptoDepositStatus.Credited => "paid",
+            CryptoDepositStatus.Expired => "expired",
+            CryptoDepositStatus.Invalid => "invalid",
+            _ => "processing"
+        };
     }
 
     private static string BuildTicketSignature(string numbers)

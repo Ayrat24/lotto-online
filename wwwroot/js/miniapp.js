@@ -8,6 +8,15 @@
   var withdrawStatusEl = document.getElementById('withdrawStatus');
   var withdrawAmountInputEl = document.getElementById('withdrawAmountInput');
   var withdrawNumberInputEl = document.getElementById('withdrawNumberInput');
+  var walletAddressInputEl = document.getElementById('walletAddressInput');
+  var saveWalletAddressBtn = document.getElementById('saveWalletAddressBtn');
+  var walletAddressStatusEl = document.getElementById('walletAddressStatus');
+  var openHistoryBtn = document.getElementById('openHistoryBtn');
+  var closeHistoryBtn = document.getElementById('closeHistoryBtn');
+  var historyScreenEl = document.getElementById('historyScreen');
+  var historyStatusEl = document.getElementById('historyStatus');
+  var historyEmptyEl = document.getElementById('historyEmpty');
+  var historyListEl = document.getElementById('historyList');
   var userBalanceTextEl = document.getElementById('userBalanceText');
   var profileBalanceTextEl = document.getElementById('profileBalanceText');
 
@@ -63,6 +72,7 @@
   var clientIsLocalDebug = false;
   var autoOpenedTicketsTab = false;
   var activeTabName = 'lottery';
+  var historyEntries = [];
   var pickerNumbers = [1, 2, 3, 4, 5];
 
   var LOTTO_NUMBERS_COUNT = 5;
@@ -102,6 +112,14 @@
 
   function setWithdrawStatus(text) {
     if (withdrawStatusEl) withdrawStatusEl.textContent = text || '';
+  }
+
+  function setWalletAddressStatus(text) {
+    if (walletAddressStatusEl) walletAddressStatusEl.textContent = text || '';
+  }
+
+  function setHistoryStatus(text) {
+    if (historyStatusEl) historyStatusEl.textContent = text || '';
   }
 
   function setDebugModeBadge(text) {
@@ -992,6 +1010,78 @@
     });
   }
 
+  function formatHistoryStatusLabel(status) {
+    var normalized = String(status || '').toLowerCase();
+    if (normalized === 'waiting_for_admin_approval') return 'Waiting for admin approval';
+    if (normalized === 'rejected') return 'Rejected';
+    if (normalized === 'paid') return 'Paid';
+    if (normalized === 'processing') return 'Processing';
+    if (normalized === 'expired') return 'Expired';
+    if (normalized === 'invalid') return 'Invalid';
+    return normalized || 'Unknown';
+  }
+
+  function getHistoryStatusClass(status) {
+    var normalized = String(status || '').toLowerCase();
+    if (normalized === 'paid') return 'tx-status-paid';
+    if (normalized === 'rejected') return 'tx-status-rejected';
+    if (normalized === 'invalid') return 'tx-status-invalid';
+    if (normalized === 'expired') return 'tx-status-expired';
+    if (normalized === 'waiting_for_admin_approval') return 'tx-status-waiting';
+    if (normalized === 'processing') return 'tx-status-processing';
+    return '';
+  }
+
+  function formatHistoryKind(kind) {
+    return String(kind || '').toLowerCase() === 'payout' ? 'Payout' : 'Top up';
+  }
+
+  function renderHistory() {
+    if (!historyListEl || !historyEmptyEl) return;
+
+    historyListEl.innerHTML = '';
+    historyEmptyEl.hidden = historyEntries.length > 0;
+
+    historyEntries.forEach(function (entry) {
+      var row = document.createElement('div');
+      row.className = 'tx-row';
+
+      var top = document.createElement('div');
+      top.className = 'tx-top';
+
+      var kind = document.createElement('div');
+      kind.className = 'tx-kind';
+      kind.textContent = formatHistoryKind(entry.kind);
+
+      var status = document.createElement('div');
+      status.className = 'tx-status ' + getHistoryStatusClass(entry.status);
+      status.textContent = formatHistoryStatusLabel(entry.status);
+
+      top.appendChild(kind);
+      top.appendChild(status);
+
+      var amount = document.createElement('div');
+      amount.className = 'tx-amount';
+      var sign = String(entry.kind || '').toLowerCase() === 'payout' ? '-' : '+';
+      amount.textContent = sign + formatCurrency(entry.amount || 0);
+
+      var sub = document.createElement('div');
+      sub.className = 'tx-sub';
+      var dateText = formatUtc(entry.createdAtUtc);
+      sub.textContent = dateText + (entry.externalId ? (' • ' + entry.externalId) : '');
+
+      row.appendChild(top);
+      row.appendChild(amount);
+      row.appendChild(sub);
+      historyListEl.appendChild(row);
+    });
+  }
+
+  function setHistoryOpen(isOpen) {
+    if (!historyScreenEl) return;
+    historyScreenEl.hidden = !isOpen;
+  }
+
   function setActiveTab(name) {
     var tab = name || 'lottery';
     activeTabName = tab;
@@ -1009,6 +1099,10 @@
 
     if (isTickets) {
       renderMyTickets(latestState);
+    }
+
+    if (!isProfile) {
+      setHistoryOpen(false);
     }
   }
 
@@ -1323,6 +1417,79 @@
       });
   }
 
+  function loadWalletAddress() {
+    if (!initData) return Promise.resolve(null);
+
+    return postJson('/api/wallet/address/get', { initData: initData || '' }, null)
+      .then(function (res) {
+        if (!(res && res.ok)) return null;
+
+        var address = String(res.address || '').trim();
+        if (walletAddressInputEl) walletAddressInputEl.value = address;
+        if (withdrawNumberInputEl && !String(withdrawNumberInputEl.value || '').trim()) {
+          withdrawNumberInputEl.value = address;
+        }
+        return address;
+      })
+      .catch(function () {
+        return null;
+      });
+  }
+
+  function saveWalletAddress() {
+    if (!initData) return;
+
+    var address = walletAddressInputEl ? String(walletAddressInputEl.value || '').trim() : '';
+    if (!address) {
+      setWalletAddressStatus('Enter wallet address first.');
+      return;
+    }
+
+    if (saveWalletAddressBtn) saveWalletAddressBtn.disabled = true;
+    setWalletAddressStatus('Saving wallet address...');
+
+    postJson('/api/wallet/address/save', { initData: initData || '', address: address }, null)
+      .then(function (res) {
+        if (!(res && res.ok)) {
+          setWalletAddressStatus('Failed to save wallet address.');
+          return;
+        }
+
+        var normalized = String(res.address || address);
+        if (walletAddressInputEl) walletAddressInputEl.value = normalized;
+        if (withdrawNumberInputEl) withdrawNumberInputEl.value = normalized;
+        setWalletAddressStatus('Wallet address saved.');
+      })
+      .catch(function (err) {
+        setWalletAddressStatus(err.message || 'Failed to save wallet address.');
+      })
+      .finally(function () {
+        if (saveWalletAddressBtn) saveWalletAddressBtn.disabled = false;
+      });
+  }
+
+  function loadHistory() {
+    if (!initData) return Promise.resolve(null);
+
+    setHistoryStatus('Loading transaction history...');
+    return postJson('/api/wallet/history', { initData: initData || '', limit: 100 }, null)
+      .then(function (res) {
+        if (!(res && res.ok && Array.isArray(res.entries))) {
+          historyEntries = [];
+          renderHistory();
+          setHistoryStatus('');
+          return;
+        }
+
+        historyEntries = res.entries.slice();
+        renderHistory();
+        setHistoryStatus('');
+      })
+      .catch(function (err) {
+        setHistoryStatus(err.message || 'Failed to load transaction history.');
+      });
+  }
+
   function pollDepositStatus(depositId, attemptsLeft) {
     if (!initData || !depositId || attemptsLeft <= 0) {
       return Promise.resolve(null);
@@ -1341,7 +1508,7 @@
         var status = String(deposit.status || '').toLowerCase();
         if (status === 'credited') {
           setTopUpStatus('Deposit credited: +' + formatCurrency(deposit.amount || 0) + '.');
-          return refreshState();
+          return refreshState().then(function () { return loadHistory(); });
         }
 
         if (status === 'expired' || status === 'invalid') {
@@ -1403,8 +1570,8 @@
       return;
     }
 
-    if (!number) {
-      setWithdrawStatus('Enter a payout number.');
+    if (!number && !(walletAddressInputEl && String(walletAddressInputEl.value || '').trim())) {
+      setWithdrawStatus('Enter wallet address or save one first.');
       return;
     }
 
@@ -1425,8 +1592,10 @@
 
         latestState.balance = Number(res.balance || 0);
         renderBalance(latestState.balance);
+        if (res.walletAddress && walletAddressInputEl) walletAddressInputEl.value = String(res.walletAddress);
         if (withdrawAmountInputEl) withdrawAmountInputEl.value = '';
-        setWithdrawStatus('Withdrawal request #' + res.requestId + ' submitted for ' + formatCurrency(res.amount) + '.');
+        setWithdrawStatus('Withdrawal request #' + res.requestId + ' submitted for ' + formatCurrency(res.amount) + '. Waiting for admin approval.');
+        loadHistory();
       })
       .catch(function (err) {
         setWithdrawStatus(err.message || 'Withdrawal request failed.');
@@ -1470,12 +1639,22 @@
   if (centerPopupBackdropEl) centerPopupBackdropEl.addEventListener('click', hideCenterPopup);
   if (topUpBtn) topUpBtn.addEventListener('click', topUpBalance);
   if (withdrawBtn) withdrawBtn.addEventListener('click', withdrawBalance);
+  if (saveWalletAddressBtn) saveWalletAddressBtn.addEventListener('click', saveWalletAddress);
+  if (openHistoryBtn) openHistoryBtn.addEventListener('click', function () {
+    setHistoryOpen(true);
+    loadHistory();
+  });
+  if (closeHistoryBtn) closeHistoryBtn.addEventListener('click', function () {
+    setHistoryOpen(false);
+  });
 
   randomizePickerNumbers();
   preloadTicketPicker();
   setActiveTab('lottery');
+  setHistoryOpen(false);
   renderCurrentDraw(null, []);
   renderMyTickets({ balance: 0, currentDraw: null, currentTickets: [], history: [] });
+  renderHistory();
   renderBalance(0);
 
   var search = '';
@@ -1505,6 +1684,8 @@
 
     postJson('/api/auth/telegram', { initData: initData })
       .then(function () { return refreshState(); })
+      .then(function () { return loadWalletAddress(); })
+      .then(function () { return loadHistory(); })
       .then(function () {
         startPolling();
       })
@@ -1533,6 +1714,8 @@
     initData = Telegram.WebApp.initData;
     postJson('/api/auth/telegram', { initData: initData })
       .then(function () { return refreshState(); })
+      .then(function () { return loadWalletAddress(); })
+      .then(function () { return loadHistory(); })
       .then(function () {
         startPolling();
       })

@@ -118,6 +118,79 @@ public sealed class BtcPayClient : IBtcPayClient
         }
     }
 
+    public async Task<BtcPayCreatePayoutResult> CreatePayoutAsync(BtcPayCreatePayoutRequest request, CancellationToken ct)
+    {
+        if (request is null)
+            return new BtcPayCreatePayoutResult(false, "Payout request is required.", BtcPayErrorCode.InvalidRequest);
+
+        if (request.Amount <= 0m)
+            return new BtcPayCreatePayoutResult(false, "Payout amount must be greater than zero.", BtcPayErrorCode.InvalidRequest);
+
+        if (string.IsNullOrWhiteSpace(request.Destination))
+            return new BtcPayCreatePayoutResult(false, "Destination address is required.", BtcPayErrorCode.InvalidRequest);
+
+        if (!TryGetConfiguration(out var btcPay, out var configError))
+            return new BtcPayCreatePayoutResult(false, configError, BtcPayErrorCode.Configuration);
+
+        var pullPaymentId = btcPay.WithdrawalsPullPaymentId?.Trim();
+        if (string.IsNullOrWhiteSpace(pullPaymentId))
+            return new BtcPayCreatePayoutResult(false, "BTCPay withdrawals pull payment id is not configured.", BtcPayErrorCode.Configuration);
+
+        var url = BuildPullPaymentPayoutsPath(btcPay.StoreId, pullPaymentId);
+        var payload = new
+        {
+            amount = request.Amount,
+            currency = string.IsNullOrWhiteSpace(request.Currency) ? "USD" : request.Currency.Trim().ToUpperInvariant(),
+            destination = request.Destination.Trim(),
+            paymentMethod = string.IsNullOrWhiteSpace(btcPay.WithdrawalsPaymentMethod) ? "BTC-CHAIN" : btcPay.WithdrawalsPaymentMethod.Trim(),
+            notificationUrl = string.IsNullOrWhiteSpace(request.NotificationUrl) ? null : request.NotificationUrl.Trim(),
+            metadata = string.IsNullOrWhiteSpace(request.Reference)
+                ? null
+                : new { reference = request.Reference.Trim() }
+        };
+
+        var responseResult = await SendWithRetryAsync(() =>
+        {
+            var message = new HttpRequestMessage(HttpMethod.Post, url)
+            {
+                Content = JsonContent.Create(payload)
+            };
+            message.Headers.Authorization = new AuthenticationHeaderValue("token", btcPay.ApiKey.Trim());
+            return message;
+        }, ct);
+
+        if (!responseResult.Success)
+            return new BtcPayCreatePayoutResult(false, responseResult.Error, responseResult.ErrorCode);
+
+        try
+        {
+            using var doc = JsonDocument.Parse(responseResult.Body!);
+            var root = doc.RootElement;
+
+            var payoutId = TryGetString(root, "id");
+            var state = TryGetString(root, "state");
+            var responsePullPaymentId = TryGetString(root, "pullPaymentId") ?? pullPaymentId;
+            var createdAt = TryParseBtcPayTime(TryGetString(root, "date"))
+                ?? TryParseBtcPayTime(TryGetString(root, "createdTime"));
+
+            if (string.IsNullOrWhiteSpace(payoutId))
+                return new BtcPayCreatePayoutResult(false, "BTCPay response is missing payout id.", BtcPayErrorCode.Parse);
+
+            return new BtcPayCreatePayoutResult(
+                true,
+                null,
+                BtcPayErrorCode.None,
+                payoutId,
+                state,
+                responsePullPaymentId,
+                createdAt);
+        }
+        catch
+        {
+            return new BtcPayCreatePayoutResult(false, "Failed to parse BTCPay payout response.", BtcPayErrorCode.Parse);
+        }
+    }
+
     private bool TryGetConfiguration(out BtcPayOptions options, out string? error)
     {
         options = _options.BtcPay;
@@ -138,6 +211,9 @@ public sealed class BtcPayClient : IBtcPayClient
 
     private static string BuildInvoicePath(string storeId, string invoiceId)
         => $"{BuildStorePath(storeId)}/invoices/{Uri.EscapeDataString(invoiceId)}";
+
+    private static string BuildPullPaymentPayoutsPath(string storeId, string pullPaymentId)
+        => $"{BuildStorePath(storeId)}/pull-payments/{Uri.EscapeDataString(pullPaymentId)}/payouts";
 
     private static string BuildStorePath(string storeId)
         => $"{NormalizeApiBasePath()}/stores/{Uri.EscapeDataString(storeId)}";

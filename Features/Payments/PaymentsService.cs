@@ -87,7 +87,7 @@ public sealed class PaymentsService : IPaymentsService
         if (!ValidateSignatureIfConfigured(payloadJson, signature))
             return new ProcessWebhookResult(false, "Invalid BTCPay webhook signature.");
 
-        if (!TryExtractEventData(payloadJson, out var eventType, out var invoiceId))
+        if (!TryExtractEventData(payloadJson, out var eventType, out var providerObjectId))
             return new ProcessWebhookResult(false, "Invalid BTCPay webhook payload.");
 
         var normalizedDeliveryId = string.IsNullOrWhiteSpace(deliveryId) ? null : deliveryId.Trim();
@@ -98,7 +98,7 @@ public sealed class PaymentsService : IPaymentsService
             Provider = ProviderName,
             DeliveryId = normalizedDeliveryId,
             EventType = eventType,
-            ProviderObjectId = invoiceId,
+            ProviderObjectId = providerObjectId,
             PayloadJson = payloadJson,
             Status = PaymentWebhookEventStatus.Received,
             ReceivedAtUtc = now
@@ -112,7 +112,7 @@ public sealed class PaymentsService : IPaymentsService
                 var payloadDuplicate = await _db.PaymentWebhookEvents
                     .AsNoTracking()
                     .AnyAsync(x => x.Provider == ProviderName
-                        && x.ProviderObjectId == invoiceId
+                        && x.ProviderObjectId == providerObjectId
                         && x.EventType == eventType
                         && x.PayloadJson == payloadJson, ct);
 
@@ -134,22 +134,21 @@ public sealed class PaymentsService : IPaymentsService
 
         try
         {
-            var deposit = await _db.CryptoDepositIntents
-                .SingleOrDefaultAsync(x => x.Provider == ProviderName && x.ProviderInvoiceId == invoiceId, ct);
+            var handled = IsPayoutEvent(eventType)
+                ? await ApplyWithdrawalStatusFromWebhookAsync(providerObjectId!, eventType, payloadJson, now, ct)
+                : await ApplyDepositStatusFromWebhookAsync(providerObjectId!, eventType, now, ct);
 
-            if (deposit is null)
+            if (!handled)
             {
                 evt.Status = PaymentWebhookEventStatus.Ignored;
-                evt.Error = "No matching local deposit intent.";
+                evt.Error = IsPayoutEvent(eventType)
+                    ? "No matching local withdrawal request."
+                    : "No matching local deposit intent.";
                 evt.ProcessedAtUtc = now;
                 await _db.SaveChangesAsync(ct);
                 await tx.CommitAsync(ct);
                 return new ProcessWebhookResult(true, null);
             }
-
-            ApplyStatusFromEvent(deposit, eventType, now);
-            if (ShouldCreditBalance(eventType))
-                await CreditDepositOnceAsync(deposit, now, ct);
 
             evt.Status = PaymentWebhookEventStatus.Processed;
             evt.ProcessedAtUtc = now;
@@ -167,7 +166,7 @@ public sealed class PaymentsService : IPaymentsService
                 Provider = ProviderName,
                 DeliveryId = normalizedDeliveryId,
                 EventType = eventType,
-                ProviderObjectId = invoiceId,
+                ProviderObjectId = providerObjectId,
                 PayloadJson = payloadJson,
                 Status = PaymentWebhookEventStatus.Failed,
                 Error = TruncateError(ex.Message),
@@ -229,6 +228,87 @@ public sealed class PaymentsService : IPaymentsService
         });
     }
 
+    private async Task<bool> ApplyDepositStatusFromWebhookAsync(string providerObjectId, string? eventType, DateTimeOffset now, CancellationToken ct)
+    {
+        var deposit = await _db.CryptoDepositIntents
+            .SingleOrDefaultAsync(x => x.Provider == ProviderName && x.ProviderInvoiceId == providerObjectId, ct);
+
+        if (deposit is null)
+            return false;
+
+        ApplyStatusFromEvent(deposit, eventType, now);
+        if (ShouldCreditBalance(eventType))
+            await CreditDepositOnceAsync(deposit, now, ct);
+
+        return true;
+    }
+
+    private async Task<bool> ApplyWithdrawalStatusFromWebhookAsync(string payoutId, string? eventType, string payloadJson, DateTimeOffset now, CancellationToken ct)
+    {
+        var request = await _db.WithdrawalRequests
+            .Include(x => x.User)
+            .SingleOrDefaultAsync(x => x.ExternalPayoutId == payoutId, ct);
+        if (request is null)
+            return false;
+
+        var payoutState = ExtractPayoutState(payloadJson, eventType);
+        request.ExternalPayoutState = payoutState ?? request.ExternalPayoutState;
+
+        if (IsFinalPaidPayoutState(payoutState))
+        {
+            request.Status = WithdrawalRequestStatus.Confirmed;
+            request.ReviewedAtUtc ??= now;
+            return true;
+        }
+
+        if (IsRejectedPayoutState(payoutState))
+        {
+            await RefundWithdrawalAsync(request, now, ct);
+        }
+
+        return true;
+    }
+
+    private async Task RefundWithdrawalAsync(WithdrawalRequest request, DateTimeOffset now, CancellationToken ct)
+    {
+        if (request.Status == WithdrawalRequestStatus.Denied)
+            return;
+
+        var reference = $"withdrawal-failed:{request.Id}";
+        var alreadyRefunded = await _db.WalletTransactions
+            .AsNoTracking()
+            .AnyAsync(x => x.Type == WalletTransactionType.WithdrawalDeniedRefund && x.Reference == reference, ct);
+        if (alreadyRefunded)
+        {
+            request.Status = WithdrawalRequestStatus.Denied;
+            request.ReviewedAtUtc ??= now;
+            return;
+        }
+
+        var serverWallet = await _wallet.EnsureServerWalletAsync(ct);
+        request.User.Balance = RoundAmount(request.User.Balance + request.Amount);
+        serverWallet.Balance = RoundAmount(serverWallet.Balance + request.Amount);
+        serverWallet.UpdatedAtUtc = now;
+
+        request.Status = WithdrawalRequestStatus.Denied;
+        request.ReviewedAtUtc ??= now;
+        request.ReviewNote = string.IsNullOrWhiteSpace(request.ReviewNote)
+            ? "BTCPay payout was not completed. Funds returned to user."
+            : request.ReviewNote;
+
+        _db.WalletTransactions.Add(new WalletTransaction
+        {
+            UserId = request.UserId,
+            Type = WalletTransactionType.WithdrawalDeniedRefund,
+            UserDelta = request.Amount,
+            UserBalanceAfter = request.User.Balance,
+            ServerDelta = request.Amount,
+            ServerBalanceAfter = serverWallet.Balance,
+            Reference = reference,
+            CreatedAtUtc = now
+        });
+    }
+
     private static void ApplyStatusFromEvent(CryptoDepositIntent deposit, string? eventType, DateTimeOffset now)
     {
         deposit.LastProviderEventType = eventType;
@@ -270,6 +350,51 @@ public sealed class PaymentsService : IPaymentsService
             || type.Contains("invoiceconfirmed", StringComparison.Ordinal);
     }
 
+    private static bool IsPayoutEvent(string? eventType)
+    {
+        var type = (eventType ?? string.Empty).ToLowerInvariant();
+        return type.Contains("payout", StringComparison.Ordinal);
+    }
+
+    private static bool IsFinalPaidPayoutState(string? payoutState)
+    {
+        var state = (payoutState ?? string.Empty).ToLowerInvariant();
+        return state is "completed" or "sent";
+    }
+
+    private static bool IsRejectedPayoutState(string? payoutState)
+    {
+        var state = (payoutState ?? string.Empty).ToLowerInvariant();
+        return state is "cancelled" or "failed";
+    }
+
+    private static string? ExtractPayoutState(string payloadJson, string? eventType)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(payloadJson);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("state", out var stateProp) && stateProp.ValueKind == JsonValueKind.String)
+                return stateProp.GetString();
+
+            if (root.TryGetProperty("data", out var dataProp) && dataProp.ValueKind == JsonValueKind.Object)
+            {
+                if (dataProp.TryGetProperty("state", out var dataState) && dataState.ValueKind == JsonValueKind.String)
+                    return dataState.GetString();
+
+                if (dataProp.TryGetProperty("currentState", out var currentState) && currentState.ValueKind == JsonValueKind.String)
+                    return currentState.GetString();
+            }
+        }
+        catch
+        {
+            return eventType;
+        }
+
+        return eventType;
+    }
+
     private bool ValidateSignatureIfConfigured(string payloadJson, string? signatureHeader)
     {
         var secret = _options.BtcPay.WebhookSecret?.Trim();
@@ -292,10 +417,10 @@ public sealed class PaymentsService : IPaymentsService
         return false;
     }
 
-    private static bool TryExtractEventData(string payloadJson, out string? eventType, out string? invoiceId)
+    private static bool TryExtractEventData(string payloadJson, out string? eventType, out string? providerObjectId)
     {
         eventType = null;
-        invoiceId = null;
+        providerObjectId = null;
 
         try
         {
@@ -306,17 +431,24 @@ public sealed class PaymentsService : IPaymentsService
                 eventType = typeProp.GetString();
 
             if (root.TryGetProperty("invoiceId", out var invoiceProp) && invoiceProp.ValueKind == JsonValueKind.String)
-                invoiceId = invoiceProp.GetString();
+                providerObjectId = invoiceProp.GetString();
 
-            if (string.IsNullOrWhiteSpace(invoiceId)
+            if (string.IsNullOrWhiteSpace(providerObjectId)
+                && root.TryGetProperty("id", out var rootIdProp)
+                && rootIdProp.ValueKind == JsonValueKind.String)
+            {
+                providerObjectId = rootIdProp.GetString();
+            }
+
+            if (string.IsNullOrWhiteSpace(providerObjectId)
                 && root.TryGetProperty("data", out var dataProp)
                 && dataProp.ValueKind == JsonValueKind.Object)
             {
                 if (dataProp.TryGetProperty("id", out var idProp) && idProp.ValueKind == JsonValueKind.String)
-                    invoiceId = idProp.GetString();
+                    providerObjectId = idProp.GetString();
             }
 
-            return !string.IsNullOrWhiteSpace(invoiceId);
+            return !string.IsNullOrWhiteSpace(providerObjectId);
         }
         catch
         {

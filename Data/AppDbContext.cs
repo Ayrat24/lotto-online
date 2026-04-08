@@ -30,6 +30,7 @@ public sealed class AppDbContext : DbContext
 
             b.Property(x => x.TelegramUserId).IsRequired();
             b.Property(x => x.Number).HasMaxLength(64);
+            b.Property(x => x.WalletAddress).HasMaxLength(256);
             b.Property(x => x.Balance).HasPrecision(18, 2).IsRequired();
             b.Property(x => x.CreatedAtUtc).IsRequired();
             b.Property(x => x.LastSeenAtUtc).IsRequired();
@@ -139,9 +140,14 @@ public sealed class AppDbContext : DbContext
             b.HasIndex(x => x.Status);
             b.HasIndex(x => new { x.Status, x.CreatedAtUtc });
             b.HasIndex(x => new { x.UserId, x.CreatedAtUtc });
+            b.HasIndex(x => x.ExternalPayoutId)
+                .IsUnique()
+                .HasFilter("\"ExternalPayoutId\" IS NOT NULL");
 
             b.Property(x => x.Amount).HasPrecision(18, 2).IsRequired();
-            b.Property(x => x.Number).HasMaxLength(64).IsRequired();
+            b.Property(x => x.Number).HasMaxLength(256).IsRequired();
+            b.Property(x => x.ExternalPayoutId).HasMaxLength(128);
+            b.Property(x => x.ExternalPayoutState).HasMaxLength(64);
             b.Property(x => x.Status)
                 .HasConversion<string>()
                 .HasMaxLength(32)

@@ -21,6 +21,10 @@ public sealed class BtcPayOptions
 
     public string ApiKey { get; set; } = string.Empty;
 
+    public string WithdrawalsPullPaymentId { get; set; } = string.Empty;
+
+    public string WithdrawalsPaymentMethod { get; set; } = "BTC-CHAIN";
+
     public string WebhookSecret { get; set; } = string.Empty;
 
     public string DefaultCurrency { get; set; } = "USD";
@@ -55,6 +59,12 @@ public sealed class PaymentsOptionsValidator : IValidateOptions<PaymentsOptions>
 
         if (string.IsNullOrWhiteSpace(btcPay.ApiKey))
             errors.Add("Payments:BtcPay:ApiKey is required when payments are enabled.");
+
+        if (string.IsNullOrWhiteSpace(btcPay.WithdrawalsPullPaymentId))
+            errors.Add("Payments:BtcPay:WithdrawalsPullPaymentId is required when payments are enabled.");
+
+        if (string.IsNullOrWhiteSpace(btcPay.WithdrawalsPaymentMethod))
+            errors.Add("Payments:BtcPay:WithdrawalsPaymentMethod is required when payments are enabled.");
 
         if (btcPay.RequestTimeoutSeconds <= 0)
             errors.Add("Payments:BtcPay:RequestTimeoutSeconds must be greater than 0.");

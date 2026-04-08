@@ -1071,6 +1071,71 @@ button:disabled {
   background: rgba(255, 111, 152, 0.12);
 }
 
+.secondary-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #d9e4f6;
+}
+
+.tx-row {
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 10px 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.tx-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.tx-kind {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tx-status {
+  font-size: 0.76rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 3px 8px;
+  color: #d6e0f2;
+}
+
+.tx-status-paid {
+  color: #87f5b1;
+  border-color: rgba(71, 209, 123, 0.55);
+}
+
+.tx-status-rejected,
+.tx-status-invalid,
+.tx-status-expired {
+  color: #ffd0d0;
+  border-color: rgba(255, 124, 124, 0.55);
+}
+
+.tx-status-waiting,
+.tx-status-processing {
+  color: #ffe4a6;
+  border-color: rgba(241, 190, 55, 0.55);
+}
+
+.tx-amount {
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.tx-sub {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
 .tickets-winning-pin {
   display: inline-grid;
   place-items: center;

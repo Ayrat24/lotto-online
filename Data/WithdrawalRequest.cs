@@ -18,6 +18,12 @@ public sealed class WithdrawalRequest
 
     public string Number { get; set; } = null!;
 
+    public string? ExternalPayoutId { get; set; }
+
+    public string? ExternalPayoutState { get; set; }
+
+    public DateTimeOffset? ExternalPayoutCreatedAtUtc { get; set; }
+
     public WithdrawalRequestStatus Status { get; set; } = WithdrawalRequestStatus.Pending;
 
     public string? ReviewedByAdmin { get; set; }

@@ -56,8 +56,75 @@ public static class WalletEndpoints
                 ok = true,
                 balance = result.UserBalance,
                 requestId = result.Request!.Id,
-                amount = result.Request.Amount
+                amount = result.Request.Amount,
+                walletAddress = result.Request.Number
             });
+        });
+
+        endpoints.MapPost("/api/wallet/address/get", async (
+            WalletGetAddressRequest req,
+            HttpContext http,
+            IConfiguration config,
+            IWebHostEnvironment env,
+            AppDbContext db,
+            IUserService users,
+            IWalletService wallet,
+            CancellationToken ct) =>
+        {
+            var authResult = await TryResolveTelegramUserIdAsync(req.InitData, http, config, env, db, ct);
+            if (authResult.ErrorResult is not null)
+                return authResult.ErrorResult;
+
+            var telegramUserId = authResult.TelegramUserId!.Value;
+            var user = await users.TouchUserAsync(telegramUserId, ct);
+            var address = await wallet.GetWalletAddressAsync(user.Id, ct);
+
+            return Results.Ok(new { ok = true, address });
+        });
+
+        endpoints.MapPost("/api/wallet/address/save", async (
+            WalletSaveAddressRequest req,
+            HttpContext http,
+            IConfiguration config,
+            IWebHostEnvironment env,
+            AppDbContext db,
+            IUserService users,
+            IWalletService wallet,
+            CancellationToken ct) =>
+        {
+            var authResult = await TryResolveTelegramUserIdAsync(req.InitData, http, config, env, db, ct);
+            if (authResult.ErrorResult is not null)
+                return authResult.ErrorResult;
+
+            var telegramUserId = authResult.TelegramUserId!.Value;
+            var user = await users.TouchUserAsync(telegramUserId, ct);
+
+            var result = await wallet.SaveWalletAddressAsync(user.Id, req.Address, ct);
+            if (!result.Success)
+                return Results.BadRequest(new { ok = false, error = result.Error ?? "Failed to save wallet address." });
+
+            return Results.Ok(new { ok = true, address = result.WalletAddress });
+        });
+
+        endpoints.MapPost("/api/wallet/history", async (
+            WalletHistoryRequest req,
+            HttpContext http,
+            IConfiguration config,
+            IWebHostEnvironment env,
+            AppDbContext db,
+            IUserService users,
+            IWalletService wallet,
+            CancellationToken ct) =>
+        {
+            var authResult = await TryResolveTelegramUserIdAsync(req.InitData, http, config, env, db, ct);
+            if (authResult.ErrorResult is not null)
+                return authResult.ErrorResult;
+
+            var telegramUserId = authResult.TelegramUserId!.Value;
+            var user = await users.TouchUserAsync(telegramUserId, ct);
+
+            var entries = await wallet.GetHistoryAsync(user.Id, req.Limit, ct);
+            return Results.Ok(new { ok = true, entries });
         });
 
         return endpoints;

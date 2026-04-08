@@ -12,6 +12,12 @@ public interface IWalletService
 
     Task<WalletWithdrawRequestResult> CreateWithdrawalRequestAsync(long userId, decimal amount, string number, CancellationToken ct);
 
+    Task<WalletSaveAddressResult> SaveWalletAddressAsync(long userId, string address, CancellationToken ct);
+
+    Task<string?> GetWalletAddressAsync(long userId, CancellationToken ct);
+
+    Task<IReadOnlyList<WalletHistoryEntry>> GetHistoryAsync(long userId, int limit, CancellationToken ct);
+
     Task<WalletReviewWithdrawalResult> ConfirmWithdrawalAsync(long withdrawalRequestId, string adminUsername, CancellationToken ct);
 
     Task<WalletReviewWithdrawalResult> DenyWithdrawalAsync(long withdrawalRequestId, string adminUsername, string? note, CancellationToken ct);
@@ -25,5 +31,16 @@ public sealed record WalletClaimResult(bool Success, decimal UserBalance, decima
 public sealed record WalletWithdrawRequestResult(bool Success, decimal UserBalance, string? Error, WithdrawalRequest? Request = null);
 
 public sealed record WalletReviewWithdrawalResult(bool Success, string? Error);
+
+public sealed record WalletSaveAddressResult(bool Success, string? Error, string? WalletAddress = null);
+
+public sealed record WalletHistoryEntry(
+    string Kind,
+    string Status,
+    decimal Amount,
+    string Currency,
+    DateTimeOffset CreatedAtUtc,
+    string? ExternalId = null,
+    string? Note = null);
 
 

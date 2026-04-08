@@ -29,6 +29,8 @@ services:
       Payments__BtcPay__BaseUrl: ${BTCPAY_BASE_URL}
       Payments__BtcPay__StoreId: ${BTCPAY_STORE_ID}
       Payments__BtcPay__ApiKey: ${BTCPAY_API_KEY}
+      Payments__BtcPay__WithdrawalsPullPaymentId: ${BTCPAY_WITHDRAWALS_PULL_PAYMENT_ID}
+      Payments__BtcPay__WithdrawalsPaymentMethod: ${BTCPAY_WITHDRAWALS_PAYMENT_METHOD:-BTC-CHAIN}
 
     ports:
       - "8080:8080"
