@@ -137,7 +137,7 @@ public sealed class BtcPayClient : IBtcPayClient
             return new BtcPayCreatePayoutResult(false, "BTCPay withdrawals pull payment id is not configured.", BtcPayErrorCode.Configuration);
 
         var url = BuildPullPaymentPayoutsPath(btcPay.StoreId, pullPaymentId);
-        var payoutMethod = string.IsNullOrWhiteSpace(btcPay.WithdrawalsPaymentMethod) ? "BTC-CHAIN" : btcPay.WithdrawalsPaymentMethod.Trim();
+        var configuredPayoutMethod = string.IsNullOrWhiteSpace(btcPay.WithdrawalsPaymentMethod) ? "BTC-CHAIN" : btcPay.WithdrawalsPaymentMethod.Trim();
         var normalizedCurrency = string.IsNullOrWhiteSpace(request.Currency) ? "USD" : request.Currency.Trim().ToUpperInvariant();
         var basePayload = new
         {
@@ -161,15 +161,53 @@ public sealed class BtcPayClient : IBtcPayClient
                 return message;
             }, ct);
 
-        var responseResult = await SendPayoutAsync(url, new
+        var discoveredPayoutMethods = await GetAllowedPayoutMethodIdsAsync(btcPay.StoreId, pullPaymentId, btcPay.ApiKey.Trim(), ct);
+        var payoutMethodCandidates = BuildPayoutMethodCandidates(configuredPayoutMethod, discoveredPayoutMethods);
+
+        BtcPayHttpResult? responseResult = null;
+        foreach (var payoutMethodCandidate in payoutMethodCandidates)
         {
-            amount = basePayload.amount,
-            currency = basePayload.currency,
-            destination = basePayload.destination,
-            paymentMethod = payoutMethod,
-            notificationUrl = basePayload.notificationUrl,
-            metadata = basePayload.metadata
-        });
+            responseResult = await SendPayoutAsync(url, new
+            {
+                amount = basePayload.amount,
+                currency = basePayload.currency,
+                destination = basePayload.destination,
+                payoutMethodId = payoutMethodCandidate,
+                notificationUrl = basePayload.notificationUrl,
+                metadata = basePayload.metadata
+            });
+
+            if (responseResult.Success || responseResult.ErrorCode != BtcPayErrorCode.InvalidRequest)
+                break;
+
+            responseResult = await SendPayoutAsync(url, new
+            {
+                amount = basePayload.amount,
+                currency = basePayload.currency,
+                destination = basePayload.destination,
+                paymentMethodId = payoutMethodCandidate,
+                notificationUrl = basePayload.notificationUrl,
+                metadata = basePayload.metadata
+            });
+
+            if (responseResult.Success || responseResult.ErrorCode != BtcPayErrorCode.InvalidRequest)
+                break;
+
+            responseResult = await SendPayoutAsync(url, new
+            {
+                amount = basePayload.amount,
+                currency = basePayload.currency,
+                destination = basePayload.destination,
+                paymentMethod = payoutMethodCandidate,
+                notificationUrl = basePayload.notificationUrl,
+                metadata = basePayload.metadata
+            });
+
+            if (responseResult.Success || responseResult.ErrorCode != BtcPayErrorCode.InvalidRequest)
+                break;
+        }
+
+        responseResult ??= BtcPayHttpResult.FromFailure(BtcPayErrorCode.InvalidRequest, "No payout method candidates available.");
 
         // Some BTCPay versions validate payout payload shape differently; retry compatible variants on 422.
         if (!responseResult.Success && responseResult.ErrorCode == BtcPayErrorCode.InvalidRequest)
@@ -179,7 +217,7 @@ public sealed class BtcPayClient : IBtcPayClient
                 amount = basePayload.amount,
                 currency = basePayload.currency,
                 destination = basePayload.destination,
-                paymentMethodId = payoutMethod,
+                paymentMethodId = payoutMethodCandidates.FirstOrDefault(),
                 notificationUrl = basePayload.notificationUrl,
                 metadata = basePayload.metadata
             });
@@ -207,8 +245,9 @@ public sealed class BtcPayClient : IBtcPayClient
                 amount = basePayload.amount,
                 currency = basePayload.currency,
                 destination = basePayload.destination,
-                paymentMethod = payoutMethod,
-                paymentMethodId = payoutMethod,
+                payoutMethodId = payoutMethodCandidates.FirstOrDefault(),
+                paymentMethod = payoutMethodCandidates.FirstOrDefault(),
+                paymentMethodId = payoutMethodCandidates.FirstOrDefault(),
                 notificationUrl = basePayload.notificationUrl,
                 metadata = basePayload.metadata
             };
@@ -223,11 +262,19 @@ public sealed class BtcPayClient : IBtcPayClient
                     amount = basePayload.amount,
                     currency = basePayload.currency,
                     destination = basePayload.destination,
-                    paymentMethod = payoutMethod,
+                    payoutMethodId = payoutMethodCandidates.FirstOrDefault(),
+                    paymentMethod = payoutMethodCandidates.FirstOrDefault(),
                     notificationUrl = basePayload.notificationUrl,
                     metadata = basePayload.metadata
                 });
             }
+        }
+
+        if (!responseResult.Success && responseResult.ErrorCode == BtcPayErrorCode.InvalidRequest && discoveredPayoutMethods.Count > 0)
+        {
+            var allowed = string.Join(", ", discoveredPayoutMethods);
+            responseResult = BtcPayHttpResult.FromFailure(BtcPayErrorCode.InvalidRequest,
+                $"{responseResult.Error} Allowed payout methods for this pull payment: {allowed}.");
         }
 
         if (!responseResult.Success)
@@ -288,6 +335,9 @@ public sealed class BtcPayClient : IBtcPayClient
 
     private static string BuildStorePayoutsPath(string storeId)
         => $"{BuildStorePath(storeId)}/payouts";
+
+    private static string BuildPullPaymentPath(string storeId, string pullPaymentId)
+        => $"{BuildStorePath(storeId)}/pull-payments/{Uri.EscapeDataString(pullPaymentId)}";
 
     private static string BuildStorePath(string storeId)
         => $"{NormalizeApiBasePath()}/stores/{Uri.EscapeDataString(storeId)}";
@@ -531,6 +581,100 @@ public sealed class BtcPayClient : IBtcPayClient
         }
 
         return value;
+    }
+
+    private async Task<IReadOnlyList<string>> GetAllowedPayoutMethodIdsAsync(string storeId, string pullPaymentId, string apiKey, CancellationToken ct)
+    {
+        var endpoint = BuildPullPaymentPath(storeId, pullPaymentId);
+        var result = await SendWithRetryAsync(() =>
+        {
+            var message = new HttpRequestMessage(HttpMethod.Get, endpoint);
+            message.Headers.Authorization = new AuthenticationHeaderValue("token", apiKey);
+            return message;
+        }, ct);
+
+        if (!result.Success || string.IsNullOrWhiteSpace(result.Body))
+            return Array.Empty<string>();
+
+        try
+        {
+            using var doc = JsonDocument.Parse(result.Body);
+            var root = doc.RootElement;
+            var values = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            if (root.TryGetProperty("payoutMethods", out var payoutMethods))
+            {
+                if (payoutMethods.ValueKind == JsonValueKind.Object)
+                {
+                    foreach (var prop in payoutMethods.EnumerateObject())
+                    {
+                        if (!string.IsNullOrWhiteSpace(prop.Name))
+                            values.Add(prop.Name.Trim());
+
+                        if (prop.Value.ValueKind == JsonValueKind.Object)
+                        {
+                            var methodId = TryGetString(prop.Value, "paymentMethod")
+                                ?? TryGetString(prop.Value, "paymentMethodId")
+                                ?? TryGetString(prop.Value, "payoutMethodId");
+                            if (!string.IsNullOrWhiteSpace(methodId))
+                                values.Add(methodId.Trim());
+                        }
+                    }
+                }
+                else if (payoutMethods.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var item in payoutMethods.EnumerateArray())
+                    {
+                        if (item.ValueKind != JsonValueKind.Object)
+                            continue;
+
+                        var methodId = TryGetString(item, "paymentMethod")
+                            ?? TryGetString(item, "paymentMethodId")
+                            ?? TryGetString(item, "payoutMethodId")
+                            ?? TryGetString(item, "id");
+                        if (!string.IsNullOrWhiteSpace(methodId))
+                            values.Add(methodId.Trim());
+                    }
+                }
+            }
+
+            return values.ToArray();
+        }
+        catch
+        {
+            return Array.Empty<string>();
+        }
+    }
+
+    private static IReadOnlyList<string> BuildPayoutMethodCandidates(string configured, IReadOnlyList<string> discovered)
+    {
+        var candidates = new List<string>();
+
+        void Add(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return;
+
+            var trimmed = value.Trim();
+            if (candidates.Any(x => string.Equals(x, trimmed, StringComparison.OrdinalIgnoreCase)))
+                return;
+
+            candidates.Add(trimmed);
+        }
+
+        Add(configured);
+        if (string.Equals(configured, "BTC-CHAIN", StringComparison.OrdinalIgnoreCase))
+            Add("BTC-OnChain");
+        if (string.Equals(configured, "BTC-OnChain", StringComparison.OrdinalIgnoreCase))
+            Add("BTC-CHAIN");
+
+        foreach (var method in discovered)
+            Add(method);
+
+        if (candidates.Count == 0)
+            Add("BTC-OnChain");
+
+        return candidates;
     }
 
     private sealed record BtcPayHttpResult(bool Success, string? Body, BtcPayErrorCode ErrorCode, string? Error)
