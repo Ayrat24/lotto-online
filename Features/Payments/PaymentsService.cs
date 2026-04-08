@@ -359,13 +359,13 @@ public sealed class PaymentsService : IPaymentsService
     private static bool IsFinalPaidPayoutState(string? payoutState)
     {
         var state = (payoutState ?? string.Empty).ToLowerInvariant();
-        return state is "completed" or "sent";
+        return state is "completed" or "sent" or "paid" or "succeeded";
     }
 
     private static bool IsRejectedPayoutState(string? payoutState)
     {
         var state = (payoutState ?? string.Empty).ToLowerInvariant();
-        return state is "cancelled" or "failed";
+        return state is "cancelled" or "failed" or "rejected" or "expired" or "invalid";
     }
 
     private static string? ExtractPayoutState(string payloadJson, string? eventType)
@@ -378,6 +378,12 @@ public sealed class PaymentsService : IPaymentsService
             if (root.TryGetProperty("state", out var stateProp) && stateProp.ValueKind == JsonValueKind.String)
                 return stateProp.GetString();
 
+            if (root.TryGetProperty("currentState", out var rootCurrentState) && rootCurrentState.ValueKind == JsonValueKind.String)
+                return rootCurrentState.GetString();
+
+            if (root.TryGetProperty("status", out var rootStatus) && rootStatus.ValueKind == JsonValueKind.String)
+                return rootStatus.GetString();
+
             if (root.TryGetProperty("data", out var dataProp) && dataProp.ValueKind == JsonValueKind.Object)
             {
                 if (dataProp.TryGetProperty("state", out var dataState) && dataState.ValueKind == JsonValueKind.String)
@@ -385,6 +391,12 @@ public sealed class PaymentsService : IPaymentsService
 
                 if (dataProp.TryGetProperty("currentState", out var currentState) && currentState.ValueKind == JsonValueKind.String)
                     return currentState.GetString();
+
+                if (dataProp.TryGetProperty("newState", out var newState) && newState.ValueKind == JsonValueKind.String)
+                    return newState.GetString();
+
+                if (dataProp.TryGetProperty("status", out var dataStatus) && dataStatus.ValueKind == JsonValueKind.String)
+                    return dataStatus.GetString();
             }
         }
         catch
@@ -434,18 +446,28 @@ public sealed class PaymentsService : IPaymentsService
                 providerObjectId = invoiceProp.GetString();
 
             if (string.IsNullOrWhiteSpace(providerObjectId)
-                && root.TryGetProperty("id", out var rootIdProp)
-                && rootIdProp.ValueKind == JsonValueKind.String)
+                && root.TryGetProperty("payoutId", out var payoutProp)
+                && payoutProp.ValueKind == JsonValueKind.String)
             {
-                providerObjectId = rootIdProp.GetString();
+                providerObjectId = payoutProp.GetString();
             }
 
             if (string.IsNullOrWhiteSpace(providerObjectId)
                 && root.TryGetProperty("data", out var dataProp)
                 && dataProp.ValueKind == JsonValueKind.Object)
             {
+                if (dataProp.TryGetProperty("payoutId", out var payoutIdProp) && payoutIdProp.ValueKind == JsonValueKind.String)
+                    providerObjectId = payoutIdProp.GetString();
+
                 if (dataProp.TryGetProperty("id", out var idProp) && idProp.ValueKind == JsonValueKind.String)
                     providerObjectId = idProp.GetString();
+            }
+
+            if (string.IsNullOrWhiteSpace(providerObjectId)
+                && root.TryGetProperty("id", out var rootIdProp)
+                && rootIdProp.ValueKind == JsonValueKind.String)
+            {
+                providerObjectId = rootIdProp.GetString();
             }
 
             return !string.IsNullOrWhiteSpace(providerObjectId);
