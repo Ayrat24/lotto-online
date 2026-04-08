@@ -138,27 +138,64 @@ public sealed class BtcPayClient : IBtcPayClient
 
         var url = BuildPullPaymentPayoutsPath(btcPay.StoreId, pullPaymentId);
         var payoutMethod = string.IsNullOrWhiteSpace(btcPay.WithdrawalsPaymentMethod) ? "BTC-CHAIN" : btcPay.WithdrawalsPaymentMethod.Trim();
-        var payload = new
+        var normalizedCurrency = string.IsNullOrWhiteSpace(request.Currency) ? "USD" : request.Currency.Trim().ToUpperInvariant();
+        var basePayload = new
         {
             amount = request.Amount,
-            currency = string.IsNullOrWhiteSpace(request.Currency) ? "USD" : request.Currency.Trim().ToUpperInvariant(),
+            currency = normalizedCurrency,
             destination = request.Destination.Trim(),
-            paymentMethod = payoutMethod,
             notificationUrl = string.IsNullOrWhiteSpace(request.NotificationUrl) ? null : request.NotificationUrl.Trim(),
             metadata = string.IsNullOrWhiteSpace(request.Reference)
                 ? null
                 : new { reference = request.Reference.Trim() }
         };
 
-        var responseResult = await SendWithRetryAsync(() =>
-        {
-            var message = new HttpRequestMessage(HttpMethod.Post, url)
+        async Task<BtcPayHttpResult> SendPayoutAsync(string endpoint, object payload)
+            => await SendWithRetryAsync(() =>
             {
-                Content = JsonContent.Create(payload)
-            };
-            message.Headers.Authorization = new AuthenticationHeaderValue("token", btcPay.ApiKey.Trim());
-            return message;
-        }, ct);
+                var message = new HttpRequestMessage(HttpMethod.Post, endpoint)
+                {
+                    Content = JsonContent.Create(payload)
+                };
+                message.Headers.Authorization = new AuthenticationHeaderValue("token", btcPay.ApiKey.Trim());
+                return message;
+            }, ct);
+
+        var responseResult = await SendPayoutAsync(url, new
+        {
+            amount = basePayload.amount,
+            currency = basePayload.currency,
+            destination = basePayload.destination,
+            paymentMethod = payoutMethod,
+            notificationUrl = basePayload.notificationUrl,
+            metadata = basePayload.metadata
+        });
+
+        // Some BTCPay versions validate payout payload shape differently; retry compatible variants on 422.
+        if (!responseResult.Success && responseResult.ErrorCode == BtcPayErrorCode.InvalidRequest)
+        {
+            responseResult = await SendPayoutAsync(url, new
+            {
+                amount = basePayload.amount,
+                currency = basePayload.currency,
+                destination = basePayload.destination,
+                paymentMethodId = payoutMethod,
+                notificationUrl = basePayload.notificationUrl,
+                metadata = basePayload.metadata
+            });
+        }
+
+        if (!responseResult.Success && responseResult.ErrorCode == BtcPayErrorCode.InvalidRequest)
+        {
+            responseResult = await SendPayoutAsync(url, new
+            {
+                amount = basePayload.amount,
+                currency = basePayload.currency,
+                destination = basePayload.destination,
+                notificationUrl = basePayload.notificationUrl,
+                metadata = basePayload.metadata
+            });
+        }
 
         // Some BTCPay versions expose payout creation at /stores/{storeId}/payouts.
         if (!responseResult.Success && responseResult.ErrorCode == BtcPayErrorCode.NotFound)
@@ -167,26 +204,30 @@ public sealed class BtcPayClient : IBtcPayClient
             var fallbackPayload = new
             {
                 pullPaymentId,
-                amount = request.Amount,
-                currency = string.IsNullOrWhiteSpace(request.Currency) ? "USD" : request.Currency.Trim().ToUpperInvariant(),
-                destination = request.Destination.Trim(),
+                amount = basePayload.amount,
+                currency = basePayload.currency,
+                destination = basePayload.destination,
                 paymentMethod = payoutMethod,
                 paymentMethodId = payoutMethod,
-                notificationUrl = string.IsNullOrWhiteSpace(request.NotificationUrl) ? null : request.NotificationUrl.Trim(),
-                metadata = string.IsNullOrWhiteSpace(request.Reference)
-                    ? null
-                    : new { reference = request.Reference.Trim() }
+                notificationUrl = basePayload.notificationUrl,
+                metadata = basePayload.metadata
             };
 
-            responseResult = await SendWithRetryAsync(() =>
+            responseResult = await SendPayoutAsync(fallbackUrl, fallbackPayload);
+
+            if (!responseResult.Success && responseResult.ErrorCode == BtcPayErrorCode.InvalidRequest)
             {
-                var message = new HttpRequestMessage(HttpMethod.Post, fallbackUrl)
+                responseResult = await SendPayoutAsync(fallbackUrl, new
                 {
-                    Content = JsonContent.Create(fallbackPayload)
-                };
-                message.Headers.Authorization = new AuthenticationHeaderValue("token", btcPay.ApiKey.Trim());
-                return message;
-            }, ct);
+                    pullPaymentId,
+                    amount = basePayload.amount,
+                    currency = basePayload.currency,
+                    destination = basePayload.destination,
+                    paymentMethod = payoutMethod,
+                    notificationUrl = basePayload.notificationUrl,
+                    metadata = basePayload.metadata
+                });
+            }
         }
 
         if (!responseResult.Success)
@@ -280,7 +321,7 @@ public sealed class BtcPayClient : IBtcPayClient
                     continue;
                 }
 
-                return BtcPayHttpResult.FromFailure(errorCode, BuildHttpErrorMessage(response.StatusCode));
+                return BtcPayHttpResult.FromFailure(errorCode, BuildHttpErrorMessage(response.StatusCode, body));
             }
             catch (TaskCanceledException) when (!ct.IsCancellationRequested)
             {
@@ -331,6 +372,7 @@ public sealed class BtcPayClient : IBtcPayClient
         return statusCode switch
         {
             HttpStatusCode.BadRequest => BtcPayErrorCode.InvalidRequest,
+            HttpStatusCode.UnprocessableEntity => BtcPayErrorCode.InvalidRequest,
             HttpStatusCode.Unauthorized => BtcPayErrorCode.Unauthorized,
             HttpStatusCode.Forbidden => BtcPayErrorCode.Unauthorized,
             HttpStatusCode.NotFound => BtcPayErrorCode.NotFound,
@@ -340,8 +382,64 @@ public sealed class BtcPayClient : IBtcPayClient
         };
     }
 
-    private static string BuildHttpErrorMessage(HttpStatusCode statusCode)
-        => $"BTCPay request failed ({(int)statusCode}).";
+    private static string BuildHttpErrorMessage(HttpStatusCode statusCode, string? body = null)
+    {
+        var suffix = ExtractErrorSuffix(body);
+        return string.IsNullOrWhiteSpace(suffix)
+            ? $"BTCPay request failed ({(int)statusCode})."
+            : $"BTCPay request failed ({(int)statusCode}): {suffix}";
+    }
+
+    private static string? ExtractErrorSuffix(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+            return null;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+
+            if (root.ValueKind == JsonValueKind.String)
+                return TruncateErrorText(root.GetString());
+
+            if (TryGetString(root, "message") is { Length: > 0 } message)
+                return TruncateErrorText(message);
+
+            if (TryGetString(root, "error") is { Length: > 0 } error)
+                return TruncateErrorText(error);
+
+            if (root.TryGetProperty("errors", out var errorsProp) && errorsProp.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in errorsProp.EnumerateArray())
+                {
+                    if (item.ValueKind == JsonValueKind.String)
+                        return TruncateErrorText(item.GetString());
+
+                    if (item.ValueKind == JsonValueKind.Object
+                        && TryGetString(item, "message") is { Length: > 0 } nestedMessage)
+                    {
+                        return TruncateErrorText(nestedMessage);
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Non-JSON response body.
+        }
+
+        return TruncateErrorText(body);
+    }
+
+    private static string? TruncateErrorText(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        var trimmed = value.Trim();
+        return trimmed.Length <= 300 ? trimmed : trimmed[..300];
+    }
 
     private static string? TryGetString(JsonElement root, string name)
     {
