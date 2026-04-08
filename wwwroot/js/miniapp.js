@@ -1352,7 +1352,7 @@
     var status = err && err.status;
     markAppReady();
     if (status === 401) {
-      setTimelineStatus('Authentication failed. Open this app from Telegram, or use the local debug profile in Development.');
+      setTimelineStatus(t('client.status.authOpenFromTelegram', 'Authentication failed. Open this app from Telegram, or use the local debug profile in Development.'));
       setPurchaseStatus(t('client.status.authenticationFailed', 'Authentication failed.'));
       return;
     }
@@ -1533,27 +1533,27 @@
 
     var address = walletAddressInputEl ? String(walletAddressInputEl.value || '').trim() : '';
     if (!address) {
-      setWalletAddressStatus('Enter wallet address first.');
+      setWalletAddressStatus(t('client.wallet.enterAddressFirst', 'Enter wallet address first.'));
       return;
     }
 
     if (saveWalletAddressBtn) saveWalletAddressBtn.disabled = true;
-    setWalletAddressStatus('Saving wallet address...');
+    setWalletAddressStatus(t('client.wallet.savingAddress', 'Saving wallet address...'));
 
     postJson('/api/wallet/address/save', { initData: initData || '', address: address }, null)
       .then(function (res) {
         if (!(res && res.ok)) {
-          setWalletAddressStatus('Failed to save wallet address.');
+          setWalletAddressStatus(t('client.wallet.saveFailed', 'Failed to save wallet address.'));
           return;
         }
 
         var normalized = String(res.address || address);
         if (walletAddressInputEl) walletAddressInputEl.value = normalized;
         if (withdrawNumberInputEl) withdrawNumberInputEl.value = normalized;
-        setWalletAddressStatus('Wallet address saved.');
+        setWalletAddressStatus(t('client.wallet.saved', 'Wallet address saved.'));
       })
       .catch(function (err) {
-        setWalletAddressStatus(err.message || 'Failed to save wallet address.');
+        setWalletAddressStatus(err.message || t('client.wallet.saveFailed', 'Failed to save wallet address.'));
       })
       .finally(function () {
         if (saveWalletAddressBtn) saveWalletAddressBtn.disabled = false;
@@ -1578,7 +1578,7 @@
         setHistoryStatus('');
       })
       .catch(function (err) {
-        setHistoryStatus(err.message || 'Failed to load transaction history.');
+        setHistoryStatus(err.message || t('client.history.loadFailed', 'Failed to load transaction history.'));
       });
   }
 
@@ -1599,12 +1599,12 @@
         var deposit = res.deposit;
         var status = String(deposit.status || '').toLowerCase();
         if (status === 'credited') {
-          setTopUpStatus('Deposit credited: +' + formatCurrency(deposit.amount || 0) + '.');
+          setTopUpStatus(t('client.topup.creditedPrefix', 'Deposit credited: +') + formatCurrency(deposit.amount || 0) + '.');
           return refreshState().then(function () { return loadHistory(); });
         }
 
         if (status === 'expired' || status === 'invalid') {
-          setTopUpStatus('Deposit ' + status + '. Please create a new one.');
+          setTopUpStatus(t('client.topup.statusPrefix', 'Deposit ') + status + '. ' + t('client.topup.createNew', 'Please create a new one.'));
           return null;
         }
 
@@ -1623,13 +1623,13 @@
     if (!initData) return;
 
     if (topUpBtn) topUpBtn.disabled = true;
-    setTopUpStatus('Creating crypto invoice...');
+    setTopUpStatus(t('client.topup.creatingInvoice', 'Creating crypto invoice...'));
     setWithdrawStatus('');
 
     postJson('/api/payments/deposits/create', { initData: initData || '', amount: 10, currency: 'USD' }, null)
       .then(function (res) {
         if (!(res && res.ok && res.deposit)) {
-          setTopUpStatus('Failed to create deposit invoice.');
+          setTopUpStatus(t('client.topup.createFailed', 'Failed to create deposit invoice.'));
           return;
         }
 
@@ -1640,11 +1640,11 @@
           } catch (e) { }
         }
 
-        setTopUpStatus('Invoice created. Complete payment in BTCPay; status updates every 4s.');
+        setTopUpStatus(t('client.topup.created', 'Invoice created. Complete payment in BTCPay; status updates every 4s.'));
         return pollDepositStatus(deposit.id, 45);
       })
       .catch(function (err) {
-        setTopUpStatus(err.message || 'Failed to create deposit invoice.');
+        setTopUpStatus(err.message || t('client.topup.createFailed', 'Failed to create deposit invoice.'));
       })
       .finally(function () {
         if (topUpBtn) topUpBtn.disabled = false;
@@ -1658,18 +1658,18 @@
     var number = withdrawNumberInputEl ? String(withdrawNumberInputEl.value || '').trim() : '';
 
     if (!Number.isFinite(amount) || amount <= 0) {
-      setWithdrawStatus('Enter a valid withdrawal amount.');
+      setWithdrawStatus(t('client.withdraw.enterValidAmount', 'Enter a valid withdrawal amount.'));
       return;
     }
 
     if (!number && !(walletAddressInputEl && String(walletAddressInputEl.value || '').trim())) {
-      setWithdrawStatus('Enter wallet address or save one first.');
+      setWithdrawStatus(t('client.withdraw.enterAddressOrSave', 'Enter wallet address or save one first.'));
       return;
     }
 
     if (withdrawBtn) withdrawBtn.disabled = true;
     setTopUpStatus('');
-    setWithdrawStatus('Submitting withdrawal request...');
+    setWithdrawStatus(t('client.withdraw.submitting', 'Submitting withdrawal request...'));
 
     postJson('/api/wallet/withdraw', {
       initData: initData || '',
@@ -1678,7 +1678,7 @@
     }, null)
       .then(function (res) {
         if (!(res && res.ok)) {
-          setWithdrawStatus('Withdrawal request failed.');
+          setWithdrawStatus(t('client.withdraw.failed', 'Withdrawal request failed.'));
           return;
         }
 
@@ -1686,11 +1686,18 @@
         renderBalance(latestState.balance);
         if (res.walletAddress && walletAddressInputEl) walletAddressInputEl.value = String(res.walletAddress);
         if (withdrawAmountInputEl) withdrawAmountInputEl.value = '';
-        setWithdrawStatus('Withdrawal request #' + res.requestId + ' submitted for ' + formatCurrency(res.amount) + '. Waiting for admin approval.');
+        setWithdrawStatus(
+          t('client.withdraw.requestPrefix', 'Withdrawal request #')
+          + res.requestId
+          + ' '
+          + t('client.withdraw.submittedFor', 'submitted for ')
+          + formatCurrency(res.amount)
+          + '. '
+          + t('client.withdraw.waitingApproval', 'Waiting for admin approval.'));
         loadHistory();
       })
       .catch(function (err) {
-        setWithdrawStatus(err.message || 'Withdrawal request failed.');
+        setWithdrawStatus(err.message || t('client.withdraw.failed', 'Withdrawal request failed.'));
       })
       .finally(function () {
         if (withdrawBtn) withdrawBtn.disabled = false;

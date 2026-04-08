@@ -43,7 +43,7 @@ public static class LocalizationEndpoints
             }
 
             var user = await users.TouchUserAsync(telegramUserId, ct);
-            var locale = localization.NormalizeLocale(user.PreferredLanguage ?? req.Locale ?? telegramLanguageCode);
+            var locale = localization.NormalizeLocale(user.PreferredLanguage ?? telegramLanguageCode ?? req.Locale);
 
             if (!string.Equals(user.PreferredLanguage, locale, StringComparison.Ordinal))
                 await users.SetPreferredLanguageAsync(telegramUserId, locale, ct);
