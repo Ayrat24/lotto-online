@@ -4,6 +4,9 @@
   var timelineStatusEl = document.getElementById('timelineStatus');
   var topUpBtn = document.getElementById('topUpBtn');
   var topUpStatusEl = document.getElementById('topUpStatus');
+  var copyReferralLinkBtn = document.getElementById('copyReferralLinkBtn');
+  var referralCodeTextEl = document.getElementById('referralCodeText');
+  var referralStatusEl = document.getElementById('referralStatus');
   var withdrawBtn = document.getElementById('withdrawBtn');
   var withdrawStatusEl = document.getElementById('withdrawStatus');
   var withdrawAmountInputEl = document.getElementById('withdrawAmountInput');
@@ -76,6 +79,9 @@
   var autoOpenedTicketsTab = false;
   var activeTabName = 'lottery';
   var historyEntries = [];
+  var referralInviteCode = '';
+  var referralInviteLink = '';
+  var referralCodeFromQuery = '';
   var pickerNumbers = [1, 2, 3, 4, 5];
 
   var LOTTO_NUMBERS_COUNT = 5;
@@ -134,6 +140,10 @@
 
   function setTopUpStatus(text) {
     if (topUpStatusEl) topUpStatusEl.textContent = text || '';
+  }
+
+  function setReferralStatus(text) {
+    if (referralStatusEl) referralStatusEl.textContent = text || '';
   }
 
   function setWithdrawStatus(text) {
@@ -1683,7 +1693,9 @@
         var status = String(deposit.status || '').toLowerCase();
         if (status === 'credited') {
           setTopUpStatus(t('client.topup.creditedPrefix', 'Deposit credited: +') + formatCurrency(deposit.amount || 0) + '.');
-          return refreshState().then(function () { return loadHistory(); });
+          return refreshState()
+            .then(function () { return loadHistory(); })
+            .then(function () { return loadReferralProfile(); });
         }
 
         if (status === 'expired' || status === 'invalid') {
@@ -1732,6 +1744,76 @@
       .finally(function () {
         if (topUpBtn) topUpBtn.disabled = false;
       });
+  }
+
+  function loadReferralProfile() {
+    if (!initData) return Promise.resolve(null);
+
+    return postJson('/api/referrals/me', { initData: initData || '' }, null)
+      .then(function (res) {
+        if (!(res && res.ok && res.profile)) return null;
+
+        var profile = res.profile;
+        referralInviteCode = String(profile.inviteCode || '').trim();
+        referralInviteLink = String(profile.inviteLink || '').trim();
+
+        if (referralCodeTextEl) {
+          referralCodeTextEl.textContent = referralInviteCode || '-';
+        }
+
+        if (profile.isBound) {
+          setReferralStatus(t('client.referral.bound', 'Referral is already linked for this account.'));
+        } else {
+          setReferralStatus('');
+        }
+
+        return profile;
+      })
+      .catch(function () {
+        return null;
+      });
+  }
+
+  function bindReferralCodeFromQuery() {
+    var code = String(referralCodeFromQuery || '').trim();
+    if (!initData || !code) return Promise.resolve(null);
+
+    referralCodeFromQuery = '';
+
+    return postJson('/api/referrals/bind', { initData: initData || '', inviteCode: code }, null)
+      .then(function (res) {
+        if (res && res.ok) {
+          setReferralStatus(t('client.referral.bindSuccess', 'Invite code linked. You will receive a bonus on your first successful crypto deposit.'));
+          return loadReferralProfile();
+        }
+
+        return null;
+      })
+      .catch(function (err) {
+        setReferralStatus(err && err.message ? err.message : t('client.referral.bindFailed', 'Failed to link invite code.'));
+        return null;
+      });
+  }
+
+  function copyReferralLink() {
+    var value = String(referralInviteLink || '').trim();
+    if (!value) {
+      setReferralStatus(t('client.referral.noLink', 'Referral link is not ready yet.'));
+      return;
+    }
+
+    if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(value)
+        .then(function () {
+          setReferralStatus(t('client.referral.copySuccess', 'Invite link copied.'));
+        })
+        .catch(function () {
+          setReferralStatus(t('client.referral.copyFallback', 'Copy failed. Share this code: ') + (referralInviteCode || value));
+        });
+      return;
+    }
+
+    setReferralStatus(t('client.referral.copyFallback', 'Copy failed. Share this code: ') + (referralInviteCode || value));
   }
 
   function withdrawBalance() {
@@ -1820,6 +1902,7 @@
   if (centerPopupConfirmBtn) centerPopupConfirmBtn.addEventListener('click', hideCenterPopup);
   if (centerPopupBackdropEl) centerPopupBackdropEl.addEventListener('click', hideCenterPopup);
   if (topUpBtn) topUpBtn.addEventListener('click', topUpBalance);
+  if (copyReferralLinkBtn) copyReferralLinkBtn.addEventListener('click', copyReferralLink);
   if (withdrawBtn) withdrawBtn.addEventListener('click', withdrawBalance);
   if (saveWalletAddressBtn) saveWalletAddressBtn.addEventListener('click', saveWalletAddress);
   if (openHistoryBtn) openHistoryBtn.addEventListener('click', function () {
@@ -1839,6 +1922,7 @@
 
   var query = new URLSearchParams(search || '');
   var forceLocalDebug = query.get('debug') === '1' || query.get('mode') === 'local-debug';
+  referralCodeFromQuery = String(query.get('ref') || '').trim();
 
   loadLocaleFromCache();
 
@@ -1867,6 +1951,8 @@
 
     loadRemoteLocale(initData)
       .then(function () { return postJson('/api/auth/telegram', { initData: initData }); })
+      .then(function () { return loadReferralProfile(); })
+      .then(function () { return bindReferralCodeFromQuery(); })
       .then(function () { return refreshState(); })
       .then(function () { return loadWalletAddress(); })
       .then(function () { return loadHistory(); })
@@ -1899,6 +1985,8 @@
     initData = Telegram.WebApp.initData;
     loadRemoteLocale(initData)
       .then(function () { return postJson('/api/auth/telegram', { initData: initData }); })
+      .then(function () { return loadReferralProfile(); })
+      .then(function () { return bindReferralCodeFromQuery(); })
       .then(function () { return refreshState(); })
       .then(function () { return loadWalletAddress(); })
       .then(function () { return loadHistory(); })

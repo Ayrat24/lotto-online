@@ -14,13 +14,15 @@ public sealed class PaymentsService : IPaymentsService
     private const string ProviderName = "BTCPay";
     private readonly AppDbContext _db;
     private readonly IWalletService _wallet;
+    private readonly IReferralService _referrals;
     private readonly IBtcPayClient _btcPay;
     private readonly PaymentsOptions _options;
 
-    public PaymentsService(AppDbContext db, IWalletService wallet, IBtcPayClient btcPay, IOptions<PaymentsOptions> options)
+    public PaymentsService(AppDbContext db, IWalletService wallet, IReferralService referrals, IBtcPayClient btcPay, IOptions<PaymentsOptions> options)
     {
         _db = db;
         _wallet = wallet;
+        _referrals = referrals;
         _btcPay = btcPay;
         _options = options.Value;
     }
@@ -226,6 +228,8 @@ public sealed class PaymentsService : IPaymentsService
             Reference = reference,
             CreatedAtUtc = now
         });
+
+        await _referrals.ApplyBonusesForDepositAsync(deposit, now, ct);
     }
 
     private async Task<bool> ApplyDepositStatusFromWebhookAsync(string providerObjectId, string? eventType, DateTimeOffset now, CancellationToken ct)

@@ -17,6 +17,8 @@ public sealed class AppDbContext : DbContext
     public DbSet<CryptoDepositIntent> CryptoDepositIntents => Set<CryptoDepositIntent>();
     public DbSet<PaymentWebhookEvent> PaymentWebhookEvents => Set<PaymentWebhookEvent>();
     public DbSet<LocalizationText> LocalizationTexts => Set<LocalizationText>();
+    public DbSet<ReferralProgramSettings> ReferralProgramSettings => Set<ReferralProgramSettings>();
+    public DbSet<ReferralReward> ReferralRewards => Set<ReferralReward>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -28,14 +30,76 @@ public sealed class AppDbContext : DbContext
             b.HasKey(x => x.Id);
 
             b.HasIndex(x => x.TelegramUserId).IsUnique();
+            b.HasIndex(x => x.InviteCode)
+                .IsUnique()
+                .HasFilter("\"InviteCode\" IS NOT NULL");
 
             b.Property(x => x.TelegramUserId).IsRequired();
             b.Property(x => x.Number).HasMaxLength(64);
             b.Property(x => x.PreferredLanguage).HasMaxLength(8);
             b.Property(x => x.WalletAddress).HasMaxLength(256);
+            b.Property(x => x.InviteCode).HasMaxLength(32);
             b.Property(x => x.Balance).HasPrecision(18, 2).IsRequired();
             b.Property(x => x.CreatedAtUtc).IsRequired();
             b.Property(x => x.LastSeenAtUtc).IsRequired();
+
+            b.HasOne<MiniAppUser>()
+                .WithMany()
+                .HasForeignKey(x => x.ReferredByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ReferralProgramSettings>(b =>
+        {
+            b.ToTable("referral_program_settings");
+            b.HasKey(x => x.Id);
+
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.Enabled).IsRequired();
+            b.Property(x => x.InviterBonusAmount).HasPrecision(18, 2).IsRequired();
+            b.Property(x => x.InviteeBonusAmount).HasPrecision(18, 2).IsRequired();
+            b.Property(x => x.MinQualifyingDepositAmount).HasPrecision(18, 2).IsRequired();
+            b.Property(x => x.EligibilityWindowDays).IsRequired();
+            b.Property(x => x.MonthlyInviterBonusCap).HasPrecision(18, 2).IsRequired();
+            b.Property(x => x.UpdatedByAdmin).HasMaxLength(128);
+            b.Property(x => x.UpdatedAtUtc).IsRequired();
+        });
+
+        modelBuilder.Entity<ReferralReward>(b =>
+        {
+            b.ToTable("referral_rewards");
+            b.HasKey(x => x.Id);
+
+            b.HasOne(x => x.InviterUser)
+                .WithMany()
+                .HasForeignKey(x => x.InviterUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            b.HasOne(x => x.InviteeUser)
+                .WithMany()
+                .HasForeignKey(x => x.InviteeUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            b.HasOne(x => x.RecipientUser)
+                .WithMany()
+                .HasForeignKey(x => x.RecipientUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            b.HasOne(x => x.DepositIntent)
+                .WithMany()
+                .HasForeignKey(x => x.DepositIntentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasIndex(x => new { x.DepositIntentId, x.Type }).IsUnique();
+            b.HasIndex(x => new { x.RecipientUserId, x.Type, x.CreatedAtUtc });
+            b.HasIndex(x => new { x.InviterUserId, x.CreatedAtUtc });
+
+            b.Property(x => x.Type)
+                .HasConversion<string>()
+                .HasMaxLength(32)
+                .IsRequired();
+            b.Property(x => x.Amount).HasPrecision(18, 2).IsRequired();
+            b.Property(x => x.CreatedAtUtc).IsRequired();
         });
 
         modelBuilder.Entity<LocalizationText>(b =>

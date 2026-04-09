@@ -11,6 +11,7 @@ using MiniApp.Features.Timeline;
 using MiniApp.Features.Wallet;
 using MiniApp.Features.Payments;
 using MiniApp.Features.Localization;
+using MiniApp.Features.Referrals;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Polling;
@@ -199,6 +200,7 @@ app.MapTimelineEndpoints();
 app.MapWalletEndpoints();
 app.MapPaymentsEndpoints();
 app.MapLocalizationEndpoints();
+app.MapReferralsEndpoints();
 
 // Small health check / default landing page
 app.MapGet("/", () => Results.Redirect(localDebugEnabled ? "/local-debug" : "/Admin"));

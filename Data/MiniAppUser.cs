@@ -21,6 +21,12 @@ public sealed class MiniAppUser
 
     public string? WalletAddress { get; set; }
 
+    public string? InviteCode { get; set; }
+
+    public long? ReferredByUserId { get; set; }
+
+    public DateTimeOffset? ReferredAtUtc { get; set; }
+
     public decimal Balance { get; set; }
 
     public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;

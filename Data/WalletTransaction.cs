@@ -8,7 +8,9 @@ public enum WalletTransactionType
     WithdrawalConfirmed = 3,
     WithdrawalDeniedRefund = 4,
     WinningsClaimed = 5,
-    CryptoDepositCredited = 6
+    CryptoDepositCredited = 6,
+    ReferralInviterBonus = 7,
+    ReferralInviteeBonus = 8
 }
 
 public sealed class WalletTransaction
