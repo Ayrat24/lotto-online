@@ -6,11 +6,13 @@ public sealed class ReferralService : IReferralService
 {
     private readonly AppDbContext _db;
     private readonly IWalletService _wallet;
+    private readonly ILogger<ReferralService> _logger;
 
-    public ReferralService(AppDbContext db, IWalletService wallet)
+    public ReferralService(AppDbContext db, IWalletService wallet, ILogger<ReferralService> logger)
     {
         _db = db;
         _wallet = wallet;
+        _logger = logger;
     }
 
     public async Task<ReferralProgramSettings> GetSettingsAsync(CancellationToken ct)
@@ -105,22 +107,36 @@ public sealed class ReferralService : IReferralService
     {
         var normalizedCode = NormalizeInviteCode(inviteCode);
         if (string.IsNullOrWhiteSpace(normalizedCode))
+        {
+            _logger.LogWarning("Referral bind failed: code is invalid after normalization. InviteeUserId={InviteeUserId}", inviteeUserId);
             return new ReferralBindResult(false, "Invite code is invalid.");
+        }
 
         var invitee = await _db.Users.SingleAsync(x => x.Id == inviteeUserId, ct);
         if (invitee.ReferredByUserId.HasValue)
+        {
+            _logger.LogWarning("Referral bind failed: invitee already has inviter. InviteeUserId={InviteeUserId}, ExistingInviterUserId={InviterUserId}", inviteeUserId, invitee.ReferredByUserId.Value);
             return new ReferralBindResult(false, "Referral is already bound for this account.");
+        }
 
         var inviter = await _db.Users.SingleOrDefaultAsync(x => x.InviteCode == normalizedCode, ct);
         if (inviter is null)
+        {
+            _logger.LogWarning("Referral bind failed: invite code not found. InviteeUserId={InviteeUserId}, Code={Code}", inviteeUserId, normalizedCode);
             return new ReferralBindResult(false, "Invite code was not found.");
+        }
 
         if (inviter.Id == invitee.Id)
+        {
+            _logger.LogWarning("Referral bind failed: self-referral attempt. InviteeUserId={InviteeUserId}, Code={Code}", inviteeUserId, normalizedCode);
             return new ReferralBindResult(false, "You cannot use your own invite code.");
+        }
 
         invitee.ReferredByUserId = inviter.Id;
         invitee.ReferredAtUtc = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation("Referral bind succeeded. InviteeUserId={InviteeUserId}, InviterUserId={InviterUserId}, Code={Code}", invitee.Id, inviter.Id, normalizedCode);
 
         return new ReferralBindResult(true, null);
     }

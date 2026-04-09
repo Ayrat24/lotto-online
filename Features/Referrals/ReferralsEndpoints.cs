@@ -46,20 +46,33 @@ public static class ReferralsEndpoints
             HttpContext http,
             IConfiguration config,
             IWebHostEnvironment env,
+            ILoggerFactory loggerFactory,
             AppDbContext db,
             IUserService users,
             IReferralService referrals,
             CancellationToken ct) =>
         {
-            var authResult = await TryResolveTelegramUserIdAsync(req.InitData, http, config, env, db, ct);
+            var logger = loggerFactory.CreateLogger("ReferralBind");
+            var initData = req.InitData ?? string.Empty;
+            logger.LogInformation("Referral bind request started. TraceId={TraceId}, InitDataLength={InitDataLength}", http.TraceIdentifier, initData.Length);
+
+            var authResult = await TryResolveTelegramUserIdAsync(initData, http, config, env, db, ct);
             if (authResult.ErrorResult is not null)
+            {
+                logger.LogWarning("Referral bind auth failed. TraceId={TraceId}", http.TraceIdentifier);
                 return authResult.ErrorResult;
+            }
 
             var telegramUserId = authResult.TelegramUserId!.Value;
             var user = await users.TouchUserAsync(telegramUserId, ct);
             var bind = await referrals.BindByCodeAsync(user.Id, req.InviteCode, ct);
             if (!bind.Success)
+            {
+                logger.LogWarning("Referral bind rejected. UserId={UserId}, TelegramUserId={TelegramUserId}, Error={Error}", user.Id, telegramUserId, bind.Error);
                 return Results.BadRequest(new { ok = false, error = bind.Error ?? "Failed to bind invite code." });
+            }
+
+            logger.LogInformation("Referral bind succeeded. UserId={UserId}, TelegramUserId={TelegramUserId}", user.Id, telegramUserId);
 
             var settings = await referrals.GetSettingsAsync(ct);
             return Results.Ok(new

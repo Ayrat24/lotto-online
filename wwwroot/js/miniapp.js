@@ -86,6 +86,7 @@
   var referralInviteCode = '';
   var referralInviteLink = '';
   var referralCodeFromQuery = '';
+  var referralIsBound = false;
   var pickerNumbers = [1, 2, 3, 4, 5];
 
   var LOTTO_NUMBERS_COUNT = 5;
@@ -1768,6 +1769,7 @@
         if (!(res && res.ok && res.profile)) return null;
 
         var profile = res.profile;
+        referralIsBound = !!profile.isBound;
         referralInviteCode = String(profile.inviteCode || '').trim();
         referralInviteLink = String(profile.inviteLink || '').trim();
 
@@ -1777,7 +1779,6 @@
 
         if (profile.isBound) {
           setReferralStatus(t('client.referral.bound', 'Referral is already linked for this account.'));
-          setPromoStatus(t('client.referral.bound', 'Referral is already linked for this account.'));
         } else {
           setReferralStatus('');
         }
@@ -1817,13 +1818,23 @@
         return null;
       })
       .catch(function (err) {
-        setReferralStatus(err && err.message ? err.message : t('client.referral.bindFailed', 'Failed to link invite code.'));
+        var message = err && err.message ? String(err.message) : '';
+        if (message.indexOf('Referral is already bound for this account.') >= 0) {
+          return loadReferralProfile();
+        }
+
+        setReferralStatus(message || t('client.referral.bindFailed', 'Failed to link invite code.'));
         return null;
       });
   }
 
   function applyPromoCode() {
     if (!initData) return;
+
+    if (referralIsBound) {
+      setPromoStatus(t('client.referral.bound', 'Referral is already linked for this account.'));
+      return;
+    }
 
     var code = promoCodeInputEl ? String(promoCodeInputEl.value || '').trim() : '';
     if (!code) {
