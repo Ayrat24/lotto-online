@@ -18,8 +18,14 @@ public static class TelegramAuthEndpoints
             CancellationToken ct) =>
         {
             var logger = loggerFactory.CreateLogger("TelegramAuth");
+            var initData = req.InitData?.Trim() ?? string.Empty;
 
-            if (LocalDebugMode.TryGetDebugTelegramUserId(http, config, env, out var debugTelegramUserId))
+            var usesExplicitLocalDebug =
+                string.Equals(initData, "local-debug", StringComparison.OrdinalIgnoreCase)
+                || http.Request.Headers.ContainsKey("X-Dev-TelegramUserId");
+
+            if (usesExplicitLocalDebug
+                && LocalDebugMode.TryGetDebugTelegramUserId(http, config, env, out var debugTelegramUserId))
             {
                 await LocalDebugSeed.EnsureSeededAsync(db, debugTelegramUserId, ct);
                 var debugUser = await users.TouchUserAsync(debugTelegramUserId, ct);
@@ -37,7 +43,7 @@ public static class TelegramAuthEndpoints
             if (string.IsNullOrWhiteSpace(botToken))
                 return Results.Problem("BotToken is not configured.", statusCode: 500);
 
-            if (!TelegramInitDataValidator.TryValidateInitData(req.InitData, botToken, TimeSpan.FromMinutes(10), out var tgUser, out var error))
+            if (!TelegramInitDataValidator.TryValidateInitData(initData, botToken, TimeSpan.FromMinutes(10), out var tgUser, out var error))
             {
                 logger.LogWarning("Telegram initData validation failed: {Error}", error);
 
