@@ -90,6 +90,7 @@ internal static class LocalizationDefaults
             ["client.history.status.unknown"] = ("Unknown", "Неизвестно", "Noma'lum"),
             ["client.debug.forcedLocal"] = ("Client debug mode: forced local debug via query parameter.", "Режим отладки клиента: локальная отладка принудительно включена через параметр запроса.", "Mijoz nosozliklarni tuzatish rejimi: so'rov parametri orqali mahalliy debug majburan yoqildi."),
             ["client.debug.missingInitData"] = ("Client debug mode: Telegram initData is missing, using local debug.", "Режим отладки клиента: отсутствует Telegram initData, используется локальная отладка.", "Mijoz nosozliklarni tuzatish rejimi: Telegram initData yo'q, mahalliy debug ishlatilmoqda."),
+            ["client.localizationDebug.title"] = ("Localization debug", "Отладка локализации", "Lokalizatsiya diagnostikasi"),
             ["client.topup.creditedPrefix"] = ("Deposit credited: +", "Пополнение зачислено: +", "To'ldirish hisobga o'tkazildi: +"),
             ["client.topup.statusPrefix"] = ("Deposit ", "Пополнение ", "To'ldirish "),
             ["client.topup.createNew"] = ("Please create a new one.", "Пожалуйста, создайте новое.", "Iltimos, yangisini yarating."),

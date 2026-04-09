@@ -23,7 +23,7 @@ public static class LocalizationEndpoints
 
             long telegramUserId;
             string? telegramLanguageCode = null;
-            var initData = req.InitData?.Trim() ?? string.Empty;
+            var initData = req.InitData.Trim();
 
             var usesExplicitLocalDebug =
                 string.Equals(initData, "local-debug", StringComparison.OrdinalIgnoreCase)
@@ -42,22 +42,40 @@ public static class LocalizationEndpoints
                     return Results.Problem("BotToken is not configured.", statusCode: 500);
 
                 if (!TelegramInitDataValidator.TryValidateInitData(initData, botToken, TimeSpan.FromMinutes(10), out var tgUser, out _))
-                    return Results.Json(new LocalizationBootstrapResult(false, "en", "0", new Dictionary<string, string>(), "Unauthorized"), statusCode: StatusCodes.Status401Unauthorized);
+                {
+                    var unauthorizedDebug = new LocalizationBootstrapDebugInfo(
+                        UsesExplicitLocalDebug: usesExplicitLocalDebug,
+                        RequestLocale: req.Locale,
+                        TelegramLanguageCode: null,
+                        PreferredLanguageBeforeSave: null,
+                        ResolvedLocale: "en");
+
+                    return Results.Json(
+                        new LocalizationBootstrapResult(false, "en", "0", new Dictionary<string, string>(), "Unauthorized", unauthorizedDebug),
+                        statusCode: StatusCodes.Status401Unauthorized);
+                }
 
                 telegramUserId = tgUser!.Id;
                 telegramLanguageCode = tgUser.LanguageCode;
             }
 
             var user = await users.TouchUserAsync(telegramUserId, ct);
-            var locale = localization.NormalizeLocale(user.PreferredLanguage ?? telegramLanguageCode ?? req.Locale);
+            var preferredLanguageBeforeSave = user.PreferredLanguage;
+            var locale = localization.NormalizeLocale(preferredLanguageBeforeSave ?? telegramLanguageCode ?? req.Locale);
 
             if (!string.Equals(user.PreferredLanguage, locale, StringComparison.Ordinal))
                 await users.SetPreferredLanguageAsync(telegramUserId, locale, ct);
 
             var dict = await localization.GetDictionaryAsync(locale, ct);
             var version = await localization.GetVersionAsync(ct);
+            var debug = new LocalizationBootstrapDebugInfo(
+                UsesExplicitLocalDebug: usesExplicitLocalDebug,
+                RequestLocale: req.Locale,
+                TelegramLanguageCode: telegramLanguageCode,
+                PreferredLanguageBeforeSave: preferredLanguageBeforeSave,
+                ResolvedLocale: locale);
 
-            return Results.Ok(new LocalizationBootstrapResult(true, locale, version, dict));
+            return Results.Ok(new LocalizationBootstrapResult(true, locale, version, dict, null, debug));
         });
 
         endpoints.MapGet("/api/admin/localization", async (ILocalizationService localization, CancellationToken ct) =>
