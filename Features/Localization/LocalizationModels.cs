@@ -7,7 +7,10 @@ public sealed record LocalizationBootstrapDebugInfo(
 	string? RequestLocale,
 	string? TelegramLanguageCode,
 	string? PreferredLanguageBeforeSave,
-	string ResolvedLocale);
+	string ResolvedLocale,
+	string? FailureStage = null,
+	string? TraceId = null,
+	string? FailureDetails = null);
 
 public sealed record LocalizationBootstrapResult(
 	bool Ok,

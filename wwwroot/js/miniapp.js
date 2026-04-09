@@ -1439,10 +1439,45 @@
       body: JSON.stringify(payload)
     }).then(function (r) {
       if (!r.ok) {
-        return r.json().catch(function () { return null; }).then(function (body) {
-          var msg = (body && body.error) ? body.error : ('HTTP ' + r.status);
+        return r.text().then(function (rawBody) {
+          var body = null;
+          if (rawBody) {
+            try {
+              body = JSON.parse(rawBody);
+            } catch (e) {
+              body = null;
+            }
+          }
+
+          var msg = '';
+          if (body && typeof body === 'object') {
+            msg = String(
+              body.error
+              || body.detail
+              || body.title
+              || body.message
+              || '').trim();
+          }
+
+          if (!msg) {
+            msg = (rawBody || '').trim();
+          }
+
+          if (!msg) {
+            msg = 'HTTP ' + r.status;
+          }
+
+          var traceId = body && typeof body === 'object'
+            ? (body.traceId || (body.debug && body.debug.traceId) || null)
+            : null;
+          if (traceId) {
+            msg += ' [traceId: ' + traceId + ']';
+          }
+
           var err = new Error(msg);
           err.status = r.status;
+          err.body = body;
+          err.rawBody = rawBody;
           throw err;
         });
       }
