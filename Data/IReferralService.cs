@@ -16,6 +16,8 @@ public interface IReferralService
 
     Task<ReferralProfileResult> GetProfileAsync(long userId, CancellationToken ct);
 
+    Task<ReferralCodeCheckResult> CheckCodeAsync(long inviteeUserId, string inviteCode, CancellationToken ct);
+
     Task<ReferralBindResult> BindByCodeAsync(long inviteeUserId, string inviteCode, CancellationToken ct);
 
     Task ApplyBonusesForDepositAsync(CryptoDepositIntent deposit, DateTimeOffset now, CancellationToken ct);
@@ -32,4 +34,6 @@ public sealed record ReferralProfileResult(
     decimal MonthInviterCap);
 
 public sealed record ReferralBindResult(bool Success, string? Error);
+
+public sealed record ReferralCodeCheckResult(bool Success, string? Error, long? InviterUserId = null);
 

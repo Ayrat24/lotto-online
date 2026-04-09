@@ -1843,10 +1843,19 @@
     }
 
     if (applyPromoBtn) applyPromoBtn.disabled = true;
-    setPromoStatus(t('client.promo.applying', 'Applying promo code...'));
+    setPromoStatus(t('client.promo.checking', 'Checking promo code...'));
 
-    postJson('/api/referrals/bind', { initData: initData || '', inviteCode: code }, null)
+    postJson('/api/referrals/check', { initData: initData || '', inviteCode: code }, null)
+      .then(function (checkRes) {
+        if (!(checkRes && checkRes.ok)) {
+          setPromoStatus(t('client.promo.applyFailed', 'Promo code is invalid or cannot be applied.'));
+          return null;
+        }
+
+        return postJson('/api/referrals/bind', { initData: initData || '', inviteCode: code }, null);
+      })
       .then(function (res) {
+        if (!res) return;
         if (!(res && res.ok)) {
           setPromoStatus(t('client.promo.applyFailed', 'Promo code is invalid or cannot be applied.'));
           return;

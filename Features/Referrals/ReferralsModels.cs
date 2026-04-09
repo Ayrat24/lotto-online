@@ -2,6 +2,8 @@ namespace MiniApp.Features.Referrals;
 
 public sealed record ReferralProfileRequest(string InitData);
 
+public sealed record ReferralCheckRequest(string InitData, string InviteCode);
+
 public sealed record ReferralBindRequest(string InitData, string InviteCode);
 
 public sealed record ReferralProfileDto(

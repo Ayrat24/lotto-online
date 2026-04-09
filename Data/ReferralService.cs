@@ -141,6 +141,41 @@ public sealed class ReferralService : IReferralService
         return new ReferralBindResult(true, null);
     }
 
+    public async Task<ReferralCodeCheckResult> CheckCodeAsync(long inviteeUserId, string inviteCode, CancellationToken ct)
+    {
+        var normalizedCode = NormalizeInviteCode(inviteCode);
+        if (string.IsNullOrWhiteSpace(normalizedCode))
+        {
+            _logger.LogWarning("Referral check failed: code is invalid after normalization. InviteeUserId={InviteeUserId}", inviteeUserId);
+            return new ReferralCodeCheckResult(false, "Invite code is invalid.");
+        }
+
+        var invitee = await _db.Users.SingleAsync(x => x.Id == inviteeUserId, ct);
+        if (invitee.ReferredByUserId.HasValue)
+        {
+            _logger.LogWarning("Referral check failed: invitee already has inviter. InviteeUserId={InviteeUserId}, ExistingInviterUserId={InviterUserId}", inviteeUserId, invitee.ReferredByUserId.Value);
+            return new ReferralCodeCheckResult(false, "Referral is already bound for this account.");
+        }
+
+        var inviter = await _db.Users
+            .AsNoTracking()
+            .SingleOrDefaultAsync(x => x.InviteCode == normalizedCode, ct);
+        if (inviter is null)
+        {
+            _logger.LogWarning("Referral check failed: invite code not found. InviteeUserId={InviteeUserId}, Code={Code}", inviteeUserId, normalizedCode);
+            return new ReferralCodeCheckResult(false, "Invite code was not found.");
+        }
+
+        if (inviter.Id == invitee.Id)
+        {
+            _logger.LogWarning("Referral check failed: self-referral attempt. InviteeUserId={InviteeUserId}, Code={Code}", inviteeUserId, normalizedCode);
+            return new ReferralCodeCheckResult(false, "You cannot use your own invite code.");
+        }
+
+        _logger.LogInformation("Referral check succeeded. InviteeUserId={InviteeUserId}, InviterUserId={InviterUserId}, Code={Code}", invitee.Id, inviter.Id, normalizedCode);
+        return new ReferralCodeCheckResult(true, null, inviter.Id);
+    }
+
     public async Task ApplyBonusesForDepositAsync(CryptoDepositIntent deposit, DateTimeOffset now, CancellationToken ct)
     {
         if (deposit.CreditedAtUtc is null)

@@ -113,6 +113,7 @@ internal static class LocalizationDefaults
             ["client.referral.copySuccess"] = ("Invite link copied.", "Ссылка приглашения скопирована.", "Taklif havolasi nusxalandi."),
             ["client.referral.copyFallback"] = ("Copy failed. Share this code: ", "Не удалось скопировать. Отправьте этот код: ", "Nusxalab bo'lmadi. Shu kodni ulashing: "),
             ["client.promo.enterCode"] = ("Enter promo code first.", "Сначала введите промокод.", "Avval promokodni kiriting."),
+            ["client.promo.checking"] = ("Checking promo code...", "Проверка промокода...", "Promokod tekshirilmoqda..."),
             ["client.promo.applying"] = ("Applying promo code...", "Применение промокода...", "Promokod qo'llanmoqda..."),
             ["client.promo.applyFailed"] = ("Promo code is invalid or cannot be applied.", "Промокод недействителен или не может быть применен.", "Promokod yaroqsiz yoki qo'llab bo'lmaydi."),
             ["client.promo.applied"] = ("Promo code applied.", "Промокод применен.", "Promokod qo'llandi."),
