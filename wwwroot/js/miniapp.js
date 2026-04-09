@@ -52,8 +52,6 @@
   var myTicketsEmptyEl = document.getElementById('myTicketsEmpty');
   var myTicketsListEl = document.getElementById('myTicketsList');
   var debugModeBadgeEl = document.getElementById('debugModeBadge');
-  var localizationDebugPanelEl = document.getElementById('localizationDebugPanel');
-  var localizationDebugLogEl = document.getElementById('localizationDebugLog');
 
   var ticketPickerSheetEl = document.getElementById('ticketPickerSheet');
   var ticketPickerBackdropEl = document.getElementById('ticketPickerBackdrop');
@@ -103,8 +101,6 @@
   var pickerOpenAnimationTimer = null;
   var pollingIntervalId = null;
   var debugModeBadgeReason = '';
-  var localizationDebugEnabled = true;
-  var localizationDebugEntries = [];
 
   function getDebugModeBadgeText(reason) {
     if (reason === 'forced-local') {
@@ -116,34 +112,6 @@
     }
 
     return '';
-  }
-
-  function writeLocalizationDebug(message, details) {
-    if (!localizationDebugEnabled) return;
-    if (!localizationDebugPanelEl || !localizationDebugLogEl) return;
-
-    var nowText = '';
-    try {
-      nowText = new Date().toLocaleTimeString(getIntlLocale());
-    } catch (e) {
-      nowText = '';
-    }
-
-    var line = (nowText ? ('[' + nowText + '] ') : '') + String(message || '');
-    if (details && typeof details === 'object') {
-      try {
-        line += ' ' + JSON.stringify(details);
-      } catch (e) {
-      }
-    }
-
-    localizationDebugEntries.push(line);
-    if (localizationDebugEntries.length > 30) {
-      localizationDebugEntries = localizationDebugEntries.slice(localizationDebugEntries.length - 30);
-    }
-
-    localizationDebugLogEl.textContent = localizationDebugEntries.join('\n');
-    localizationDebugPanelEl.hidden = false;
   }
 
   function reapplyLocalizedRuntimeTexts() {
@@ -236,28 +204,16 @@
   function loadLocaleFromCache() {
     try {
       var raw = localStorage.getItem('miniapp.locale.bootstrap.v1');
-      if (!raw) {
-        writeLocalizationDebug('locale cache miss');
-        return;
-      }
+      if (!raw) return;
 
       var parsed = JSON.parse(raw);
-      if (!parsed || !parsed.locale || !parsed.strings) {
-        writeLocalizationDebug('locale cache invalid');
-        return;
-      }
+      if (!parsed || !parsed.locale || !parsed.strings) return;
 
       localeCode = String(parsed.locale || 'en');
       localeVersion = String(parsed.version || '0');
       localeStrings = parsed.strings || {};
       applyLocalizedDomTexts();
-      writeLocalizationDebug('locale cache applied', {
-        locale: localeCode,
-        version: localeVersion,
-        keys: Object.keys(localeStrings || {}).length
-      });
     } catch (e) {
-      writeLocalizationDebug('locale cache read failed', { error: String(e && e.message || e) });
     }
   }
 
@@ -273,41 +229,20 @@
   }
 
   function loadRemoteLocale(initDataValue) {
-    writeLocalizationDebug('requesting remote locale', {
-      requestLocale: localeCode,
-      hasInitData: !!(initDataValue && String(initDataValue).length > 0),
-      isLocalDebugRequest: String(initDataValue || '') === 'local-debug'
-    });
-
     return postJson('/api/localization/bootstrap', {
       initData: initDataValue || '',
       locale: localeCode
     }, null)
       .then(function (res) {
-        if (!(res && res.ok && res.locale && res.strings)) {
-          writeLocalizationDebug('remote locale response invalid', res || null);
-          return;
-        }
+        if (!(res && res.ok && res.locale && res.strings)) return;
 
         localeCode = String(res.locale || 'en');
         localeVersion = String(res.version || '0');
         localeStrings = res.strings || {};
         saveLocaleToCache();
         applyLocalizedDomTexts();
-
-        writeLocalizationDebug('remote locale applied', {
-          locale: localeCode,
-          version: localeVersion,
-          keys: Object.keys(localeStrings || {}).length,
-          debug: res.debug || null
-        });
       })
-      .catch(function (err) {
-        writeLocalizationDebug('remote locale failed', {
-          error: String(err && err.message || err),
-          status: err && err.status ? err.status : null,
-          debug: err && err.body && err.body.debug ? err.body.debug : null
-        });
+      .catch(function () {
         // Keep cached/fallback locale silently.
       });
   }
@@ -1498,10 +1433,6 @@
 
   function handleAuthFailure(err) {
     var status = err && err.status;
-    writeLocalizationDebug('auth failure', {
-      status: status || null,
-      error: String(err && err.message || '')
-    });
     markAppReady();
     if (status === 401) {
       setTimelineStatus(t('client.status.authOpenFromTelegram', 'Authentication failed. Open this app from Telegram, or use the local debug profile in Development.'));
@@ -1908,14 +1839,6 @@
 
   var query = new URLSearchParams(search || '');
   var forceLocalDebug = query.get('debug') === '1' || query.get('mode') === 'local-debug';
-  localizationDebugEnabled = localizationDebugEnabled || forceLocalDebug || query.get('locdebug') === '1';
-
-  if (localizationDebugEnabled) {
-    writeLocalizationDebug('localization debug enabled', {
-      forceLocalDebug: forceLocalDebug,
-      queryMode: query.get('mode') || null
-    });
-  }
 
   loadLocaleFromCache();
 
@@ -1937,10 +1860,8 @@
 
   if (forceLocalDebug || !hasTelegramInitData) {
     clientIsLocalDebug = true;
-    localizationDebugEnabled = true;
     debugModeBadgeReason = forceLocalDebug ? 'forced-local' : 'missing-init-data';
     setDebugModeBadge(getDebugModeBadgeText(debugModeBadgeReason));
-    writeLocalizationDebug('starting local debug bootstrap', { reason: debugModeBadgeReason });
 
     initData = 'local-debug';
 
@@ -1963,7 +1884,6 @@
   setDebugModeBadge('');
   debugModeBadgeReason = '';
   clientIsLocalDebug = false;
-  writeLocalizationDebug('starting telegram bootstrap', { hasTelegramInitData: hasTelegramInitData });
 
 
   try {
