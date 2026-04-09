@@ -184,10 +184,12 @@ public sealed class LocalizationService : ILocalizationService
     {
         await EnsureDefaultsAsync(ct);
 
-        var ticks = await _db.LocalizationTexts
+        var latestUpdatedAt = await _db.LocalizationTexts
             .AsNoTracking()
-            .Select(x => (long?)x.UpdatedAtUtc.UtcTicks)
-            .MaxAsync(ct) ?? 0L;
+            .Select(x => (DateTimeOffset?)x.UpdatedAtUtc)
+            .MaxAsync(ct);
+
+        var ticks = latestUpdatedAt?.UtcTicks ?? 0L;
 
         return ticks.ToString();
     }
