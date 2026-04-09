@@ -303,7 +303,11 @@
         });
       })
       .catch(function (err) {
-        writeLocalizationDebug('remote locale failed', { error: String(err && err.message || err) });
+        writeLocalizationDebug('remote locale failed', {
+          error: String(err && err.message || err),
+          status: err && err.status ? err.status : null,
+          debug: err && err.body && err.body.debug ? err.body.debug : null
+        });
         // Keep cached/fallback locale silently.
       });
   }
@@ -1481,11 +1485,7 @@
           }
 
           var err = new Error(msg);
-        writeLocalizationDebug('remote locale failed', {
-          error: String(err && err.message || err),
-          status: err && err.status ? err.status : null,
-          debug: err && err.body && err.body.debug ? err.body.debug : null
-        });
+          err.status = r.status;
           err.body = body;
           err.rawBody = rawBody;
           throw err;

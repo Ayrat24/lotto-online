@@ -64,7 +64,20 @@ public sealed class LocalizationService : ILocalizationService
     public async Task EnsureDefaultsAsync(CancellationToken ct)
     {
         var now = DateTimeOffset.UtcNow;
-        var existing = await _db.LocalizationTexts.ToDictionaryAsync(x => x.Key, StringComparer.Ordinal, ct);
+        var existingRows = await _db.LocalizationTexts
+            .OrderByDescending(x => x.UpdatedAtUtc)
+            .ToListAsync(ct);
+
+        var existing = new Dictionary<string, LocalizationText>(StringComparer.Ordinal);
+        foreach (var row in existingRows)
+        {
+            if (string.IsNullOrWhiteSpace(row.Key))
+                continue;
+
+            // If duplicates exist in legacy data, keep the latest row by UpdatedAtUtc.
+            if (!existing.ContainsKey(row.Key))
+                existing[row.Key] = row;
+        }
         var changed = false;
 
         foreach (var pair in LocalizationDefaults.Entries)
@@ -149,15 +162,19 @@ public sealed class LocalizationService : ILocalizationService
             .OrderBy(x => x.Key)
             .ToListAsync(ct);
 
-        var dict = rows.ToDictionary(
-            x => x.Key,
-            x => normalizedLocale switch
+        var dict = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var row in rows.OrderByDescending(x => x.UpdatedAtUtc))
+        {
+            if (string.IsNullOrWhiteSpace(row.Key) || dict.ContainsKey(row.Key))
+                continue;
+
+            dict[row.Key] = normalizedLocale switch
             {
-                "ru" => x.RussianValue,
-                "uz" => x.UzbekValue,
-                _ => x.EnglishValue
-            },
-            StringComparer.Ordinal);
+                "ru" => row.RussianValue,
+                "uz" => row.UzbekValue,
+                _ => row.EnglishValue
+            };
+        }
 
         _cache.Set(cacheKey, dict, TimeSpan.FromMinutes(1));
         return dict;
