@@ -113,11 +113,6 @@ public sealed class ReferralService : IReferralService
         }
 
         var invitee = await _db.Users.SingleAsync(x => x.Id == inviteeUserId, ct);
-        if (invitee.ReferredByUserId.HasValue)
-        {
-            _logger.LogWarning("Referral bind failed: invitee already has inviter. InviteeUserId={InviteeUserId}, ExistingInviterUserId={InviterUserId}", inviteeUserId, invitee.ReferredByUserId.Value);
-            return new ReferralBindResult(false, "Referral is already bound for this account.");
-        }
 
         var inviter = await _db.Users.SingleOrDefaultAsync(x => x.InviteCode == normalizedCode, ct);
         if (inviter is null)
@@ -132,6 +127,7 @@ public sealed class ReferralService : IReferralService
             return new ReferralBindResult(false, "You cannot use your own invite code.");
         }
 
+        // Debug mode behavior: allow re-binding to simplify promo flow diagnostics.
         invitee.ReferredByUserId = inviter.Id;
         invitee.ReferredAtUtc = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
@@ -151,11 +147,6 @@ public sealed class ReferralService : IReferralService
         }
 
         var invitee = await _db.Users.SingleAsync(x => x.Id == inviteeUserId, ct);
-        if (invitee.ReferredByUserId.HasValue)
-        {
-            _logger.LogWarning("Referral check failed: invitee already has inviter. InviteeUserId={InviteeUserId}, ExistingInviterUserId={InviterUserId}", inviteeUserId, invitee.ReferredByUserId.Value);
-            return new ReferralCodeCheckResult(false, "Referral is already bound for this account.");
-        }
 
         var inviter = await _db.Users
             .AsNoTracking()
