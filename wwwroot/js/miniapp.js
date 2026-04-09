@@ -100,6 +100,29 @@
   var pickerWheelSyncLockedUntil = 0;
   var pickerOpenAnimationTimer = null;
   var pollingIntervalId = null;
+  var debugModeBadgeReason = '';
+
+  function getDebugModeBadgeText(reason) {
+    if (reason === 'forced-local') {
+      return t('client.debug.forcedLocal', 'Client debug mode: forced local debug via query parameter.');
+    }
+
+    if (reason === 'missing-init-data') {
+      return t('client.debug.missingInitData', 'Client debug mode: Telegram initData is missing, using local debug.');
+    }
+
+    return '';
+  }
+
+  function reapplyLocalizedRuntimeTexts() {
+    renderCurrentDraw(latestState.currentDraw || null, latestState.currentTickets || []);
+    renderMyTickets(latestState);
+    renderHistory();
+
+    if (clientIsLocalDebug && debugModeBadgeReason) {
+      setDebugModeBadge(getDebugModeBadgeText(debugModeBadgeReason));
+    }
+  }
 
   function setPurchaseStatus(text) {
     if (purchaseStatusEl) purchaseStatusEl.textContent = text || '';
@@ -174,6 +197,8 @@
       document.documentElement.lang = localeCode || 'en';
     } catch (e) {
     }
+
+    reapplyLocalizedRuntimeTexts();
   }
 
   function loadLocaleFromCache() {
@@ -240,9 +265,15 @@
     }
   }
 
+  function getIntlLocale() {
+    if (localeCode === 'ru') return 'ru-RU';
+    if (localeCode === 'uz') return 'uz-UZ';
+    return 'en-US';
+  }
+
   function formatUtc(iso) {
     try {
-      return new Date(iso).toLocaleString();
+      return new Date(iso).toLocaleString(getIntlLocale());
     } catch (e) {
       return String(iso || '');
     }
@@ -251,19 +282,19 @@
   function formatPrizePool(value) {
     var amount = Number(value || 0);
     if (!Number.isFinite(amount)) amount = 0;
-    return amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return amount.toLocaleString(getIntlLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
   function formatJackpot(value) {
     var amount = Number(value || 0);
     if (!Number.isFinite(amount)) amount = 0;
-    return '$' + Math.round(amount).toLocaleString();
+    return '$' + Math.round(amount).toLocaleString(getIntlLocale());
   }
 
   function formatCurrency(value) {
     var amount = Number(value || 0);
     if (!Number.isFinite(amount)) amount = 0;
-    return '$' + amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return '$' + amount.toLocaleString(getIntlLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
   function renderBalance(balanceValue) {
@@ -295,7 +326,7 @@
   function showCenterPopup(message) {
     if (!centerPopupEl || !centerPopupMessageEl) return;
 
-    centerPopupMessageEl.textContent = String(message || '').trim() || 'Action cannot be completed.';
+    centerPopupMessageEl.textContent = String(message || '').trim() || t('client.popup.defaultError', 'Action cannot be completed.');
     centerPopupEl.hidden = false;
   }
 
@@ -864,6 +895,15 @@
     return { label: t('client.ticket.status.awaiting', 'Waiting for draw'), className: 'ticket-status-awaiting' };
   }
 
+  function formatDrawStateLabel(state) {
+    var value = String(state || '').toLowerCase();
+    if (value === 'active') return t('client.draw.state.active', 'active');
+    if (value === 'finished') return t('client.draw.state.finished', 'finished');
+    if (value === 'upcoming') return t('client.draw.state.upcoming', 'upcoming');
+    if (value === 'waiting') return t('client.currentDraw.waiting', 'waiting');
+    return value || t('client.draw.state.unknown', 'unknown');
+  }
+
   function createTicketEl(ticket, draw) {
     var el = document.createElement('div');
     el.className = 'ticket';
@@ -883,7 +923,7 @@
 
     var title = document.createElement('div');
     title.className = 'ticket-title';
-    title.textContent = 'Ticket #' + ticket.id;
+    title.textContent = t('client.ticket.titlePrefix', 'Ticket #') + ticket.id;
 
     var meta = document.createElement('div');
     meta.className = 'ticket-meta';
@@ -953,7 +993,7 @@
     if (draw) {
       var info = document.createElement('div');
       info.className = 'draw-header-label';
-      info.textContent = t('client.history.statePrefix', 'State:') + ' ' + draw.state + ' • ' + t('client.history.prizePoolPrefix', 'Prize pool:') + ' ' + formatPrizePool(draw.prizePool);
+      info.textContent = t('client.history.statePrefix', 'State:') + ' ' + formatDrawStateLabel(draw.state) + ' • ' + t('client.history.prizePoolPrefix', 'Prize pool:') + ' ' + formatPrizePool(draw.prizePool);
       header.appendChild(info);
 
       if (draw.numbers) {
@@ -989,7 +1029,7 @@
       currentDrawStateBadgeEl.className = 'state-badge state-badge-muted';
       currentDrawEmptyEl.hidden = false;
       currentDrawContentEl.hidden = true;
-      if (currentDrawIdEl) currentDrawIdEl.textContent = 'PowerBall Global';
+      if (currentDrawIdEl) currentDrawIdEl.textContent = t('client.draw.gameTitle', 'PowerBall Global');
       if (currentDrawPrizePoolEl) currentDrawPrizePoolEl.textContent = '$0.00';
       if (currentDrawCreatedAtEl) currentDrawCreatedAtEl.textContent = t('client.jackpot.endsIn', 'Ends in --:--:--');
       if (jackpotAmountEl) jackpotAmountEl.textContent = '$0';
@@ -1012,12 +1052,12 @@
 
     var isFinishedDraw = draw.state === 'finished';
 
-    currentDrawStateBadgeEl.textContent = draw.state;
+    currentDrawStateBadgeEl.textContent = formatDrawStateLabel(draw.state);
     currentDrawStateBadgeEl.className = 'state-badge ' + (draw.state === 'active' ? 'state-badge-active' : draw.state === 'finished' ? 'state-badge-finished' : 'state-badge-upcoming');
     currentDrawEmptyEl.hidden = true;
     currentDrawContentEl.hidden = false;
 
-    if (currentDrawIdEl) currentDrawIdEl.textContent = 'PowerBall Global • #' + draw.id;
+    if (currentDrawIdEl) currentDrawIdEl.textContent = t('client.draw.gameTitle', 'PowerBall Global') + ' • #' + draw.id;
     if (currentDrawPrizePoolEl) currentDrawPrizePoolEl.textContent = '$' + formatPrizePool(draw.prizePool);
     if (currentDrawCreatedAtEl) currentDrawCreatedAtEl.textContent = (draw.state === 'finished' ? t('client.currentDraw.concludedPrefix', 'Concluded ') : t('client.currentDraw.openedPrefix', 'Opened ')) + formatUtc(draw.createdAtUtc);
     if (jackpotAmountEl) jackpotAmountEl.textContent = formatJackpot(draw.prizePool);
@@ -1104,13 +1144,13 @@
 
   function formatHistoryStatusLabel(status) {
     var normalized = String(status || '').toLowerCase();
-    if (normalized === 'waiting_for_admin_approval') return 'Waiting for admin approval';
-    if (normalized === 'rejected') return 'Rejected';
-    if (normalized === 'paid') return 'Paid';
-    if (normalized === 'processing') return 'Processing';
-    if (normalized === 'expired') return 'Expired';
-    if (normalized === 'invalid') return 'Invalid';
-    return normalized || 'Unknown';
+    if (normalized === 'waiting_for_admin_approval') return t('client.history.status.waiting_for_admin_approval', 'Waiting for admin approval');
+    if (normalized === 'rejected') return t('client.history.status.rejected', 'Rejected');
+    if (normalized === 'paid') return t('client.history.status.paid', 'Paid');
+    if (normalized === 'processing') return t('client.history.status.processing', 'Processing');
+    if (normalized === 'expired') return t('client.history.status.expired', 'Expired');
+    if (normalized === 'invalid') return t('client.history.status.invalid', 'Invalid');
+    return normalized || t('client.history.status.unknown', 'Unknown');
   }
 
   function getHistoryStatusClass(status) {
@@ -1125,7 +1165,9 @@
   }
 
   function formatHistoryKind(kind) {
-    return String(kind || '').toLowerCase() === 'payout' ? 'Payout' : 'Top up';
+    return String(kind || '').toLowerCase() === 'payout'
+      ? t('client.history.kind.payout', 'Payout')
+      : t('client.history.kind.topup', 'Top up');
   }
 
   function renderHistory() {
@@ -1604,7 +1646,7 @@
         }
 
         if (status === 'expired' || status === 'invalid') {
-          setTopUpStatus(t('client.topup.statusPrefix', 'Deposit ') + status + '. ' + t('client.topup.createNew', 'Please create a new one.'));
+          setTopUpStatus(t('client.topup.statusPrefix', 'Deposit ') + formatHistoryStatusLabel(status) + '. ' + t('client.topup.createNew', 'Please create a new one.'));
           return null;
         }
 
@@ -1777,9 +1819,8 @@
 
   if (forceLocalDebug || !hasTelegramInitData) {
     clientIsLocalDebug = true;
-    setDebugModeBadge(forceLocalDebug
-      ? 'Client debug mode: forced local debug via query parameter.'
-      : 'Client debug mode: Telegram initData is missing, using local debug.');
+    debugModeBadgeReason = forceLocalDebug ? 'forced-local' : 'missing-init-data';
+    setDebugModeBadge(getDebugModeBadgeText(debugModeBadgeReason));
 
     initData = 'local-debug';
 
@@ -1800,6 +1841,7 @@
   }
 
   setDebugModeBadge('');
+  debugModeBadgeReason = '';
   clientIsLocalDebug = false;
 
 

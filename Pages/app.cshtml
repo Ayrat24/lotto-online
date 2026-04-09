@@ -6,7 +6,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="robots" content="noindex, nofollow" />
-  <title>Lotto</title>
+  <title data-loc="client.app.title">Lotto</title>
 
   <meta name="theme-color" content="#0b1019" />
   <meta name="msapplication-navbutton-color" content="#0b1019" />
@@ -57,7 +57,7 @@
         <div class="loading-skeleton loading-skeleton-ticket"></div>
       </section>
 
-      <nav class="loading-shell-tabbar" aria-label="Loading tabs">
+      <nav class="loading-shell-tabbar" aria-label="Loading tabs" data-loc-aria-label="client.loading.tabsAria">
         <div class="loading-skeleton loading-skeleton-tab"></div>
         <div class="loading-skeleton loading-skeleton-tab"></div>
         <div class="loading-skeleton loading-skeleton-tab"></div>
@@ -107,7 +107,7 @@
         <div class="draw-accent"></div>
         <div class="section-header">
           <div>
-            <div class="section-title" id="currentDrawId">PowerBall Global</div>
+            <div class="section-title" id="currentDrawId" data-loc="client.draw.gameTitle">PowerBall Global</div>
             <div class="section-subtitle" id="currentDrawSubtitle" data-loc="client.currentDraw.subtitle">Next draw and ticket purchase</div>
           </div>
           <div id="currentDrawStateBadge" class="state-badge state-badge-muted" data-loc="client.currentDraw.waiting">waiting</div>
@@ -197,7 +197,7 @@
     </div>
   </div>
 
-  <nav class="tabbar" aria-label="Bottom tabs">
+  <nav class="tabbar" aria-label="Bottom tabs" data-loc-aria-label="client.tabbar.aria">
     <button id="lotteryTabBtn" type="button" class="tabbar-btn tabbar-btn-active"><span data-loc="client.tab.home">Home</span></button>
     <button id="ticketsTabBtn" type="button" class="tabbar-btn"><span data-loc="client.tab.tickets">My Tickets</span> <span id="ticketsWinningPin" class="tickets-winning-pin" hidden>0</span></button>
     <button id="profileTabBtn" type="button" class="tabbar-btn"><span data-loc="client.tab.profile">Profile</span></button>

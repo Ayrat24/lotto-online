@@ -95,6 +95,14 @@ public sealed class LocalizationService : ILocalizationService
                 row.RussianValue = pair.Value.Ru;
                 updated = true;
             }
+            else if (string.Equals(row.RussianValue, row.EnglishValue, StringComparison.Ordinal)
+                     && string.Equals(row.EnglishValue, pair.Value.En, StringComparison.Ordinal)
+                     && !string.Equals(pair.Value.Ru, pair.Value.En, StringComparison.Ordinal))
+            {
+                // Repair legacy rows where RU was seeded from EN by mistake.
+                row.RussianValue = pair.Value.Ru;
+                updated = true;
+            }
             else if (LegacyRussianValues.TryGetValue(pair.Key, out var legacyRussian)
                      && string.Equals(row.RussianValue, legacyRussian, StringComparison.Ordinal))
             {
@@ -104,6 +112,14 @@ public sealed class LocalizationService : ILocalizationService
 
             if (string.IsNullOrWhiteSpace(row.UzbekValue))
             {
+                row.UzbekValue = pair.Value.Uz;
+                updated = true;
+            }
+            else if (string.Equals(row.UzbekValue, row.EnglishValue, StringComparison.Ordinal)
+                     && string.Equals(row.EnglishValue, pair.Value.En, StringComparison.Ordinal)
+                     && !string.Equals(pair.Value.Uz, pair.Value.En, StringComparison.Ordinal))
+            {
+                // Repair legacy rows where UZ was seeded from EN by mistake.
                 row.UzbekValue = pair.Value.Uz;
                 updated = true;
             }
