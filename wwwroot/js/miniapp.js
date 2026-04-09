@@ -1470,12 +1470,22 @@
           var traceId = body && typeof body === 'object'
             ? (body.traceId || (body.debug && body.debug.traceId) || null)
             : null;
+          var failureStage = body && typeof body === 'object' && body.debug
+            ? (body.debug.failureStage || null)
+            : null;
+          if (failureStage) {
+            msg += ' [stage: ' + failureStage + ']';
+          }
           if (traceId) {
             msg += ' [traceId: ' + traceId + ']';
           }
 
           var err = new Error(msg);
-          err.status = r.status;
+        writeLocalizationDebug('remote locale failed', {
+          error: String(err && err.message || err),
+          status: err && err.status ? err.status : null,
+          debug: err && err.body && err.body.debug ? err.body.debug : null
+        });
           err.body = body;
           err.rawBody = rawBody;
           throw err;

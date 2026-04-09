@@ -111,7 +111,10 @@ public static class LocalizationEndpoints
             {
                 logger.LogError(ex, "Localization bootstrap failed at stage {Stage}. TraceId={TraceId}", stage, http.TraceIdentifier);
 
-                var details = env.IsDevelopment() ? ex.Message : "Localization bootstrap failed.";
+                var publicError = env.IsDevelopment()
+                    ? ex.Message
+                    : $"Localization bootstrap failed at stage '{stage}'.";
+                var details = env.IsDevelopment() ? ex.Message : null;
                 var errorDebug = new LocalizationBootstrapDebugInfo(
                     UsesExplicitLocalDebug: usesExplicitLocalDebug,
                     RequestLocale: req.Locale,
@@ -123,7 +126,7 @@ public static class LocalizationEndpoints
                     FailureDetails: details);
 
                 return Results.Json(
-                    new LocalizationBootstrapResult(false, "en", "0", new Dictionary<string, string>(), details, errorDebug),
+                    new LocalizationBootstrapResult(false, "en", "0", new Dictionary<string, string>(), publicError, errorDebug),
                     statusCode: StatusCodes.Status500InternalServerError);
             }
         });
