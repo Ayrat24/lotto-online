@@ -61,7 +61,14 @@ public static class ReferralsEndpoints
             if (!bind.Success)
                 return Results.BadRequest(new { ok = false, error = bind.Error ?? "Failed to bind invite code." });
 
-            return Results.Ok(new { ok = true });
+            var settings = await referrals.GetSettingsAsync(ct);
+            return Results.Ok(new
+            {
+                ok = true,
+                rewardsEnabled = settings.Enabled,
+                bonusAmount = settings.InviteeBonusAmount,
+                minDepositAmount = settings.MinQualifyingDepositAmount
+            });
         });
 
         return endpoints;

@@ -4,6 +4,10 @@
   var timelineStatusEl = document.getElementById('timelineStatus');
   var topUpBtn = document.getElementById('topUpBtn');
   var topUpStatusEl = document.getElementById('topUpStatus');
+  var topUpAmountInputEl = document.getElementById('topUpAmountInput');
+  var promoCodeInputEl = document.getElementById('promoCodeInput');
+  var applyPromoBtn = document.getElementById('applyPromoBtn');
+  var promoStatusEl = document.getElementById('promoStatus');
   var copyReferralLinkBtn = document.getElementById('copyReferralLinkBtn');
   var referralCodeTextEl = document.getElementById('referralCodeText');
   var referralStatusEl = document.getElementById('referralStatus');
@@ -140,6 +144,10 @@
 
   function setTopUpStatus(text) {
     if (topUpStatusEl) topUpStatusEl.textContent = text || '';
+  }
+
+  function setPromoStatus(text) {
+    if (promoStatusEl) promoStatusEl.textContent = text || '';
   }
 
   function setReferralStatus(text) {
@@ -1717,11 +1725,17 @@
   function topUpBalance() {
     if (!initData) return;
 
+    var topUpAmount = topUpAmountInputEl ? Number(topUpAmountInputEl.value) : NaN;
+    if (!Number.isFinite(topUpAmount) || topUpAmount <= 0) {
+      setTopUpStatus(t('client.topup.enterValidAmount', 'Enter a valid top up amount.'));
+      return;
+    }
+
     if (topUpBtn) topUpBtn.disabled = true;
     setTopUpStatus(t('client.topup.creatingInvoice', 'Creating crypto invoice...'));
     setWithdrawStatus('');
 
-    postJson('/api/payments/deposits/create', { initData: initData || '', amount: 10, currency: 'USD' }, null)
+    postJson('/api/payments/deposits/create', { initData: initData || '', amount: topUpAmount, currency: 'USD' }, null)
       .then(function (res) {
         if (!(res && res.ok && res.deposit)) {
           setTopUpStatus(t('client.topup.createFailed', 'Failed to create deposit invoice.'));
@@ -1763,6 +1777,7 @@
 
         if (profile.isBound) {
           setReferralStatus(t('client.referral.bound', 'Referral is already linked for this account.'));
+          setPromoStatus(t('client.referral.bound', 'Referral is already linked for this account.'));
         } else {
           setReferralStatus('');
         }
@@ -1783,7 +1798,19 @@
     return postJson('/api/referrals/bind', { initData: initData || '', inviteCode: code }, null)
       .then(function (res) {
         if (res && res.ok) {
-          setReferralStatus(t('client.referral.bindSuccess', 'Invite code linked. You will receive a bonus on your first successful crypto deposit.'));
+          var bonusAmount = Number(res.bonusAmount || 0);
+          var minDepositAmount = Number(res.minDepositAmount || 0);
+          if (res.rewardsEnabled && bonusAmount > 0) {
+            setReferralStatus(
+              t('client.referral.bindSuccessWithAmountPrefix', 'Promo applied. Bonus: ')
+              + formatCurrency(bonusAmount)
+              + ' '
+              + t('client.referral.bindSuccessWithAmountSuffix', 'after your first successful crypto deposit of at least ')
+              + formatCurrency(minDepositAmount)
+              + '.');
+          } else {
+            setReferralStatus(t('client.referral.bindSuccess', 'Invite code linked. You will receive a bonus on your first successful crypto deposit.'));
+          }
           return loadReferralProfile();
         }
 
@@ -1792,6 +1819,50 @@
       .catch(function (err) {
         setReferralStatus(err && err.message ? err.message : t('client.referral.bindFailed', 'Failed to link invite code.'));
         return null;
+      });
+  }
+
+  function applyPromoCode() {
+    if (!initData) return;
+
+    var code = promoCodeInputEl ? String(promoCodeInputEl.value || '').trim() : '';
+    if (!code) {
+      setPromoStatus(t('client.promo.enterCode', 'Enter promo code first.'));
+      return;
+    }
+
+    if (applyPromoBtn) applyPromoBtn.disabled = true;
+    setPromoStatus(t('client.promo.applying', 'Applying promo code...'));
+
+    postJson('/api/referrals/bind', { initData: initData || '', inviteCode: code }, null)
+      .then(function (res) {
+        if (!(res && res.ok)) {
+          setPromoStatus(t('client.promo.applyFailed', 'Promo code is invalid or cannot be applied.'));
+          return;
+        }
+
+        var bonusAmount = Number(res.bonusAmount || 0);
+        var minDepositAmount = Number(res.minDepositAmount || 0);
+        if (res.rewardsEnabled && bonusAmount > 0) {
+          setPromoStatus(
+            t('client.promo.appliedWithAmountPrefix', 'Promo applied. Your bonus: ')
+            + formatCurrency(bonusAmount)
+            + '. '
+            + t('client.promo.appliedWithAmountSuffix', 'It will be credited after your first successful crypto top up of at least ')
+            + formatCurrency(minDepositAmount)
+            + '.');
+        } else {
+          setPromoStatus(t('client.promo.applied', 'Promo code applied.'));
+        }
+
+        if (promoCodeInputEl) promoCodeInputEl.value = '';
+        return loadReferralProfile();
+      })
+      .catch(function (err) {
+        setPromoStatus(err && err.message ? err.message : t('client.promo.applyFailed', 'Promo code is invalid or cannot be applied.'));
+      })
+      .finally(function () {
+        if (applyPromoBtn) applyPromoBtn.disabled = false;
       });
   }
 
@@ -1902,6 +1973,7 @@
   if (centerPopupConfirmBtn) centerPopupConfirmBtn.addEventListener('click', hideCenterPopup);
   if (centerPopupBackdropEl) centerPopupBackdropEl.addEventListener('click', hideCenterPopup);
   if (topUpBtn) topUpBtn.addEventListener('click', topUpBalance);
+  if (applyPromoBtn) applyPromoBtn.addEventListener('click', applyPromoCode);
   if (copyReferralLinkBtn) copyReferralLinkBtn.addEventListener('click', copyReferralLink);
   if (withdrawBtn) withdrawBtn.addEventListener('click', withdrawBalance);
   if (saveWalletAddressBtn) saveWalletAddressBtn.addEventListener('click', saveWalletAddress);
@@ -1934,6 +2006,9 @@
   renderMyTickets({ balance: 0, currentDraw: null, currentTickets: [], history: [] });
   renderHistory();
   renderBalance(0);
+  if (topUpAmountInputEl && !String(topUpAmountInputEl.value || '').trim()) {
+    topUpAmountInputEl.value = '10';
+  }
 
   var hasTelegramInitData = false;
   try {
