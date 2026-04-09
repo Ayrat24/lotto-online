@@ -1829,11 +1829,14 @@
   }
 
   function applyPromoCode() {
-    if (!initData) return;
+    if (!initData) {
+      setPromoStatus(t('client.promo.notReady', 'App is still initializing. Please wait a moment and try again.'));
+      return;
+    }
 
     if (referralIsBound) {
+      // Keep UX hint, but continue and call backend check for diagnostics/log visibility.
       setPromoStatus(t('client.referral.bound', 'Referral is already linked for this account.'));
-      return;
     }
 
     var code = promoCodeInputEl ? String(promoCodeInputEl.value || '').trim() : '';
@@ -1994,6 +1997,14 @@
   if (centerPopupBackdropEl) centerPopupBackdropEl.addEventListener('click', hideCenterPopup);
   if (topUpBtn) topUpBtn.addEventListener('click', topUpBalance);
   if (applyPromoBtn) applyPromoBtn.addEventListener('click', applyPromoCode);
+  if (promoCodeInputEl) {
+    promoCodeInputEl.addEventListener('keydown', function (event) {
+      if (event && event.key === 'Enter') {
+        event.preventDefault();
+        applyPromoCode();
+      }
+    });
+  }
   if (copyReferralLinkBtn) copyReferralLinkBtn.addEventListener('click', copyReferralLink);
   if (withdrawBtn) withdrawBtn.addEventListener('click', withdrawBalance);
   if (saveWalletAddressBtn) saveWalletAddressBtn.addEventListener('click', saveWalletAddress);
