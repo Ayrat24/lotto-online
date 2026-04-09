@@ -51,19 +51,24 @@ public sealed class IndexModel : PageModel
         Users = await _db.Users
             .OrderByDescending(x => x.LastSeenAtUtc)
             .Take(200)
-            .AsNoTracking()
             .ToListAsync();
+
+        var changed = false;
+        foreach (var user in Users)
+        {
+            if (!string.IsNullOrWhiteSpace(user.InviteCode))
+                continue;
+
+            user.InviteCode = await GenerateInviteCodeAsync(HttpContext.RequestAborted);
+            changed = true;
+        }
+
+        if (changed)
+            await _db.SaveChangesAsync(HttpContext.RequestAborted);
     }
 
     public async Task<IActionResult> OnPostCreateFakeAsync(CancellationToken ct)
     {
-        if (!_env.IsDevelopment() || !LocalDebugMode.IsEnabled(_config, _env) || !LocalDebugMode.IsLocalRequest(HttpContext))
-        {
-            FlashMessage = "Creating fake users is allowed only in Development local-debug mode from a local request.";
-            FlashIsError = true;
-            return RedirectToPage();
-        }
-
         var balance = decimal.Round(Math.Max(0m, FakeUserBalance), 2, MidpointRounding.AwayFromZero);
         var nextTelegramUserId = (await _db.Users
             .Where(x => x.TelegramUserId >= 900000000)
@@ -76,6 +81,8 @@ public sealed class IndexModel : PageModel
             TelegramUserId = nextTelegramUserId,
             Number = $"+1999{nextTelegramUserId}",
             PreferredLanguage = "en",
+            InviteCode = await GenerateInviteCodeAsync(ct),
+            IsFake = true,
             Balance = balance,
             CreatedAtUtc = now,
             LastSeenAtUtc = now
@@ -87,6 +94,19 @@ public sealed class IndexModel : PageModel
         FlashMessage = $"Fake user created (TelegramUserId={fake.TelegramUserId}, Balance={fake.Balance:0.00}).";
         FlashIsError = false;
         return RedirectToPage();
+    }
+
+    private async Task<string> GenerateInviteCodeAsync(CancellationToken ct)
+    {
+        for (var i = 0; i < 16; i++)
+        {
+            var candidate = Guid.NewGuid().ToString("N")[..10].ToUpperInvariant();
+            var exists = await _db.Users.AsNoTracking().AnyAsync(x => x.InviteCode == candidate, ct);
+            if (!exists)
+                return candidate;
+        }
+
+        return Guid.NewGuid().ToString("N").ToUpperInvariant();
     }
 
     public async Task<IActionResult> OnPostDeleteAsync(long id, CancellationToken ct)

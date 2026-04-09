@@ -16,6 +16,11 @@
     return;
 }
 
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <div class="alert @(Model.StatusIsError ? "alert-danger" : "alert-info")">@Model.StatusMessage</div>
+}
+
 <div class="card mb-3">
     <div class="card-body">
         <div><strong>User Id:</strong> @Model.SelectedUser.Id</div>
@@ -23,6 +28,46 @@
         <div><strong>Balance:</strong> @Model.SelectedUser.Balance.ToString("0.00")</div>
         <div><strong>Created:</strong> @Model.SelectedUser.CreatedAtUtc</div>
         <div><strong>Last seen:</strong> @Model.SelectedUser.LastSeenAtUtc</div>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <h2 class="h5">Add ticket</h2>
+
+        @if (Model.Draws.Count == 0)
+        {
+            <div class="alert alert-secondary mb-0">No draws found. Create a draw first.</div>
+        }
+        else
+        {
+            <form method="post" asp-page-handler="AddTicket" asp-route-id="@Model.SelectedUser.Id" class="row g-2 align-items-end">
+                @Html.AntiForgeryToken()
+
+                <div class="col-md-4">
+                    <label asp-for="SelectedDrawId" class="form-label">Draw</label>
+                    <select asp-for="SelectedDrawId" class="form-select">
+                        @foreach (var draw in Model.Draws)
+                        {
+                            <option value="@draw.Id">#@draw.Id (@draw.State)</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-4">
+                    <label asp-for="TicketNumbers" class="form-label">Numbers</label>
+                    <input asp-for="TicketNumbers" class="form-control" placeholder="e.g. 1,7,14,23,36" />
+                </div>
+
+                <div class="col-auto">
+                    <button class="btn btn-primary" type="submit">Add ticket</button>
+                </div>
+
+                <div class="col-12 text-muted small">
+                    Enter exactly 5 unique numbers from 1 to 36, separated by commas.
+                </div>
+            </form>
+        }
     </div>
 </div>
 
@@ -40,6 +85,7 @@ else
             <th>Id</th>
             <th>DrawId</th>
             <th>Numbers</th>
+            <th>Status</th>
             <th>Purchased (UTC)</th>
             <th></th>
         </tr>
@@ -51,6 +97,7 @@ else
                 <td>@t.Id</td>
                 <td><strong>@t.DrawId</strong></td>
                 <td><code>@t.Numbers</code></td>
+                <td>@t.Status</td>
                 <td>@t.PurchasedAtUtc</td>
                 <td class="text-end">
                     <form method="post" asp-page-handler="DeleteTicket" asp-route-id="@Model.SelectedUser.Id" asp-route-ticketId="@t.Id"

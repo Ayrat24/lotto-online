@@ -24,7 +24,7 @@
                 <button class="btn btn-outline-secondary" type="submit">Add fake user</button>
             </div>
             <div class="col-12 text-muted small">
-                Creates a synthetic user with auto-generated TelegramUserId. Available only in Development local-debug mode.
+                Creates a synthetic user with auto-generated TelegramUserId and marks it as FAKE for testing visibility.
             </div>
         </form>
     </div>
@@ -35,6 +35,8 @@
     <tr>
         <th>Id</th>
         <th>TelegramUserId</th>
+        <th>Label</th>
+        <th>Referral code</th>
         <th>Number</th>
         <th>Balance</th>
         <th>Created (UTC)</th>
@@ -48,6 +50,17 @@
         <tr>
             <td>@u.Id</td>
             <td>@u.TelegramUserId</td>
+            <td>
+                @if (u.IsFake)
+                {
+                    <span class="badge text-bg-warning">FAKE</span>
+                }
+                else
+                {
+                    <span class="text-muted">real</span>
+                }
+            </td>
+            <td><code>@(string.IsNullOrWhiteSpace(u.InviteCode) ? "-" : u.InviteCode)</code></td>
             <td>@(string.IsNullOrWhiteSpace(u.Number) ? "-" : u.Number)</td>
             <td>@u.Balance.ToString("0.00")</td>
             <td>@u.CreatedAtUtc</td>

@@ -27,6 +27,8 @@ public sealed class MiniAppUser
 
     public DateTimeOffset? ReferredAtUtc { get; set; }
 
+    public bool IsFake { get; set; }
+
     public decimal Balance { get; set; }
 
     public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
