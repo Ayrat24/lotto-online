@@ -1,8 +1,6 @@
 using MiniApp.Data;
 using MiniApp.Features.Auth;
 using MiniApp.TelegramLogin;
-using Telegram.Bot;
-using Telegram.Bot.Types;
 
 namespace MiniApp.Features.Referrals;
 
@@ -16,7 +14,6 @@ public static class ReferralsEndpoints
             IConfiguration config,
             IWebHostEnvironment env,
             ILoggerFactory loggerFactory,
-            IServiceProvider services,
             AppDbContext db,
             IUserService users,
             IReferralService referrals,
@@ -40,13 +37,11 @@ public static class ReferralsEndpoints
             if (!check.Success)
             {
                 logger.LogWarning("Referral check rejected. UserId={UserId}, TelegramUserId={TelegramUserId}, Error={Error}", user.Id, telegramUserId, check.Error);
-                await SendReferralDebugToChatAsync(services, telegramUserId, $"[ref-check] trace={http.TraceIdentifier} FAIL reason={check.Error}", ct);
                 return Results.BadRequest(new { ok = false, error = check.Error ?? "Invite code is invalid." });
             }
 
             var settings = await referrals.GetSettingsAsync(ct);
             logger.LogInformation("Referral check succeeded. UserId={UserId}, TelegramUserId={TelegramUserId}, InviterUserId={InviterUserId}", user.Id, telegramUserId, check.InviterUserId);
-            await SendReferralDebugToChatAsync(services, telegramUserId, $"[ref-check] trace={http.TraceIdentifier} OK inviter={check.InviterUserId}", ct);
 
             return Results.Ok(new
             {
@@ -96,7 +91,6 @@ public static class ReferralsEndpoints
             IConfiguration config,
             IWebHostEnvironment env,
             ILoggerFactory loggerFactory,
-            IServiceProvider services,
             AppDbContext db,
             IUserService users,
             IReferralService referrals,
@@ -119,12 +113,10 @@ public static class ReferralsEndpoints
             if (!bind.Success)
             {
                 logger.LogWarning("Referral bind rejected. UserId={UserId}, TelegramUserId={TelegramUserId}, Error={Error}", user.Id, telegramUserId, bind.Error);
-                await SendReferralDebugToChatAsync(services, telegramUserId, $"[ref-bind] trace={http.TraceIdentifier} FAIL reason={bind.Error}", ct);
                 return Results.BadRequest(new { ok = false, error = bind.Error ?? "Failed to bind invite code." });
             }
 
             logger.LogInformation("Referral bind succeeded. UserId={UserId}, TelegramUserId={TelegramUserId}", user.Id, telegramUserId);
-            await SendReferralDebugToChatAsync(services, telegramUserId, $"[ref-bind] trace={http.TraceIdentifier} OK", ct);
 
             var settings = await referrals.GetSettingsAsync(ct);
             return Results.Ok(new
@@ -175,20 +167,5 @@ public static class ReferralsEndpoints
         return (tgUser!.Id, null);
     }
 
-    private static async Task SendReferralDebugToChatAsync(IServiceProvider services, long telegramUserId, string message, CancellationToken ct)
-    {
-        var bot = services.GetService<TelegramBotClient>();
-        if (bot is null)
-            return;
-
-        try
-        {
-            await bot.SendMessage(new ChatId(telegramUserId), message, cancellationToken: ct);
-        }
-        catch
-        {
-            // Debug notification must never break referral API flow.
-        }
-    }
 }
 
