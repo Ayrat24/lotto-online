@@ -190,6 +190,7 @@ public static class LocalDebugSeed
             TelegramUserId = telegramUserId,
             Number = number,
             PreferredLanguage = "en",
+            ReferredByUserId = MiniAppUser.UnboundReferralUserId,
             Balance = minBalance,
             CreatedAtUtc = now,
             LastSeenAtUtc = now

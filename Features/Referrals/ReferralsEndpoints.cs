@@ -79,7 +79,7 @@ public static class ReferralsEndpoints
             var dto = new ReferralProfileDto(
                 profile.InviteCode,
                 inviteLink,
-                profile.ReferredByUserId.HasValue,
+                profile.ReferredByUserId != MiniAppUser.UnboundReferralUserId,
                 profile.TotalInviterRewards,
                 profile.TotalInviteeRewards,
                 profile.SuccessfulInvites,

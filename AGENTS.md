@@ -21,6 +21,7 @@
 - Use `DateTimeOffset.UtcNow` for persisted timestamps.
 - EF reads use `AsNoTracking()` in list/query pages and APIs.
 - Local debug identity is resolved via `LocalDebugMode.TryGetDebugTelegramUserId(...)`; explicit `initData=local-debug` / `X-Dev-TelegramUserId` triggering is handled in auth + localization bootstrap endpoints.
+- Referral binding uses `MiniAppUser.UnboundReferralUserId` (`-1`) as the explicit "not bound" sentinel; new users should be initialized with it in normal creation, local-debug seeding, and admin fake-user creation.
 - SignalR is removed; timeline updates are polling-based every ~4s (`wwwroot/js/miniapp.js`, `Features/Draws/DrawsHub.cs`).
 
 ## Configuration that blocks startup
@@ -47,6 +48,7 @@
 - New DB fields/entities: update `Data/*`, `AppDbContext`, then create migration in `Migrations/`.
 - New API features: add `Features/<Area>/...Endpoints.cs`, DTOs in `*Models.cs`, and map in `Program.cs`.
 - Changes to auth/initData handling must be mirrored across auth, localization bootstrap, tickets, timeline, wallet, and payments endpoints.
+- If changing referral binding semantics, keep the `MiniAppUser.UnboundReferralUserId` sentinel and the profile `IsBound` check aligned across user creation, referral service logic, and the Mini App UI.
 - If changing draw/ticket semantics, verify active-draw purchase rules and timeline featured/history grouping together.
 - If changing payments: update `Features/Payments/*`, keep `AppDbContext` mappings aligned with migrations, and verify BTCPay webhook processing still preserves idempotent crediting.
 - Preserve webhook signature handling (`BTCPay-Sig`) and audit trail states in `PaymentWebhookEvent` (`Received`/`Processed`/`Ignored`/`Failed`).

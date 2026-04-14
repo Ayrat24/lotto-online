@@ -27,6 +27,7 @@ public sealed class UserRepository : IUserRepository
         var user = new MiniAppUser
         {
             TelegramUserId = telegramUserId,
+            ReferredByUserId = MiniAppUser.UnboundReferralUserId,
             CreatedAtUtc = DateTimeOffset.UtcNow,
             LastSeenAtUtc = DateTimeOffset.UtcNow
         };

@@ -25,7 +25,7 @@ public interface IReferralService
 
 public sealed record ReferralProfileResult(
     string InviteCode,
-    long? ReferredByUserId,
+    long ReferredByUserId,
     DateTimeOffset? ReferredAtUtc,
     decimal TotalInviterRewards,
     decimal TotalInviteeRewards,

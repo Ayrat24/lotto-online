@@ -2,6 +2,8 @@ namespace MiniApp.Data;
 
 public sealed class MiniAppUser
 {
+    public const long UnboundReferralUserId = -1;
+
     public long Id { get; set; }
 
     /// <summary>
@@ -23,7 +25,10 @@ public sealed class MiniAppUser
 
     public string? InviteCode { get; set; }
 
-    public long? ReferredByUserId { get; set; }
+    /// <summary>
+    /// Referring user id, or -1 when the account is not bound.
+    /// </summary>
+    public long ReferredByUserId { get; set; } = UnboundReferralUserId;
 
     public DateTimeOffset? ReferredAtUtc { get; set; }
 

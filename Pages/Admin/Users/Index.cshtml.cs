@@ -82,6 +82,7 @@ public sealed class IndexModel : PageModel
             Number = $"+1999{nextTelegramUserId}",
             PreferredLanguage = "en",
             InviteCode = await GenerateInviteCodeAsync(ct),
+            ReferredByUserId = MiniAppUser.UnboundReferralUserId,
             IsFake = true,
             Balance = balance,
             CreatedAtUtc = now,

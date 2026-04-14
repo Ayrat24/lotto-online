@@ -127,7 +127,12 @@ public sealed class ReferralService : IReferralService
             return new ReferralBindResult(false, "You cannot use your own invite code.");
         }
 
-        // Debug mode behavior: allow re-binding to simplify promo flow diagnostics.
+        if (invitee.ReferredByUserId != MiniAppUser.UnboundReferralUserId)
+        {
+            _logger.LogWarning("Referral bind failed: invitee already bound. InviteeUserId={InviteeUserId}, ExistingInviterUserId={ExistingInviterUserId}, Code={Code}", inviteeUserId, invitee.ReferredByUserId, normalizedCode);
+            return new ReferralBindResult(false, "Referral is already bound for this account.");
+        }
+
         invitee.ReferredByUserId = inviter.Id;
         invitee.ReferredAtUtc = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
@@ -183,10 +188,10 @@ public sealed class ReferralService : IReferralService
             return;
 
         var invitee = await _db.Users.SingleAsync(x => x.Id == deposit.UserId, ct);
-        if (!invitee.ReferredByUserId.HasValue)
+        if (invitee.ReferredByUserId == MiniAppUser.UnboundReferralUserId)
             return;
 
-        var inviterId = invitee.ReferredByUserId.Value;
+        var inviterId = invitee.ReferredByUserId;
         if (inviterId == invitee.Id)
             return;
 

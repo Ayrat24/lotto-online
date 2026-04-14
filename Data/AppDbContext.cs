@@ -39,6 +39,10 @@ public sealed class AppDbContext : DbContext
             b.Property(x => x.PreferredLanguage).HasMaxLength(8);
             b.Property(x => x.WalletAddress).HasMaxLength(256);
             b.Property(x => x.InviteCode).HasMaxLength(32);
+            b.Property(x => x.ReferredByUserId)
+                .HasConversion(
+                    v => v == MiniAppUser.UnboundReferralUserId ? (long?)null : v,
+                    v => v ?? MiniAppUser.UnboundReferralUserId);
             b.Property(x => x.IsFake).IsRequired().HasDefaultValue(false);
             b.Property(x => x.Balance).HasPrecision(18, 2).IsRequired();
             b.Property(x => x.CreatedAtUtc).IsRequired();
