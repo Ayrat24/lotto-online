@@ -65,25 +65,29 @@
     </div>
   </div>
 
+  <header class="app-fixed-header" aria-label="App header" data-loc-aria-label="client.header.aria">
+    <div class="app-fixed-header-inner">
+      <div class="brand">
+        <div class="brand-icon">⚡</div>
+        <div class="brand-title" data-loc="client.brand.title">LottoVibe</div>
+      </div>
+      <div class="balance-block">
+        <div class="balance-label" data-loc="client.balance.label">Money</div>
+        <div id="userBalanceText" class="balance-value">$0.00</div>
+      </div>
+    </div>
+  </header>
+
   <main id="appShell" class="container app-shell" aria-busy="true">
     <section id="lotteryTabPanel" class="tab-panel stack">
-      <header class="topbar">
-        <div class="brand">
-          <div class="brand-icon">⚡</div>
-          <div class="brand-title" data-loc="client.brand.title">LottoVibe</div>
-        </div>
-        <div class="balance-block">
-          <div class="balance-label" data-loc="client.balance.label">Money</div>
-          <div id="userBalanceText" class="balance-value">$0.00</div>
-        </div>
-      </header>
 
       <div id="debugModeBadge" class="debug-mode-badge" hidden></div>
 
       <section id="featuredJackpotCard" class="card jackpot-card">
         <div class="jackpot-main">
           <div class="jackpot-top">
-            <span class="jackpot-chip" data-loc="client.draw.state.active">Active</span>
+            <!-- Replaced top red "jackpot-chip" with the green state badge. JS will update its text/class at runtime. -->
+            <span id="currentDrawStateBadge" class="state-badge state-badge-active" data-loc="client.draw.state.active">Active</span>
             <span class="jackpot-time" id="currentDrawCreatedAt" data-loc="client.jackpot.endsIn">Ends in --:--:--</span>
           </div>
 
@@ -94,8 +98,6 @@
           </div>
 
           <p class="jackpot-copy" id="jackpotSubtitle" data-loc="client.jackpot.subtitle">The next draw is coming soon. Get your tickets now.</p>
-
-          <div id="currentDrawStateBadge" class="state-badge state-badge-muted" hidden></div>
 
           <div id="currentDrawPrizeTiers" class="prize-tier-row" hidden>
             <div class="prize-tier-pill">
@@ -142,25 +144,46 @@
     </section>
 
     <section id="profileTabPanel" class="tab-panel stack" hidden>
-      <div class="card stack">
+      <div id="profileHomeScreen" class="card stack profile-screen">
         <div class="section-title" data-loc="client.profile.title">Profile</div>
-        <div class="section-subtitle" data-loc="client.profile.subtitle">Manage your wallet balance.</div>
-        <div class="draw-meta-row"><span data-loc="client.profile.currentBalance">Current balance:</span> <strong id="profileBalanceText">$0.00</strong></div>
 
-        <div class="section-subtitle" data-loc="client.profile.promoTitle">Enter promo code</div>
-        <input id="promoCodeInput" type="text" maxlength="64" placeholder="Promo code" data-loc-placeholder="client.profile.promoPlaceholder" class="profile-input" />
-        <button id="applyPromoBtn" type="button" class="secondary-btn" data-loc="client.button.applyPromo">Apply promo code</button>
-        <div id="promoStatus" class="muted"></div>
+        <button id="openDepositScreenBtn" type="button" data-loc="client.profile.menuDeposit">Deposit Money</button>
+        <button id="openInviteScreenBtn" type="button" class="secondary-btn" data-loc="client.profile.menuInvite">Invite Friend</button>
+        <button id="openWithdrawScreenBtn" type="button" class="secondary-btn" data-loc="client.profile.menuWithdraw">Withdraw Money</button>
+        <button id="openHistoryScreenBtn" type="button" class="secondary-btn" data-loc="client.profile.menuHistory">Transaction History</button>
+      </div>
 
+      <div id="profileDepositScreen" class="card stack profile-screen" hidden>
+        <button id="backFromDepositBtn" type="button" class="profile-back-btn" data-loc-aria-label="client.button.back">←</button>
+        <div class="section-header">
+          <div class="section-title" data-loc="client.profile.menuDeposit">Deposit Money</div>
+        </div>
         <input id="topUpAmountInput" type="number" min="0.01" step="0.01" placeholder="Top up amount" data-loc-placeholder="client.topup.amountPlaceholder" class="profile-input" />
         <button id="topUpBtn" type="button" data-loc="client.button.deposit">Deposit crypto</button>
         <div id="topUpStatus" class="muted"></div>
+      </div>
+
+      <div id="profileInviteScreen" class="card stack profile-screen" hidden>
+        <button id="backFromInviteBtn" type="button" class="profile-back-btn" data-loc-aria-label="client.button.back">←</button>
+        <div class="section-header">
+          <div class="section-title" data-loc="client.profile.menuInvite">Invite Friend</div>
+        </div>
+        <div class="section-subtitle" data-loc="client.profile.promoTitle">Enter promo code</div>
+        <input id="promoCodeInput" type="text" maxlength="64" placeholder="Promo code" data-loc-placeholder="client.profile.promoPlaceholder" class="profile-input" />
+        <button id="applyPromoBtn" type="button" data-loc="client.button.applyPromo">Apply promo code</button>
+        <div id="promoStatus" class="muted"></div>
 
         <div class="section-subtitle" data-loc="client.referral.title">Invite friends</div>
         <div class="draw-meta-row"><span data-loc="client.referral.codeLabel">Your invite code:</span> <strong id="referralCodeText">-</strong></div>
         <button id="copyReferralLinkBtn" type="button" class="secondary-btn" data-loc="client.referral.copyLink">Copy invite link</button>
         <div id="referralStatus" class="muted"></div>
+      </div>
 
+      <div id="profileWithdrawScreen" class="card stack profile-screen" hidden>
+        <button id="backFromWithdrawBtn" type="button" class="profile-back-btn" data-loc-aria-label="client.button.back">←</button>
+        <div class="section-header">
+          <div class="section-title" data-loc="client.profile.menuWithdraw">Withdraw Money</div>
+        </div>
         <div class="section-subtitle" data-loc="client.profile.savedWallet">Saved wallet address</div>
         <input id="walletAddressInput" type="text" maxlength="256" placeholder="Bitcoin wallet address" data-loc-placeholder="client.profile.walletPlaceholder" class="profile-input" />
         <button id="saveWalletAddressBtn" type="button" data-loc="client.button.saveWallet">Save wallet address</button>
@@ -171,14 +194,12 @@
         <input id="withdrawNumberInput" type="text" maxlength="256" placeholder="Wallet address (or leave empty to use saved)" data-loc-placeholder="client.profile.withdrawAddressPlaceholder" class="profile-input" />
         <button id="withdrawBtn" type="button" data-loc="client.button.withdraw">Withdraw</button>
         <div id="withdrawStatus" class="muted"></div>
-
-        <button id="openHistoryBtn" type="button" class="secondary-btn" data-loc="client.button.openHistory">Transaction history</button>
       </div>
 
-      <div id="historyScreen" class="card stack" hidden>
+      <div id="profileHistoryScreen" class="card stack profile-screen" hidden>
+        <button id="closeHistoryBtn" type="button" class="profile-back-btn" data-loc-aria-label="client.button.back">←</button>
         <div class="section-header">
           <div class="section-title" data-loc="client.history.title">Transaction history</div>
-          <button id="closeHistoryBtn" type="button" class="secondary-btn" data-loc="client.button.back">Back</button>
         </div>
         <div id="historyStatus" class="muted"></div>
         <div id="historyEmpty" class="empty-card" data-loc="client.history.empty">No transactions yet.</div>

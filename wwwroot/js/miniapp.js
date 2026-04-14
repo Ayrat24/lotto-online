@@ -18,9 +18,19 @@
   var walletAddressInputEl = document.getElementById('walletAddressInput');
   var saveWalletAddressBtn = document.getElementById('saveWalletAddressBtn');
   var walletAddressStatusEl = document.getElementById('walletAddressStatus');
-  var openHistoryBtn = document.getElementById('openHistoryBtn');
+  var openDepositScreenBtn = document.getElementById('openDepositScreenBtn');
+  var openInviteScreenBtn = document.getElementById('openInviteScreenBtn');
+  var openWithdrawScreenBtn = document.getElementById('openWithdrawScreenBtn');
+  var openHistoryScreenBtn = document.getElementById('openHistoryScreenBtn');
+  var backFromDepositBtn = document.getElementById('backFromDepositBtn');
+  var backFromInviteBtn = document.getElementById('backFromInviteBtn');
+  var backFromWithdrawBtn = document.getElementById('backFromWithdrawBtn');
   var closeHistoryBtn = document.getElementById('closeHistoryBtn');
-  var historyScreenEl = document.getElementById('historyScreen');
+  var profileHomeScreenEl = document.getElementById('profileHomeScreen');
+  var profileDepositScreenEl = document.getElementById('profileDepositScreen');
+  var profileInviteScreenEl = document.getElementById('profileInviteScreen');
+  var profileWithdrawScreenEl = document.getElementById('profileWithdrawScreen');
+  var historyScreenEl = document.getElementById('profileHistoryScreen');
   var historyStatusEl = document.getElementById('historyStatus');
   var historyEmptyEl = document.getElementById('historyEmpty');
   var historyListEl = document.getElementById('historyList');
@@ -55,8 +65,6 @@
   var currentDrawTicketPriceRowEl = document.getElementById('currentDrawTicketPriceRow');
   var currentDrawTicketCostEl = document.getElementById('currentDrawTicketCost');
   var currentDrawPurchaseBlockEl = document.getElementById('currentDrawPurchaseBlock');
-  var featuredJackpotCardEl = document.getElementById('featuredJackpotCard');
-  var jackpotCardsContainerEl = document.getElementById('jackpotCardsContainer');
   var currentDisplayedDrawId = null;
   var appShellEl = document.getElementById('appShell');
   var appLoadingShellEl = document.getElementById('appLoadingShell');
@@ -88,6 +96,7 @@
   var localeStrings = {};
   var autoOpenedTicketsTab = false;
   var activeTabName = 'lottery';
+  var activeProfileScreen = 'home';
   var historyEntries = [];
   var referralInviteCode = '';
   var referralInviteLink = '';
@@ -135,7 +144,6 @@
   function reapplyLocalizedRuntimeTexts() {
     var selected = resolveSelectedDrawSnapshot(latestState);
     renderCurrentDraw(selected.draw, selected.tickets, selected.hasMultipleActiveDraws);
-    renderActiveDrawBanners(getActiveDraws(latestState), getActiveTicketGroups(latestState));
     renderMyTickets(latestState);
     renderHistory();
 
@@ -182,190 +190,7 @@
     return { draw: selectedDraw, tickets: tickets, hasMultipleActiveDraws: hasMultipleActiveDraws };
   }
 
-  function selectActiveDraw(drawId, shouldOpenPicker) {
-    var parsedDrawId = parseInt(drawId, 10);
-    if (!Number.isFinite(parsedDrawId) || parsedDrawId <= 0) return;
-
-    var activeDraws = getActiveDraws(latestState);
-    var hasDraw = activeDraws.some(function (x) { return x && x.id === parsedDrawId; });
-    if (!hasDraw) return;
-
-    selectedActiveDrawId = parsedDrawId;
-
-    var selected = resolveSelectedDrawSnapshot(latestState);
-    renderCurrentDraw(selected.draw, selected.tickets, selected.hasMultipleActiveDraws);
-    renderActiveDrawBanners(activeDraws, getActiveTicketGroups(latestState));
-
-    if (shouldOpenPicker === true) {
-      if (!selected.draw || selected.draw.state !== 'active') {
-        setPurchaseStatus(t('client.status.noActiveDraw', 'There is no active draw right now.'));
-        return;
-      }
-
-      setPurchaseStatus('');
-      openTicketPicker();
-    }
-  }
-
-  function renderActiveDrawBanners(activeDraws, activeTicketGroups) {
-    if (!jackpotCardsContainerEl) return;
-
-    var draws = Array.isArray(activeDraws) ? activeDraws : [];
-    var groups = Array.isArray(activeTicketGroups) ? activeTicketGroups : [];
-
-    jackpotCardsContainerEl.innerHTML = '';
-
-    if (draws.length === 0) {
-      if (featuredJackpotCardEl) featuredJackpotCardEl.hidden = false;
-      jackpotCardsContainerEl.hidden = true;
-      return;
-    }
-
-    if (featuredJackpotCardEl) featuredJackpotCardEl.hidden = true;
-    jackpotCardsContainerEl.hidden = false;
-
-    draws.forEach(function (draw) {
-      if (!draw) return;
-
-      var isSelected = selectedActiveDrawId === draw.id;
-      var stateClass = draw.state === 'active'
-        ? 'state-badge-active'
-        : draw.state === 'finished'
-          ? 'state-badge-finished'
-          : 'state-badge-upcoming';
-
-      var banner = document.createElement('article');
-      banner.className = 'card jackpot-card duplicate-jackpot-card' + (isSelected ? ' duplicate-jackpot-card-selected' : '');
-      banner.setAttribute('role', 'button');
-      banner.setAttribute('tabindex', '0');
-      banner.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
-
-      var header = document.createElement('div');
-      header.className = 'jackpot-main';
-
-      var top = document.createElement('div');
-      top.className = 'jackpot-top';
-
-      var chip = document.createElement('span');
-      chip.className = 'jackpot-chip';
-      chip.textContent = formatDrawStateLabel(draw.state);
-
-      var openedLine = document.createElement('span');
-      openedLine.className = 'jackpot-time';
-      openedLine.textContent = (draw.state === 'finished'
-        ? t('client.currentDraw.concludedPrefix', 'Concluded ')
-        : t('client.currentDraw.openedPrefix', 'Opened ')) + formatUtc(draw.createdAtUtc);
-
-      top.appendChild(chip);
-      top.appendChild(openedLine);
-      header.appendChild(top);
-
-      var headline = document.createElement('div');
-      headline.className = 'jackpot-headline';
-
-      var title = document.createElement('span');
-      title.className = 'jackpot-title';
-      title.textContent = t('client.jackpot.prizePoolTitle', 'Prize pool :');
-
-      var amount = document.createElement('span');
-      amount.className = 'jackpot-amount';
-      amount.textContent = formatJackpot(draw.prizePool);
-
-      var bang = document.createElement('span');
-      bang.className = 'jackpot-amount-bang';
-      bang.textContent = '!';
-
-      headline.appendChild(title);
-      headline.appendChild(amount);
-      headline.appendChild(bang);
-      header.appendChild(headline);
-
-      var subtitle = document.createElement('p');
-      subtitle.className = 'jackpot-copy';
-      subtitle.textContent = draw.state === 'active'
-        ? t('client.currentDraw.liveSubtitle', 'The draw is live. Don\'t miss your chance to become a multi-millionaire!')
-        : t('client.jackpot.subtitle', 'The next draw is coming soon. Get your tickets now.');
-      header.appendChild(subtitle);
-
-      var tiers = document.createElement('div');
-      tiers.className = 'prize-tier-row';
-
-      function createTier(label, value) {
-        var pill = document.createElement('div');
-        pill.className = 'prize-tier-pill';
-        var tierLabel = document.createElement('span');
-        tierLabel.className = 'prize-tier-label';
-        tierLabel.textContent = label;
-        var tierValue = document.createElement('span');
-        tierValue.className = 'prize-tier-value';
-        tierValue.textContent = '$' + formatPrizePool(value);
-        pill.appendChild(tierLabel);
-        pill.appendChild(tierValue);
-        return pill;
-      }
-
-      tiers.appendChild(createTier('3/5', draw.prizePoolMatch3));
-      tiers.appendChild(createTier('4/5', draw.prizePoolMatch4));
-      tiers.appendChild(createTier('5/5', draw.prizePoolMatch5));
-      header.appendChild(tiers);
-
-      var stateBadge = document.createElement('span');
-      stateBadge.className = 'state-badge ' + stateClass;
-      stateBadge.textContent = formatDrawStateLabel(draw.state);
-      header.appendChild(stateBadge);
-      banner.appendChild(header);
-
-      var footer = document.createElement('div');
-      footer.className = 'jackpot-buy-row';
-
-      var left = document.createElement('div');
-      left.className = 'jackpot-buy-left';
-
-      var priceLabel = document.createElement('div');
-      priceLabel.className = 'jackpot-buy-price-label';
-      priceLabel.textContent = t('client.currentDraw.ticketCostPrefix', 'Ticket cost:');
-
-      var price = document.createElement('div');
-      price.className = 'jackpot-buy-price';
-      price.textContent = formatCurrency(draw.ticketCost);
-
-      left.appendChild(priceLabel);
-      left.appendChild(price);
-
-      var buyBtn = document.createElement('button');
-      buyBtn.type = 'button';
-      buyBtn.className = 'jackpot-buy-btn';
-      buyBtn.textContent = t('client.button.purchase', 'Purchase ticket');
-      buyBtn.disabled = draw.state !== 'active';
-
-      buyBtn.addEventListener('click', function (ev) {
-        ev.preventDefault();
-        ev.stopPropagation();
-        selectActiveDraw(draw.id, true);
-      });
-
-      footer.appendChild(left);
-      var right = document.createElement('div');
-      right.className = 'jackpot-buy-right';
-      right.appendChild(buyBtn);
-      footer.appendChild(right);
-      banner.appendChild(footer);
-
-      banner.addEventListener('click', function () {
-        selectActiveDraw(draw.id, false);
-      });
-
-      banner.addEventListener('keydown', function (ev) {
-        if (!ev) return;
-        if (ev.key === 'Enter' || ev.key === ' ') {
-          ev.preventDefault();
-          selectActiveDraw(draw.id, false);
-        }
-      });
-
-      jackpotCardsContainerEl.appendChild(banner);
-    });
-  }
+  // Per-draw banner UI removed — jackpot card will show featured/current draw and contain the purchase controls.
 
   function setPurchaseStatus(text) {
     if (purchaseStatusEl) purchaseStatusEl.textContent = text || '';
@@ -1505,9 +1330,23 @@
     });
   }
 
-  function setHistoryOpen(isOpen) {
-    if (!historyScreenEl) return;
-    historyScreenEl.hidden = !isOpen;
+  function setProfileScreen(name) {
+    var nextScreen = String(name || 'home').toLowerCase();
+    if (nextScreen !== 'home' && nextScreen !== 'deposit' && nextScreen !== 'invite' && nextScreen !== 'withdraw' && nextScreen !== 'history') {
+      nextScreen = 'home';
+    }
+
+    activeProfileScreen = nextScreen;
+
+    if (profileHomeScreenEl) profileHomeScreenEl.hidden = nextScreen !== 'home';
+    if (profileDepositScreenEl) profileDepositScreenEl.hidden = nextScreen !== 'deposit';
+    if (profileInviteScreenEl) profileInviteScreenEl.hidden = nextScreen !== 'invite';
+    if (profileWithdrawScreenEl) profileWithdrawScreenEl.hidden = nextScreen !== 'withdraw';
+    if (historyScreenEl) historyScreenEl.hidden = nextScreen !== 'history';
+
+    if (nextScreen === 'history') {
+      loadHistory();
+    }
   }
 
   function setActiveTab(name) {
@@ -1529,9 +1368,8 @@
       renderMyTickets(latestState);
     }
 
-    if (!isProfile) {
-      setHistoryOpen(false);
-    }
+    // Any footer tab click resets profile to its home menu.
+    setProfileScreen('home');
   }
 
   function openTicketPicker() {
@@ -1622,11 +1460,6 @@
     var selectedDrawId = selected.draw && selected.draw.state === 'active'
       ? selected.draw.id
       : null;
-
-    if (selectedDrawId == null) {
-      setTicketPickerStatus(t('client.status.noActiveDraw', 'There is no active draw right now.'));
-      return;
-    }
 
     var validation = validatePickerSelection();
     if (!validation.ok) {
@@ -1842,7 +1675,6 @@
 
     var selected = resolveSelectedDrawSnapshot(latestState);
     renderCurrentDraw(selected.draw, selected.tickets, selected.hasMultipleActiveDraws);
-    renderActiveDrawBanners(activeDraws, getActiveTicketGroups(latestState));
     renderMyTickets(latestState);
 
     if (clientIsLocalDebug && !autoOpenedTicketsTab) {
@@ -2356,13 +2188,14 @@
   if (copyReferralLinkBtn) copyReferralLinkBtn.addEventListener('click', copyReferralLink);
   if (withdrawBtn) withdrawBtn.addEventListener('click', withdrawBalance);
   if (saveWalletAddressBtn) saveWalletAddressBtn.addEventListener('click', saveWalletAddress);
-  if (openHistoryBtn) openHistoryBtn.addEventListener('click', function () {
-    setHistoryOpen(true);
-    loadHistory();
-  });
-  if (closeHistoryBtn) closeHistoryBtn.addEventListener('click', function () {
-    setHistoryOpen(false);
-  });
+  if (openDepositScreenBtn) openDepositScreenBtn.addEventListener('click', function () { setProfileScreen('deposit'); });
+  if (openInviteScreenBtn) openInviteScreenBtn.addEventListener('click', function () { setProfileScreen('invite'); });
+  if (openWithdrawScreenBtn) openWithdrawScreenBtn.addEventListener('click', function () { setProfileScreen('withdraw'); });
+  if (openHistoryScreenBtn) openHistoryScreenBtn.addEventListener('click', function () { setProfileScreen('history'); });
+  if (backFromDepositBtn) backFromDepositBtn.addEventListener('click', function () { setProfileScreen('home'); });
+  if (backFromInviteBtn) backFromInviteBtn.addEventListener('click', function () { setProfileScreen('home'); });
+  if (backFromWithdrawBtn) backFromWithdrawBtn.addEventListener('click', function () { setProfileScreen('home'); });
+  if (closeHistoryBtn) closeHistoryBtn.addEventListener('click', function () { setProfileScreen('home'); });
 
   var search = '';
   try {
@@ -2380,7 +2213,7 @@
   randomizePickerNumbers();
   preloadTicketPicker();
   setActiveTab('lottery');
-  setHistoryOpen(false);
+  setProfileScreen('home');
   renderCurrentDraw(null, [], false);
   renderMyTickets({ balance: 0, currentDraw: null, activeDraws: [], activeTicketGroups: [], currentTickets: [], history: [] });
   renderHistory();

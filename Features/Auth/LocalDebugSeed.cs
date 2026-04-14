@@ -8,7 +8,6 @@ public static class LocalDebugSeed
 {
     private const long FakeUserA = 700000001;
     private const long FakeUserB = 700000002;
-    private const int DebugActiveDrawCount = 2;
 
     public static async Task EnsureSeededAsync(AppDbContext db, long debugTelegramUserId, CancellationToken ct)
     {
@@ -52,7 +51,7 @@ public static class LocalDebugSeed
             finishedDraws.Add(finished);
         }
 
-        var targetActiveDrawCount = GetTargetActiveDrawCount();
+        var targetActiveDrawCount = GetTargetActiveDrawCount(debugTelegramUserId, now);
         var activeDraws = draws
             .Where(x => x.State == DrawState.Active)
             .OrderByDescending(x => x.Id)
@@ -173,8 +172,15 @@ public static class LocalDebugSeed
         await db.SaveChangesAsync(ct);
     }
 
-    private static int GetTargetActiveDrawCount()
-        => DebugActiveDrawCount;
+    private static int GetTargetActiveDrawCount(long debugTelegramUserId, DateTimeOffset now)
+    {
+        // Keep randomization stable throughout the day to avoid draw state flapping during polling.
+        var dayOfYear = now.UtcDateTime.DayOfYear;
+        var year = now.UtcDateTime.Year;
+        var seed = HashCode.Combine(debugTelegramUserId, year, dayOfYear);
+        var rng = new Random(seed);
+        return rng.Next(1, 3);
+    }
 
     private static int CountMatches(string ticketNumbers, string drawNumbers)
     {
