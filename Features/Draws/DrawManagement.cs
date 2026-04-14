@@ -17,8 +17,6 @@ internal static class DrawManagement
         EnsureTicketCost(ticketCost);
 
         var nextId = (await db.Draws.MaxAsync(x => (long?)x.Id, ct) ?? 0) + 1;
-        var hasActiveDraw = await db.Draws.AnyAsync(x => x.State == DrawState.Active, ct);
-
         var draw = new Draw
         {
             Id = nextId,
@@ -26,7 +24,7 @@ internal static class DrawManagement
             PrizePoolMatch4 = RoundPrizePool(prizePoolMatch4),
             PrizePoolMatch5 = RoundPrizePool(prizePoolMatch5),
             TicketCost = RoundMoney(ticketCost),
-            State = hasActiveDraw ? DrawState.Upcoming : DrawState.Active,
+            State = DrawState.Active,
             CreatedAtUtc = DateTimeOffset.UtcNow
         };
 
@@ -48,15 +46,6 @@ internal static class DrawManagement
         if (state == DrawState.Finished)
             throw new InvalidOperationException("Use Execute Draw to finish a draw.");
 
-        if (state == DrawState.Active)
-        {
-            var activeDraws = await db.Draws
-                .Where(x => x.Id != draw.Id && x.State == DrawState.Active)
-                .ToListAsync(ct);
-
-            foreach (var activeDraw in activeDraws)
-                activeDraw.State = DrawState.Upcoming;
-        }
 
         draw.PrizePoolMatch3 = RoundPrizePool(prizePoolMatch3);
         draw.PrizePoolMatch4 = RoundPrizePool(prizePoolMatch4);

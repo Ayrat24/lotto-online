@@ -73,7 +73,7 @@ public sealed class WalletService : IWalletService
             return new WalletPurchaseResult(false, 0m, "Draw was not found.");
 
         if (draw.State != DrawState.Active)
-            return new WalletPurchaseResult(false, 0m, "Only the active draw accepts purchases.");
+            return new WalletPurchaseResult(false, 0m, "Only active draws accept purchases.");
 
         if (draw.TicketCost <= 0)
             return new WalletPurchaseResult(false, 0m, "Ticket cost is not configured for this draw.");
@@ -90,7 +90,7 @@ public sealed class WalletService : IWalletService
             .ToListAsync(ct);
 
         if (existingNumbers.Any(x => BuildTicketSignature(x) == candidateSignature))
-            return new WalletPurchaseResult(false, user.Balance, "You already purchased this ticket for the current draw.");
+            return new WalletPurchaseResult(false, user.Balance, "You already purchased this ticket for the selected draw.");
 
         var cost = RoundAmount(draw.TicketCost);
         if (user.Balance < cost)
@@ -133,7 +133,7 @@ public sealed class WalletService : IWalletService
         catch (DbUpdateException ex) when (ex.InnerException?.Message?.Contains("IX_tickets_UserId_DrawId_NumbersSignature", StringComparison.OrdinalIgnoreCase) == true
                                         || ex.Message.Contains("IX_tickets_UserId_DrawId_NumbersSignature", StringComparison.OrdinalIgnoreCase))
         {
-            return new WalletPurchaseResult(false, user.Balance, "You already purchased this ticket for the current draw.");
+            return new WalletPurchaseResult(false, user.Balance, "You already purchased this ticket for the selected draw.");
         }
         return new WalletPurchaseResult(true, user.Balance, null, ticket);
     }

@@ -12,7 +12,7 @@ public static class TicketsEndpoints
     {
         // List tickets for current Telegram user.
         endpoints.MapPost("/api/tickets/list", async (
-            PurchaseTicketRequest req,
+            InitDataRequest req,
             HttpContext http,
             IConfiguration config,
             IWebHostEnvironment env,
@@ -77,7 +77,7 @@ public static class TicketsEndpoints
             return Results.Ok(new { ok = true, tickets });
         });
 
-        // Purchase a ticket for the current active draw using user-selected numbers.
+        // Purchase a ticket for a selected active draw.
         endpoints.MapPost("/api/tickets/purchase", async (
             PurchaseTicketRequest req,
             HttpContext http,
@@ -122,24 +122,13 @@ public static class TicketsEndpoints
             if (activeDraws.Count == 0)
                 return Results.BadRequest(new { ok = false, error = "There is no active draw right now." });
 
-            long selectedDrawId;
-            if (req.DrawId.HasValue)
-            {
-                var requestedDrawId = req.DrawId.Value;
-                if (!activeDraws.Any(x => x.Id == requestedDrawId))
-                    return Results.BadRequest(new { ok = false, error = "Selected draw is not active." });
-
-                selectedDrawId = requestedDrawId;
-            }
-            else
-            {
-                selectedDrawId = activeDraws[0].Id;
-            }
+            if (req.DrawId <= 0 || !activeDraws.Any(x => x.Id == req.DrawId))
+                return Results.BadRequest(new { ok = false, error = "Selected draw is not active." });
 
             if (!TryNormalizeSelectedNumbers(req.Numbers, out var numbers, out var validationError))
                 return Results.BadRequest(new { ok = false, error = validationError });
 
-            var purchaseResult = await wallet.TryPurchaseTicketAsync(u.Id, selectedDrawId, numbers, ct);
+            var purchaseResult = await wallet.TryPurchaseTicketAsync(u.Id, req.DrawId, numbers, ct);
             if (!purchaseResult.Success || purchaseResult.Ticket is null)
                 return Results.BadRequest(new { ok = false, error = purchaseResult.Error ?? "Purchase failed.", balance = purchaseResult.UserBalance });
 

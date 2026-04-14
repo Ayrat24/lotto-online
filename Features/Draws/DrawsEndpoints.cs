@@ -9,7 +9,7 @@ public static class DrawsEndpoints
 {
     public static IEndpointRouteBuilder MapDrawsEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        // Admin: create the next draw instance. If there is no active draw, the new instance becomes active.
+        // Admin: create the next draw instance in active state.
         endpoints.MapPost("/api/admin/draws/start", [Authorize(Policy = AdminAuth.PolicyName)] async (
             CreateDrawRequest? req,
             AppDbContext db,

@@ -2,6 +2,8 @@ using MiniApp.Features.Draws;
 
 namespace MiniApp.Features.Timeline;
 
+public sealed record TimelineRequest(string InitData);
+
 public sealed record MiniAppStateDto(
     decimal Balance,
     DrawDto? CurrentDraw,

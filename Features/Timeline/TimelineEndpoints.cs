@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using MiniApp.Data;
 using MiniApp.Features.Auth;
 using MiniApp.Features.Draws;
-using MiniApp.Features.Tickets;
 using MiniApp.TelegramLogin;
 
 namespace MiniApp.Features.Timeline;
@@ -13,7 +12,7 @@ public static class TimelineEndpoints
     {
         // Returns the current draw, the user's tickets for it, and grouped personal history for previous draws.
         endpoints.MapPost("/api/timeline", async (
-            PurchaseTicketRequest req,
+            TimelineRequest req,
             HttpContext http,
             IConfiguration config,
             IWebHostEnvironment env,
