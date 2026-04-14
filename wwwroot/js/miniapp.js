@@ -55,6 +55,8 @@
   var currentDrawTicketPriceRowEl = document.getElementById('currentDrawTicketPriceRow');
   var currentDrawTicketCostEl = document.getElementById('currentDrawTicketCost');
   var currentDrawPurchaseBlockEl = document.getElementById('currentDrawPurchaseBlock');
+  var featuredJackpotCardEl = document.getElementById('featuredJackpotCard');
+  var jackpotCardsContainerEl = document.getElementById('jackpotCardsContainer');
   var currentDisplayedDrawId = null;
   var appShellEl = document.getElementById('appShell');
   var appLoadingShellEl = document.getElementById('appLoadingShell');
@@ -133,6 +135,7 @@
   function reapplyLocalizedRuntimeTexts() {
     var selected = resolveSelectedDrawSnapshot(latestState);
     renderCurrentDraw(selected.draw, selected.tickets, selected.hasMultipleActiveDraws);
+    renderActiveDrawBanners(getActiveDraws(latestState), getActiveTicketGroups(latestState));
     renderMyTickets(latestState);
     renderHistory();
 
@@ -179,7 +182,190 @@
     return { draw: selectedDraw, tickets: tickets, hasMultipleActiveDraws: hasMultipleActiveDraws };
   }
 
-  // Per-draw banner UI removed — jackpot card will show featured/current draw and contain the purchase controls.
+  function selectActiveDraw(drawId, shouldOpenPicker) {
+    var parsedDrawId = parseInt(drawId, 10);
+    if (!Number.isFinite(parsedDrawId) || parsedDrawId <= 0) return;
+
+    var activeDraws = getActiveDraws(latestState);
+    var hasDraw = activeDraws.some(function (x) { return x && x.id === parsedDrawId; });
+    if (!hasDraw) return;
+
+    selectedActiveDrawId = parsedDrawId;
+
+    var selected = resolveSelectedDrawSnapshot(latestState);
+    renderCurrentDraw(selected.draw, selected.tickets, selected.hasMultipleActiveDraws);
+    renderActiveDrawBanners(activeDraws, getActiveTicketGroups(latestState));
+
+    if (shouldOpenPicker === true) {
+      if (!selected.draw || selected.draw.state !== 'active') {
+        setPurchaseStatus(t('client.status.noActiveDraw', 'There is no active draw right now.'));
+        return;
+      }
+
+      setPurchaseStatus('');
+      openTicketPicker();
+    }
+  }
+
+  function renderActiveDrawBanners(activeDraws, activeTicketGroups) {
+    if (!jackpotCardsContainerEl) return;
+
+    var draws = Array.isArray(activeDraws) ? activeDraws : [];
+    var groups = Array.isArray(activeTicketGroups) ? activeTicketGroups : [];
+
+    jackpotCardsContainerEl.innerHTML = '';
+
+    if (draws.length === 0) {
+      if (featuredJackpotCardEl) featuredJackpotCardEl.hidden = false;
+      jackpotCardsContainerEl.hidden = true;
+      return;
+    }
+
+    if (featuredJackpotCardEl) featuredJackpotCardEl.hidden = true;
+    jackpotCardsContainerEl.hidden = false;
+
+    draws.forEach(function (draw) {
+      if (!draw) return;
+
+      var isSelected = selectedActiveDrawId === draw.id;
+      var stateClass = draw.state === 'active'
+        ? 'state-badge-active'
+        : draw.state === 'finished'
+          ? 'state-badge-finished'
+          : 'state-badge-upcoming';
+
+      var banner = document.createElement('article');
+      banner.className = 'card jackpot-card duplicate-jackpot-card' + (isSelected ? ' duplicate-jackpot-card-selected' : '');
+      banner.setAttribute('role', 'button');
+      banner.setAttribute('tabindex', '0');
+      banner.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+
+      var header = document.createElement('div');
+      header.className = 'jackpot-main';
+
+      var top = document.createElement('div');
+      top.className = 'jackpot-top';
+
+      var chip = document.createElement('span');
+      chip.className = 'jackpot-chip';
+      chip.textContent = formatDrawStateLabel(draw.state);
+
+      var openedLine = document.createElement('span');
+      openedLine.className = 'jackpot-time';
+      openedLine.textContent = (draw.state === 'finished'
+        ? t('client.currentDraw.concludedPrefix', 'Concluded ')
+        : t('client.currentDraw.openedPrefix', 'Opened ')) + formatUtc(draw.createdAtUtc);
+
+      top.appendChild(chip);
+      top.appendChild(openedLine);
+      header.appendChild(top);
+
+      var headline = document.createElement('div');
+      headline.className = 'jackpot-headline';
+
+      var title = document.createElement('span');
+      title.className = 'jackpot-title';
+      title.textContent = t('client.jackpot.prizePoolTitle', 'Prize pool :');
+
+      var amount = document.createElement('span');
+      amount.className = 'jackpot-amount';
+      amount.textContent = formatJackpot(draw.prizePool);
+
+      var bang = document.createElement('span');
+      bang.className = 'jackpot-amount-bang';
+      bang.textContent = '!';
+
+      headline.appendChild(title);
+      headline.appendChild(amount);
+      headline.appendChild(bang);
+      header.appendChild(headline);
+
+      var subtitle = document.createElement('p');
+      subtitle.className = 'jackpot-copy';
+      subtitle.textContent = draw.state === 'active'
+        ? t('client.currentDraw.liveSubtitle', 'The draw is live. Don\'t miss your chance to become a multi-millionaire!')
+        : t('client.jackpot.subtitle', 'The next draw is coming soon. Get your tickets now.');
+      header.appendChild(subtitle);
+
+      var tiers = document.createElement('div');
+      tiers.className = 'prize-tier-row';
+
+      function createTier(label, value) {
+        var pill = document.createElement('div');
+        pill.className = 'prize-tier-pill';
+        var tierLabel = document.createElement('span');
+        tierLabel.className = 'prize-tier-label';
+        tierLabel.textContent = label;
+        var tierValue = document.createElement('span');
+        tierValue.className = 'prize-tier-value';
+        tierValue.textContent = '$' + formatPrizePool(value);
+        pill.appendChild(tierLabel);
+        pill.appendChild(tierValue);
+        return pill;
+      }
+
+      tiers.appendChild(createTier('3/5', draw.prizePoolMatch3));
+      tiers.appendChild(createTier('4/5', draw.prizePoolMatch4));
+      tiers.appendChild(createTier('5/5', draw.prizePoolMatch5));
+      header.appendChild(tiers);
+
+      var stateBadge = document.createElement('span');
+      stateBadge.className = 'state-badge ' + stateClass;
+      stateBadge.textContent = formatDrawStateLabel(draw.state);
+      header.appendChild(stateBadge);
+      banner.appendChild(header);
+
+      var footer = document.createElement('div');
+      footer.className = 'jackpot-buy-row';
+
+      var left = document.createElement('div');
+      left.className = 'jackpot-buy-left';
+
+      var priceLabel = document.createElement('div');
+      priceLabel.className = 'jackpot-buy-price-label';
+      priceLabel.textContent = t('client.currentDraw.ticketCostPrefix', 'Ticket cost:');
+
+      var price = document.createElement('div');
+      price.className = 'jackpot-buy-price';
+      price.textContent = formatCurrency(draw.ticketCost);
+
+      left.appendChild(priceLabel);
+      left.appendChild(price);
+
+      var buyBtn = document.createElement('button');
+      buyBtn.type = 'button';
+      buyBtn.className = 'jackpot-buy-btn';
+      buyBtn.textContent = t('client.button.purchase', 'Purchase ticket');
+      buyBtn.disabled = draw.state !== 'active';
+
+      buyBtn.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        selectActiveDraw(draw.id, true);
+      });
+
+      footer.appendChild(left);
+      var right = document.createElement('div');
+      right.className = 'jackpot-buy-right';
+      right.appendChild(buyBtn);
+      footer.appendChild(right);
+      banner.appendChild(footer);
+
+      banner.addEventListener('click', function () {
+        selectActiveDraw(draw.id, false);
+      });
+
+      banner.addEventListener('keydown', function (ev) {
+        if (!ev) return;
+        if (ev.key === 'Enter' || ev.key === ' ') {
+          ev.preventDefault();
+          selectActiveDraw(draw.id, false);
+        }
+      });
+
+      jackpotCardsContainerEl.appendChild(banner);
+    });
+  }
 
   function setPurchaseStatus(text) {
     if (purchaseStatusEl) purchaseStatusEl.textContent = text || '';
@@ -1437,6 +1623,11 @@
       ? selected.draw.id
       : null;
 
+    if (selectedDrawId == null) {
+      setTicketPickerStatus(t('client.status.noActiveDraw', 'There is no active draw right now.'));
+      return;
+    }
+
     var validation = validatePickerSelection();
     if (!validation.ok) {
       setTicketPickerStatus(validation.message);
@@ -1651,6 +1842,7 @@
 
     var selected = resolveSelectedDrawSnapshot(latestState);
     renderCurrentDraw(selected.draw, selected.tickets, selected.hasMultipleActiveDraws);
+    renderActiveDrawBanners(activeDraws, getActiveTicketGroups(latestState));
     renderMyTickets(latestState);
 
     if (clientIsLocalDebug && !autoOpenedTicketsTab) {
