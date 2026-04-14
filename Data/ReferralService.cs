@@ -94,7 +94,7 @@ public sealed class ReferralService : IReferralService
 
         return new ReferralProfileResult(
             user.InviteCode!,
-            user.ReferredByUserId,
+            user.ReferredByUserIdOrUnbound,
             user.ReferredAtUtc,
             totalInviterRewards,
             totalInviteeRewards,
@@ -127,9 +127,9 @@ public sealed class ReferralService : IReferralService
             return new ReferralBindResult(false, "You cannot use your own invite code.");
         }
 
-        if (invitee.ReferredByUserId != MiniAppUser.UnboundReferralUserId)
+        if (invitee.ReferredByUserIdOrUnbound != MiniAppUser.UnboundReferralUserId)
         {
-            _logger.LogWarning("Referral bind failed: invitee already bound. InviteeUserId={InviteeUserId}, ExistingInviterUserId={ExistingInviterUserId}, Code={Code}", inviteeUserId, invitee.ReferredByUserId, normalizedCode);
+            _logger.LogWarning("Referral bind failed: invitee already bound. InviteeUserId={InviteeUserId}, ExistingInviterUserId={ExistingInviterUserId}, Code={Code}", inviteeUserId, invitee.ReferredByUserIdOrUnbound, normalizedCode);
             return new ReferralBindResult(false, "Referral is already bound for this account.");
         }
 
@@ -188,10 +188,10 @@ public sealed class ReferralService : IReferralService
             return;
 
         var invitee = await _db.Users.SingleAsync(x => x.Id == deposit.UserId, ct);
-        if (invitee.ReferredByUserId == MiniAppUser.UnboundReferralUserId)
+        if (!invitee.ReferredByUserId.HasValue)
             return;
 
-        var inviterId = invitee.ReferredByUserId;
+        var inviterId = invitee.ReferredByUserId.Value;
         if (inviterId == invitee.Id)
             return;
 

@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace MiniApp.Data;
 
 public sealed class MiniAppUser
@@ -25,10 +27,14 @@ public sealed class MiniAppUser
 
     public string? InviteCode { get; set; }
 
-    /// <summary>
-    /// Referring user id, or -1 when the account is not bound.
-    /// </summary>
-    public long ReferredByUserId { get; set; } = UnboundReferralUserId;
+    public long? ReferredByUserId { get; set; }
+
+    [NotMapped]
+    public long ReferredByUserIdOrUnbound
+    {
+        get => ReferredByUserId ?? UnboundReferralUserId;
+        set => ReferredByUserId = value == UnboundReferralUserId ? null : value;
+    }
 
     public DateTimeOffset? ReferredAtUtc { get; set; }
 
