@@ -113,19 +113,33 @@ public static class TicketsEndpoints
 
             var u = await users.TouchUserAsync(telegramUserId, ct);
 
-            var currentDraw = await db.Draws
+            var activeDraws = await db.Draws
                 .Where(x => x.State == DrawState.Active)
                 .OrderByDescending(x => x.Id)
                 .Select(x => new { x.Id })
-                .FirstOrDefaultAsync(ct);
+                .ToListAsync(ct);
 
-            if (currentDraw is null)
+            if (activeDraws.Count == 0)
                 return Results.BadRequest(new { ok = false, error = "There is no active draw right now." });
+
+            long selectedDrawId;
+            if (req.DrawId.HasValue)
+            {
+                var requestedDrawId = req.DrawId.Value;
+                if (!activeDraws.Any(x => x.Id == requestedDrawId))
+                    return Results.BadRequest(new { ok = false, error = "Selected draw is not active." });
+
+                selectedDrawId = requestedDrawId;
+            }
+            else
+            {
+                selectedDrawId = activeDraws[0].Id;
+            }
 
             if (!TryNormalizeSelectedNumbers(req.Numbers, out var numbers, out var validationError))
                 return Results.BadRequest(new { ok = false, error = validationError });
 
-            var purchaseResult = await wallet.TryPurchaseTicketAsync(u.Id, currentDraw.Id, numbers, ct);
+            var purchaseResult = await wallet.TryPurchaseTicketAsync(u.Id, selectedDrawId, numbers, ct);
             if (!purchaseResult.Success || purchaseResult.Ticket is null)
                 return Results.BadRequest(new { ok = false, error = purchaseResult.Error ?? "Purchase failed.", balance = purchaseResult.UserBalance });
 

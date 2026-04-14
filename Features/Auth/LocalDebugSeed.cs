@@ -51,30 +51,56 @@ public static class LocalDebugSeed
             finishedDraws.Add(finished);
         }
 
-        var activeDraw = draws
+        var targetActiveDrawCount = GetTargetActiveDrawCount(debugTelegramUserId, now);
+        var activeDraws = draws
             .Where(x => x.State == DrawState.Active)
             .OrderByDescending(x => x.Id)
-            .FirstOrDefault();
+            .ToList();
 
-        if (activeDraw is null)
+        if (activeDraws.Count > targetActiveDrawCount)
         {
-            activeDraw = new Draw
-            {
-                Id = nextId++,
-                PrizePoolMatch3 = 80m,
-                PrizePoolMatch4 = 50m,
-                PrizePoolMatch5 = 70m,
-                TicketCost = 2m,
-                State = DrawState.Active,
-                CreatedAtUtc = now.AddHours(-1)
-            };
-            db.Draws.Add(activeDraw);
-            draws.Add(activeDraw);
+            foreach (var drawToDemote in activeDraws.Skip(targetActiveDrawCount))
+                drawToDemote.State = DrawState.Upcoming;
+
+            activeDraws = activeDraws.Take(targetActiveDrawCount).ToList();
         }
 
-        var otherActiveDraws = draws.Where(x => x.State == DrawState.Active && x.Id != activeDraw.Id).ToList();
-        foreach (var d in otherActiveDraws)
-            d.State = DrawState.Upcoming;
+        if (activeDraws.Count < targetActiveDrawCount)
+        {
+            var upcomingPool = draws
+                .Where(x => x.State == DrawState.Upcoming)
+                .OrderByDescending(x => x.Id)
+                .ToList();
+
+            while (activeDraws.Count < targetActiveDrawCount)
+            {
+                Draw drawToActivate;
+                if (upcomingPool.Count > 0)
+                {
+                    drawToActivate = upcomingPool[0];
+                    upcomingPool.RemoveAt(0);
+                }
+                else
+                {
+                    drawToActivate = new Draw
+                    {
+                        Id = nextId++,
+                        PrizePoolMatch3 = 80m + activeDraws.Count * 20m,
+                        PrizePoolMatch4 = 50m + activeDraws.Count * 20m,
+                        PrizePoolMatch5 = 70m + activeDraws.Count * 30m,
+                        TicketCost = 2m,
+                        State = DrawState.Active,
+                        CreatedAtUtc = now.AddHours(-1).AddMinutes(-20 * activeDraws.Count)
+                    };
+
+                    db.Draws.Add(drawToActivate);
+                    draws.Add(drawToActivate);
+                }
+
+                drawToActivate.State = DrawState.Active;
+                activeDraws.Add(drawToActivate);
+            }
+        }
 
         var upcomingDraw = draws
             .Where(x => x.State == DrawState.Upcoming)
@@ -144,6 +170,16 @@ public static class LocalDebugSeed
         }
 
         await db.SaveChangesAsync(ct);
+    }
+
+    private static int GetTargetActiveDrawCount(long debugTelegramUserId, DateTimeOffset now)
+    {
+        // Keep randomization stable throughout the day to avoid draw state flapping during polling.
+        var dayOfYear = now.UtcDateTime.DayOfYear;
+        var year = now.UtcDateTime.Year;
+        var seed = HashCode.Combine(debugTelegramUserId, year, dayOfYear);
+        var rng = new Random(seed);
+        return rng.Next(1, 3);
     }
 
     private static int CountMatches(string ticketNumbers, string drawNumbers)

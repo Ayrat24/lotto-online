@@ -45,11 +45,13 @@ public static class TimelineEndpoints
 
             var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.TelegramUserId == telegramUserId, ct);
 
-            var activeDrawEntity = await db.Draws
+            var activeDrawEntities = await db.Draws
                 .Where(x => x.State == DrawState.Active)
                 .OrderByDescending(x => x.Id)
                 .AsNoTracking()
-                .FirstOrDefaultAsync(ct);
+                .ToListAsync(ct);
+
+            var activeDrawEntity = activeDrawEntities.FirstOrDefault();
 
             Draw? featuredDrawEntity = activeDrawEntity;
             if (featuredDrawEntity is null)
@@ -81,6 +83,10 @@ public static class TimelineEndpoints
             var currentDraw = featuredDrawEntity is null
                 ? null
                 : DrawManagement.ToDto(featuredDrawEntity);
+
+            var activeDraws = activeDrawEntities
+                .Select(DrawManagement.ToDto)
+                .ToArray();
 
             var ticketRows = user is null
                 ? new List<Ticket>()
@@ -120,8 +126,20 @@ public static class TimelineEndpoints
                     .OrderByDescending(x => x.PurchasedAtUtc)
                     .ToArray();
 
+            var activeDrawIds = activeDraws.Select(x => x.Id).ToHashSet();
+
+            var activeTicketGroups = activeDraws
+                .Select(draw => new DrawGroupDto(
+                    draw.Id,
+                    draw,
+                    tickets
+                        .Where(x => x.DrawId == draw.Id)
+                        .OrderByDescending(x => x.PurchasedAtUtc)
+                        .ToArray()))
+                .ToArray();
+
             var historyTicketGroups = tickets
-                .Where(x => currentDraw is null || x.DrawId != currentDraw.Id)
+                .Where(x => !activeDrawIds.Contains(x.DrawId))
                 .GroupBy(x => x.DrawId)
                 .OrderByDescending(g => g.Key)
                 .ToList();
@@ -144,7 +162,7 @@ public static class TimelineEndpoints
                 })
                 .ToArray();
 
-            var state = new MiniAppStateDto(user?.Balance ?? 0m, currentDraw, currentTickets, history);
+            var state = new MiniAppStateDto(user?.Balance ?? 0m, currentDraw, activeDraws, activeTicketGroups, currentTickets, history);
             return Results.Ok(new { ok = true, state });
         });
 

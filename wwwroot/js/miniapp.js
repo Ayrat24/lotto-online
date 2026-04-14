@@ -35,13 +35,15 @@
   var ticketsTabPanel = document.getElementById('ticketsTabPanel');
   var profileTabPanel = document.getElementById('profileTabPanel');
 
-  var currentDrawStateBadgeEl = document.getElementById('currentDrawStateBadge');
+  var currentDrawStateBadgeEl = document.getElementById('currentDrawStateBadge') || document.getElementById('jackpotGameStateBadge');
   var currentDrawEmptyEl = document.getElementById('currentDrawEmpty');
   var currentDrawContentEl = document.getElementById('currentDrawContent');
-  var currentDrawIdEl = document.getElementById('currentDrawId');
-  var currentDrawSubtitleEl = document.getElementById('currentDrawSubtitle');
+  // previous currentDrawId/currentDrawSubtitle were removed; use jackpotGameTitle/subtitle instead
+  var currentDrawIdEl = document.getElementById('jackpotGameTitle') || document.getElementById('currentDrawId');
+  var currentDrawSubtitleEl = document.getElementById('jackpotGameSubtitle') || document.getElementById('currentDrawSubtitle');
   var currentDrawPrizePoolEl = document.getElementById('currentDrawPrizePool');
   var currentDrawCreatedAtEl = document.getElementById('currentDrawCreatedAt');
+  var jackpotChipEl = document.querySelector('.jackpot-chip');
   var jackpotAmountEl = document.getElementById('jackpotAmount');
   var jackpotSubtitleEl = document.getElementById('jackpotSubtitle');
   var currentDrawPrizeTiersEl = document.getElementById('currentDrawPrizeTiers');
@@ -53,6 +55,7 @@
   var currentDrawTicketPriceRowEl = document.getElementById('currentDrawTicketPriceRow');
   var currentDrawTicketCostEl = document.getElementById('currentDrawTicketCost');
   var currentDrawPurchaseBlockEl = document.getElementById('currentDrawPurchaseBlock');
+  var currentDisplayedDrawId = null;
   var appShellEl = document.getElementById('appShell');
   var appLoadingShellEl = document.getElementById('appLoadingShell');
 
@@ -73,7 +76,8 @@
 
   var highlightTicketId = null;
   var lastStateSig = null;
-  var latestState = { balance: 0, currentDraw: null, currentTickets: [], history: [] };
+  var latestState = { balance: 0, currentDraw: null, activeDraws: [], activeTicketGroups: [], currentTickets: [], history: [] };
+  var selectedActiveDrawId = null;
   var appHasLoadedState = false;
   var initData = null;
   var clientIsLocalDebug = false;
@@ -112,6 +116,7 @@
   var pickerOpenAnimationTimer = null;
   var pollingIntervalId = null;
   var debugModeBadgeReason = '';
+  var localDebugWatchdog = null;
 
   function getDebugModeBadgeText(reason) {
     if (reason === 'forced-local') {
@@ -126,7 +131,8 @@
   }
 
   function reapplyLocalizedRuntimeTexts() {
-    renderCurrentDraw(latestState.currentDraw || null, latestState.currentTickets || []);
+    var selected = resolveSelectedDrawSnapshot(latestState);
+    renderCurrentDraw(selected.draw, selected.tickets, selected.hasMultipleActiveDraws);
     renderMyTickets(latestState);
     renderHistory();
 
@@ -134,6 +140,46 @@
       setDebugModeBadge(getDebugModeBadgeText(debugModeBadgeReason));
     }
   }
+
+  function getActiveDraws(state) {
+    return (state && Array.isArray(state.activeDraws)) ? state.activeDraws : [];
+  }
+
+  function getActiveTicketGroups(state) {
+    return (state && Array.isArray(state.activeTicketGroups)) ? state.activeTicketGroups : [];
+  }
+
+  function resolveSelectedDrawSnapshot(state) {
+    var activeDraws = getActiveDraws(state);
+    var hasMultipleActiveDraws = activeDraws.length > 1;
+
+    var selectedDraw = null;
+    if (selectedActiveDrawId != null) {
+      selectedDraw = activeDraws.find(function (x) { return x && x.id === selectedActiveDrawId; }) || null;
+    }
+
+    if (!selectedDraw && activeDraws.length > 0) {
+      selectedDraw = activeDraws[0];
+    }
+
+    if (!selectedDraw) {
+      selectedDraw = state && state.currentDraw ? state.currentDraw : null;
+    }
+
+    var tickets = [];
+    if (selectedDraw && activeDraws.some(function (x) { return x && x.id === selectedDraw.id; })) {
+      var activeGroup = getActiveTicketGroups(state).find(function (group) {
+        return group && group.drawId === selectedDraw.id;
+      });
+      tickets = activeGroup && Array.isArray(activeGroup.tickets) ? activeGroup.tickets : [];
+    } else {
+      tickets = (state && Array.isArray(state.currentTickets)) ? state.currentTickets : [];
+    }
+
+    return { draw: selectedDraw, tickets: tickets, hasMultipleActiveDraws: hasMultipleActiveDraws };
+  }
+
+  // Per-draw banner UI removed — jackpot card will show featured/current draw and contain the purchase controls.
 
   function setPurchaseStatus(text) {
     if (purchaseStatusEl) purchaseStatusEl.textContent = text || '';
@@ -1040,15 +1086,31 @@
     return container;
   }
 
-  function renderCurrentDraw(draw, currentTickets) {
-    if (!currentDrawEmptyEl || !currentDrawContentEl || !currentDrawStateBadgeEl) return;
+  // Backwards-compatible shim: delegate to banner renderer
+  function renderActiveDrawPicker(activeDraws) {
+    try {
+      renderActiveDrawBanners(activeDraws, getActiveTicketGroups(latestState));
+    } catch (e) {
+      // swallow errors to avoid breaking early initialization
+      try { console.warn('renderActiveDrawPicker shim error', e); } catch (e) { }
+    }
+  }
+
+  function renderCurrentDraw(draw, currentTickets, hasMultipleActiveDraws) {
+      // allow rendering when the old current-draw card was removed — require badge or title elements
+      if (!currentDrawStateBadgeEl) return;
+
+    // legacy picker removed; banners will be rendered instead
 
     if (!draw) {
-      currentDrawStateBadgeEl.textContent = t('client.currentDraw.waiting', 'waiting');
-      currentDrawStateBadgeEl.className = 'state-badge state-badge-muted';
-      currentDrawEmptyEl.hidden = false;
-      currentDrawContentEl.hidden = true;
-      if (currentDrawIdEl) currentDrawIdEl.textContent = t('client.draw.gameTitle', 'PowerBall Global');
+      if (jackpotChipEl) jackpotChipEl.textContent = t('client.currentDraw.waiting', 'waiting');
+        if (currentDrawStateBadgeEl) {
+          currentDrawStateBadgeEl.textContent = t('client.currentDraw.waiting', 'waiting');
+          currentDrawStateBadgeEl.className = 'state-badge state-badge-muted';
+        }
+        if (currentDrawEmptyEl) currentDrawEmptyEl.hidden = false;
+        if (currentDrawContentEl) currentDrawContentEl.hidden = true;
+      if (currentDrawIdEl) currentDrawIdEl.textContent = t('client.jackpot.prizePoolTitle', 'Prize pool :');
       if (currentDrawPrizePoolEl) currentDrawPrizePoolEl.textContent = '$0.00';
       if (currentDrawCreatedAtEl) currentDrawCreatedAtEl.textContent = t('client.jackpot.endsIn', 'Ends in --:--:--');
       if (jackpotAmountEl) jackpotAmountEl.textContent = '$0';
@@ -1066,17 +1128,21 @@
       if (currentDrawTicketPriceRowEl) currentDrawTicketPriceRowEl.hidden = false;
       if (currentDrawTicketCostEl) currentDrawTicketCostEl.textContent = '$2.00';
       if (currentDrawPurchaseBlockEl) currentDrawPurchaseBlockEl.hidden = false;
+      // legacy picker cleanup not required
       return;
     }
 
     var isFinishedDraw = draw.state === 'finished';
 
-    currentDrawStateBadgeEl.textContent = formatDrawStateLabel(draw.state);
-    currentDrawStateBadgeEl.className = 'state-badge ' + (draw.state === 'active' ? 'state-badge-active' : draw.state === 'finished' ? 'state-badge-finished' : 'state-badge-upcoming');
-    currentDrawEmptyEl.hidden = true;
-    currentDrawContentEl.hidden = false;
+    if (currentDrawStateBadgeEl) {
+      currentDrawStateBadgeEl.textContent = formatDrawStateLabel(draw.state);
+      currentDrawStateBadgeEl.className = 'state-badge ' + (draw.state === 'active' ? 'state-badge-active' : draw.state === 'finished' ? 'state-badge-finished' : 'state-badge-upcoming');
+    }
+    if (jackpotChipEl) jackpotChipEl.textContent = formatDrawStateLabel(draw.state);
+    if (currentDrawEmptyEl) currentDrawEmptyEl.hidden = true;
+    if (currentDrawContentEl) currentDrawContentEl.hidden = false;
 
-    if (currentDrawIdEl) currentDrawIdEl.textContent = t('client.draw.gameTitle', 'PowerBall Global') + ' • #' + draw.id;
+    if (currentDrawIdEl) currentDrawIdEl.textContent = t('client.jackpot.prizePoolTitle', 'Prize pool :');
     if (currentDrawPrizePoolEl) currentDrawPrizePoolEl.textContent = '$' + formatPrizePool(draw.prizePool);
     if (currentDrawCreatedAtEl) currentDrawCreatedAtEl.textContent = (draw.state === 'finished' ? t('client.currentDraw.concludedPrefix', 'Concluded ') : t('client.currentDraw.openedPrefix', 'Opened ')) + formatUtc(draw.createdAtUtc);
     if (jackpotAmountEl) jackpotAmountEl.textContent = formatJackpot(draw.prizePool);
@@ -1085,6 +1151,22 @@
     if (currentDrawPrizePool4El) currentDrawPrizePool4El.textContent = '$' + formatPrizePool(draw.prizePoolMatch4);
     if (currentDrawPrizePool5El) currentDrawPrizePool5El.textContent = '$' + formatPrizePool(draw.prizePoolMatch5);
     if (currentDrawTicketCostEl) currentDrawTicketCostEl.textContent = formatCurrency(draw.ticketCost);
+
+    // Update jackpot purchase price and track the displayed draw id
+    try {
+      currentDisplayedDrawId = draw ? draw.id : null;
+      var jackpotPriceEl = document.getElementById('jackpotBuyPrice');
+      if (jackpotPriceEl) jackpotPriceEl.textContent = formatCurrency(draw ? draw.ticketCost : 0);
+
+      if (purchaseBtn) {
+        // Ensure purchase button is visible and enabled only for active draws
+        purchaseBtn.hidden = false;
+        purchaseBtn.disabled = draw ? draw.state !== 'active' : true;
+        purchaseBtn.title = draw && draw.state === 'active' ? '' : t('client.currentDraw.activeOnlyTitle', 'Only the active draw accepts purchases.');
+      }
+    } catch (e) {
+      try { console.warn('renderCurrentDraw jackpot update error', e); } catch (e) { }
+    }
 
     var hasWinningsAvailable = false;
     (currentTickets || []).forEach(function (ticket) {
@@ -1125,9 +1207,16 @@
     var groups = [];
     var seenDraw = {};
 
+    var activeTicketGroups = getActiveTicketGroups(state);
+    activeTicketGroups.forEach(function (group) {
+      if (!group || !group.draw || !Array.isArray(group.tickets) || group.tickets.length === 0) return;
+      groups.push({ drawId: group.drawId, draw: group.draw, tickets: group.tickets.slice() });
+      seenDraw[group.drawId] = true;
+    });
+
     var currentDraw = state && state.currentDraw ? state.currentDraw : null;
     var currentTickets = state && state.currentTickets ? state.currentTickets : [];
-    if (currentDraw && currentTickets.length > 0) {
+    if (currentDraw && currentTickets.length > 0 && !seenDraw[currentDraw.id]) {
       groups.push({ drawId: currentDraw.id, draw: currentDraw, tickets: currentTickets.slice() });
       seenDraw[currentDraw.id] = true;
     }
@@ -1343,6 +1432,11 @@
   function confirmSelectedTicketNumbers() {
     if (!initData) return;
 
+    var selected = resolveSelectedDrawSnapshot(latestState);
+    var selectedDrawId = selected.draw && selected.draw.state === 'active'
+      ? selected.draw.id
+      : null;
+
     var validation = validatePickerSelection();
     if (!validation.ok) {
       setTicketPickerStatus(validation.message);
@@ -1356,7 +1450,8 @@
 
     postJson('/api/tickets/purchase', {
       initData: initData || '',
-      numbers: pickerNumbers.slice(0, LOTTO_NUMBERS_COUNT)
+      numbers: pickerNumbers.slice(0, LOTTO_NUMBERS_COUNT),
+      drawId: selectedDrawId
     }, null)
       .then(function (res) {
         if (res && res.ok && res.ticket) {
@@ -1380,7 +1475,8 @@
       .finally(function () {
         updatePickerUi();
         if (purchaseBtn) {
-          purchaseBtn.disabled = !(latestState.currentDraw && latestState.currentDraw.state === 'active');
+          var snapshot = resolveSelectedDrawSnapshot(latestState);
+          purchaseBtn.disabled = !(snapshot.draw && snapshot.draw.state === 'active');
         }
       });
   }
@@ -1473,6 +1569,31 @@
           numbers: state.currentDraw.numbers || null,
           createdAtUtc: state.currentDraw.createdAtUtc || null
         } : null,
+        activeDraws: (state && state.activeDraws || []).map(function (draw) {
+          return {
+            id: draw.id,
+            prizePool: draw.prizePool,
+            ticketCost: draw.ticketCost,
+            state: draw.state,
+            numbers: draw.numbers || null,
+            createdAtUtc: draw.createdAtUtc || null
+          };
+        }),
+        activeTicketGroups: (state && state.activeTicketGroups || []).map(function (group) {
+          return {
+            drawId: group.drawId,
+            tickets: (group.tickets || []).map(function (ticket) {
+              return {
+                id: ticket.id,
+                drawId: ticket.drawId,
+                numbers: ticket.numbers || null,
+                status: ticket.status || null,
+                purchasedAtUtc: ticket.purchasedAtUtc || null,
+                winningAmount: Number(ticket.winningAmount || 0)
+              };
+            })
+          };
+        }),
         currentTickets: (state && state.currentTickets || []).map(function (ticket) {
           return {
             id: ticket.id,
@@ -1513,12 +1634,23 @@
   }
 
   function applyState(state) {
-    latestState = state || { balance: 0, currentDraw: null, currentTickets: [], history: [] };
+    latestState = state || { balance: 0, currentDraw: null, activeDraws: [], activeTicketGroups: [], currentTickets: [], history: [] };
+
+    var activeDraws = getActiveDraws(latestState);
+    if (activeDraws.length === 0) {
+      selectedActiveDrawId = null;
+    } else {
+      var selectedExists = selectedActiveDrawId != null && activeDraws.some(function (x) { return x && x.id === selectedActiveDrawId; });
+      if (!selectedExists) {
+        selectedActiveDrawId = activeDraws[0].id;
+      }
+    }
 
     renderBalance(latestState.balance);
     setTicketsWinningPin(countWinningTickets(latestState));
 
-    renderCurrentDraw(latestState.currentDraw || null, latestState.currentTickets || []);
+    var selected = resolveSelectedDrawSnapshot(latestState);
+    renderCurrentDraw(selected.draw, selected.tickets, selected.hasMultipleActiveDraws);
     renderMyTickets(latestState);
 
     if (clientIsLocalDebug && !autoOpenedTicketsTab) {
@@ -1532,16 +1664,31 @@
 
   function countWinningTickets(state) {
     var count = 0;
+    var countedTicketIds = {};
+
+    function includeTickets(items) {
+      (items || []).forEach(function (ticket) {
+        if (!ticket || ticket.status !== 'winnings_available') return;
+
+        var ticketId = ticket.id;
+        if (ticketId != null && countedTicketIds[ticketId]) return;
+
+        if (ticketId != null) countedTicketIds[ticketId] = true;
+        count++;
+      });
+    }
+
     var currentTickets = state && state.currentTickets ? state.currentTickets : [];
-    currentTickets.forEach(function (ticket) {
-      if (ticket && ticket.status === 'winnings_available') count++;
+    includeTickets(currentTickets);
+
+    var activeTicketGroups = getActiveTicketGroups(state);
+    activeTicketGroups.forEach(function (group) {
+      includeTickets(group && group.tickets ? group.tickets : []);
     });
 
     var history = state && state.history ? state.history : [];
     history.forEach(function (group) {
-      (group && group.tickets ? group.tickets : []).forEach(function (ticket) {
-        if (ticket && ticket.status === 'winnings_available') count++;
-      });
+      includeTickets(group && group.tickets ? group.tickets : []);
     });
 
     return count;
@@ -1591,6 +1738,11 @@
           var found = false;
           (res.state.currentTickets || []).forEach(function (ticket) {
             if (ticket && ticket.id === highlightTicketId) found = true;
+          });
+          (res.state.activeTicketGroups || []).forEach(function (group) {
+            (group && group.tickets ? group.tickets : []).forEach(function (ticket) {
+              if (ticket && ticket.id === highlightTicketId) found = true;
+            });
           });
           if (!found) highlightTicketId = null;
         }
@@ -1977,12 +2129,15 @@
 
   function purchaseTicket() {
     if (!initData) return;
-    if (!latestState.currentDraw || latestState.currentDraw.state !== 'active') {
+    var selected = resolveSelectedDrawSnapshot(latestState);
+    if (!selected.draw || selected.draw.state !== 'active') {
       setPurchaseStatus(t('client.status.noActiveDraw', 'There is no active draw right now.'));
       return;
     }
 
     setPurchaseStatus('');
+    // Ensure purchases from jackpot card target the featured/current draw
+    if (currentDisplayedDrawId != null) selectedActiveDrawId = currentDisplayedDrawId;
     openTicketPicker();
   }
 
@@ -1995,6 +2150,7 @@
   if (confirmTicketNumbersBtn) confirmTicketNumbersBtn.addEventListener('click', confirmSelectedTicketNumbers);
   if (centerPopupConfirmBtn) centerPopupConfirmBtn.addEventListener('click', hideCenterPopup);
   if (centerPopupBackdropEl) centerPopupBackdropEl.addEventListener('click', hideCenterPopup);
+  // active draw selection handled via per-banner buy buttons
   if (topUpBtn) topUpBtn.addEventListener('click', topUpBalance);
   if (applyPromoBtn) applyPromoBtn.addEventListener('click', applyPromoCode);
   if (promoCodeInputEl) {
@@ -2033,8 +2189,8 @@
   preloadTicketPicker();
   setActiveTab('lottery');
   setHistoryOpen(false);
-  renderCurrentDraw(null, []);
-  renderMyTickets({ balance: 0, currentDraw: null, currentTickets: [], history: [] });
+  renderCurrentDraw(null, [], false);
+  renderMyTickets({ balance: 0, currentDraw: null, activeDraws: [], activeTicketGroups: [], currentTickets: [], history: [] });
   renderHistory();
   renderBalance(0);
   if (topUpAmountInputEl && !String(topUpAmountInputEl.value || '').trim()) {
@@ -2055,6 +2211,13 @@
 
     initData = 'local-debug';
 
+    // watchdog: ensure the app gets out of loading overlay if the local-debug bootstrap chain stalls
+    try { if (localDebugWatchdog) clearTimeout(localDebugWatchdog); } catch (e) { }
+    localDebugWatchdog = setTimeout(function () {
+      try { console.warn('local-debug watchdog: marking app ready due to timeout'); } catch (e) { }
+      try { markAppReady(); } catch (e) { }
+    }, 5000);
+
     loadRemoteLocale(initData)
       .then(function () { return postJson('/api/auth/telegram', { initData: initData }); })
       .then(function () { return loadReferralProfile(); })
@@ -2064,9 +2227,12 @@
       .then(function () { return loadHistory(); })
       .then(function () {
         startPolling();
+        // clear watchdog when startup finished successfully
+        try { if (localDebugWatchdog) { clearTimeout(localDebugWatchdog); localDebugWatchdog = null; } } catch (e) { }
       })
       .catch(function (err) {
         console.warn('Failed local debug auth', err);
+        try { if (localDebugWatchdog) { clearTimeout(localDebugWatchdog); localDebugWatchdog = null; } } catch (e) { }
         handleAuthFailure(err);
       });
 

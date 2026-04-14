@@ -81,56 +81,50 @@
       <div id="debugModeBadge" class="debug-mode-badge" hidden></div>
 
       <section class="card jackpot-card">
-        <div class="jackpot-top">
-          <span class="jackpot-chip" data-loc="client.jackpot.alert">Jackpot alert</span>
-          <span class="jackpot-time" id="currentDrawCreatedAt" data-loc="client.jackpot.endsIn">Ends in --:--:--</span>
-        </div>
-        <div class="jackpot-amount" id="jackpotAmount">$0.00</div>
-        <p class="jackpot-copy" id="jackpotSubtitle" data-loc="client.jackpot.subtitle">The next draw is coming soon. Get your tickets now.</p>
-        <div id="currentDrawPrizeTiers" class="prize-tier-row" hidden>
-          <div class="prize-tier-pill">
-            <span class="prize-tier-label">3/5</span>
-            <span class="prize-tier-value" id="currentDrawPrizePool3">$0.00</span>
+        <div class="jackpot-main">
+          <div class="jackpot-top">
+            <span class="jackpot-chip" data-loc="client.draw.state.active">Active</span>
+            <span class="jackpot-time" id="currentDrawCreatedAt" data-loc="client.jackpot.endsIn">Ends in --:--:--</span>
           </div>
-          <div class="prize-tier-pill">
-            <span class="prize-tier-label">4/5</span>
-            <span class="prize-tier-value" id="currentDrawPrizePool4">$0.00</span>
-          </div>
-          <div class="prize-tier-pill">
-            <span class="prize-tier-label">5/5</span>
-            <span class="prize-tier-value" id="currentDrawPrizePool5">$0.00</span>
-          </div>
-        </div>
-      </section>
 
-      <section id="currentDrawCard" class="card stack current-draw-card">
-        <div class="draw-accent"></div>
-        <div class="section-header">
-          <div>
-            <div class="section-title" id="currentDrawId" data-loc="client.draw.gameTitle">PowerBall Global</div>
-            <div class="section-subtitle" id="currentDrawSubtitle" data-loc="client.currentDraw.subtitle">Next draw and ticket purchase</div>
+          <div class="jackpot-headline">
+            <span class="jackpot-title" id="jackpotGameTitle" data-loc="client.jackpot.prizePoolTitle">Prize pool :</span>
+            <span class="jackpot-amount" id="jackpotAmount">$0.00</span>
+            <span class="jackpot-amount-bang" aria-hidden="true">!</span>
           </div>
-          <div id="currentDrawStateBadge" class="state-badge state-badge-muted" data-loc="client.currentDraw.waiting">waiting</div>
-        </div>
 
-        <div id="currentDrawEmpty" class="empty-card" data-loc="client.currentDraw.empty">There is no active draw right now.</div>
+          <p class="jackpot-copy" id="jackpotSubtitle" data-loc="client.jackpot.subtitle">The next draw is coming soon. Get your tickets now.</p>
 
-        <div id="currentDrawContent" class="stack" hidden>
-          <div id="currentDrawPurchaseBlock" class="stack">
-            <div id="currentDrawTicketPriceRow" class="draw-meta-row">
-              <span><span data-loc="client.currentDraw.ticketCostPrefix">Ticket cost:</span> <strong id="currentDrawTicketCost">$2.00</strong> <span data-loc="client.currentDraw.ticketCostSuffix">per entry.</span></span>
+          <div id="currentDrawStateBadge" class="state-badge state-badge-muted" hidden></div>
+
+          <div id="currentDrawPrizeTiers" class="prize-tier-row" hidden>
+            <div class="prize-tier-pill">
+              <span class="prize-tier-label">3/5</span>
+              <span class="prize-tier-value" id="currentDrawPrizePool3">$0.00</span>
             </div>
-
-            <button id="purchaseTicketBtn" type="button" data-loc="client.button.purchase">Purchase ticket</button>
-            <div id="purchaseStatus" class="muted"></div>
+            <div class="prize-tier-pill">
+              <span class="prize-tier-label">4/5</span>
+              <span class="prize-tier-value" id="currentDrawPrizePool4">$0.00</span>
+            </div>
+            <div class="prize-tier-pill">
+              <span class="prize-tier-label">5/5</span>
+              <span class="prize-tier-value" id="currentDrawPrizePool5">$0.00</span>
+            </div>
           </div>
-
-          <div id="currentDrawNumbersWrap" class="stack" hidden>
-            <div class="section-subtitle" data-loc="client.currentDraw.winningNumbers">Winning numbers</div>
-            <div id="currentDrawNumbers"></div>
+        </div>
+        <!-- Purchase row: dark subcontainer inside the red jackpot card -->
+        <div class="jackpot-buy-row">
+          <div class="jackpot-buy-left">
+            <div class="jackpot-buy-price-label" data-loc="client.currentDraw.ticketCostPrefix">Ticket cost:</div>
+            <div id="jackpotBuyPrice" class="jackpot-buy-price">$2.00</div>
+          </div>
+          <div class="jackpot-buy-right">
+            <button id="purchaseTicketBtn" type="button" class="jackpot-buy-btn" data-loc="client.button.purchase">Purchase ticket</button>
           </div>
         </div>
       </section>
+
+      <!-- current draw card removed — its small helpers were migrated into the jackpot card above -->
 
     </section>
 

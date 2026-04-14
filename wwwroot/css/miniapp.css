@@ -285,10 +285,16 @@ body.app-loading .loading-shell {
 }
 
 .jackpot-card {
-  background: linear-gradient(135deg, #670019, #4f0016);
-  border: 1px solid rgba(255, 111, 152, 0.22);
-  border-radius: 18px;
-  padding: 14px 16px 16px;
+  background: linear-gradient(145deg, #720022 0%, #4d0016 100%);
+  border: 1px solid rgba(255, 111, 152, 0.2);
+  border-radius: 24px;
+  padding: 0;
+  overflow: hidden;
+  box-shadow: 0 14px 28px rgba(9, 9, 18, 0.28);
+}
+
+.jackpot-main {
+  padding: 20px 22px 16px;
 }
 
 .jackpot-top {
@@ -296,55 +302,82 @@ body.app-loading .loading-shell {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+  margin-top: 0;
 }
 
 .jackpot-chip {
   border-radius: 999px;
   background: rgba(255, 167, 187, 0.28);
   color: #ffdce6;
-  font-size: 0.72rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 0.9rem;
+  letter-spacing: 0;
+  text-transform: none;
   font-weight: 700;
-  padding: 6px 10px;
+  padding: 9px 18px;
 }
 
 .jackpot-time {
   color: #ffc7d7;
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.jackpot-headline {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 18px;
+  padding: 8px 0;
+  border-radius: 14px;
+  background: rgba(255, 222, 236, 0.05);
+}
+
+.jackpot-title {
+  font-size: 2.8rem;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  color: #fff9fc;
 }
 
 .jackpot-amount {
-  margin-top: 10px;
-  font-size: 3rem;
+  margin-top: 0;
+  font-size: 4.6rem;
   line-height: 1.05;
   font-weight: 900;
   letter-spacing: -0.015em;
 }
 
+.jackpot-amount-bang {
+  font-size: 3.4rem;
+  line-height: 1;
+  font-weight: 900;
+  color: #ffffff;
+}
+
 .jackpot-copy {
-  margin: 8px 0 0;
-  color: #ffd8e2;
+  margin: 12px 0 0;
+  color: #f2b8c8;
   font-size: 1.2rem;
-  line-height: 1.4;
+  line-height: 1.35;
 }
 
 .prize-tier-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 12px;
+  gap: 14px;
+  margin-top: 18px;
 }
 
 .prize-tier-pill {
   display: grid;
   gap: 2px;
   justify-items: center;
-  padding: 8px 10px;
+  padding: 10px 12px;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(222, 65, 112, 0.18);
+  border: 1px solid rgba(255, 184, 206, 0.18);
 }
 
 .prize-tier-label {
@@ -356,7 +389,7 @@ body.app-loading .loading-shell {
 }
 
 .prize-tier-value {
-  font-size: 0.92rem;
+  font-size: 2.1rem;
   font-weight: 900;
   color: #ffffff;
   font-variant-numeric: tabular-nums;
@@ -364,16 +397,20 @@ body.app-loading .loading-shell {
 
 @media (max-width: 560px) {
   .prize-tier-row {
-    gap: 6px;
+    gap: 8px;
   }
 
   .prize-tier-pill {
-    padding: 7px 8px;
+    padding: 8px;
   }
 
   .prize-tier-value {
-    font-size: 0.84rem;
+    font-size: 1.4rem;
   }
+}
+
+#currentDrawStateBadge {
+  display: none !important;
 }
 
 .current-draw-card {
@@ -520,6 +557,177 @@ button:disabled {
   padding: 14px;
 }
 
+/* Draw banner styles for multi-active draws */
+.draw-banners {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.draw-banner {
+  position: relative;
+  padding: 14px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #0f1724 0%, #0b1520 100%);
+  border: 1px solid var(--line);
+}
+
+.draw-banner-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.draw-banner-title {
+  font-weight: 800;
+  font-size: 1.1rem;
+}
+
+.draw-banner-body {
+  margin-top: 10px;
+}
+
+.draw-banner-numbers {
+  margin-top: 8px;
+}
+
+.draw-banner-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.draw-banner-price {
+  font-weight: 800;
+  font-size: 1rem;
+  color: #ffffff;
+}
+
+.draw-banner-buy {
+  background: linear-gradient(180deg, #4ade80, #22c55e);
+  color: #072a12;
+  border-radius: 12px;
+  padding: 10px 14px;
+  min-width: 120px;
+}
+
+/* Jackpot buy row (dark subcontainer inside red jackpot card) */
+.jackpot-buy-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-top: 0;
+  padding: 18px 22px 20px;
+  background: linear-gradient(180deg, #121a28 0%, #101823 100%);
+  border-radius: 0 0 24px 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.jackpot-buy-left {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.jackpot-buy-price-label { color: #f2afc5; font-size: 0.95rem; }
+.jackpot-buy-price { font-weight: 900; font-size: 2rem; color: #fff; }
+
+.jackpot-buy-right { text-align: right; }
+.jackpot-buy-btn {
+  background: linear-gradient(180deg, #ff6c9f, #f15d93);
+  color: #fff;
+  border-radius: 16px;
+  padding: 14px 28px;
+  min-width: 220px;
+  border: none;
+  font-weight: 900;
+  text-transform: uppercase;
+  font-size: 1rem;
+  box-shadow: 0 6px 0 rgba(165, 57, 95, 0.8), 0 10px 24px rgba(0, 0, 0, 0.35);
+}
+
+@media (max-width: 560px) {
+  .jackpot-main {
+    padding: 16px 16px 12px;
+  }
+
+  .jackpot-chip {
+    font-size: 0.85rem;
+    padding: 7px 12px;
+  }
+
+  .jackpot-time {
+    font-size: 0.8rem;
+  }
+
+  .jackpot-headline {
+    gap: 6px;
+    margin-top: 14px;
+  }
+
+  .jackpot-title {
+    font-size: 1.45rem;
+  }
+
+  .jackpot-amount {
+    font-size: 2.4rem;
+  }
+
+  .jackpot-amount-bang {
+    font-size: 2rem;
+  }
+
+  .jackpot-copy {
+    font-size: 1rem;
+  }
+
+  .jackpot-buy-row {
+    gap: 10px;
+    padding: 14px 16px 16px;
+  }
+
+  .jackpot-buy-left {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .jackpot-buy-price-label {
+    font-size: 0.95rem;
+  }
+
+  .jackpot-buy-price {
+    font-size: 1.8rem;
+  }
+
+  .jackpot-buy-btn {
+    min-width: 150px;
+    padding: 11px 14px;
+    font-size: 0.95rem;
+  }
+}
+
+/* Jackpot small title/subtitle moved into jackpot card */
+.jackpot-game {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.jackpot-game-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #ffe4ec;
+}
+.jackpot-game-subtitle {
+  font-size: 0.95rem;
+  color: #ffdce6;
+}
+
 .ticket-header {
   display: flex;
   justify-content: space-between;
@@ -662,7 +870,6 @@ button:disabled {
   border-radius: 18px 18px 0 0;
   box-sizing: border-box;
   overflow: hidden;
-  overflow-x: hidden;
 }
 
 .ticket-picker-grid {
@@ -1211,7 +1418,7 @@ button:disabled {
   }
 
   .jackpot-copy {
-    font-size: 1rem;
+    font-size: 1.15rem;
   }
 
   .section-header,
