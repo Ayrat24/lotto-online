@@ -1365,8 +1365,8 @@ button:disabled {
   color: #d9e4f6;
 }
 
-/* Make all profile tab buttons share the primary gradient color */
-.profile-screen button,
+/* Make profile action buttons share the primary gradient color (exclude the floating back button). */
+.profile-screen button:not(.profile-back-btn),
 .profile-screen .secondary-btn,
 .profile-screen .link-btn {
   background: linear-gradient(180deg, #ff7aa5, #ff668f);
@@ -1380,13 +1380,20 @@ button:disabled {
   left: 16px;
   top: 16px; /* inside the card, top-left with padding so it doesn't overlap header */
   z-index: 46;
+  box-sizing: border-box;
   width: 42px;
   height: 42px;
+  min-height: 0;
+  padding: 0;
   border-radius: 10px;
   background: rgba(255,255,255,0.04);
   color: var(--text);
   border: 1px solid rgba(255,255,255,0.06);
   font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: none;
+  letter-spacing: 0;
   display: grid;
   place-items: center;
   box-shadow: 0 6px 18px rgba(0,0,0,0.36);

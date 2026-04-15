@@ -1899,6 +1899,31 @@
       });
   }
 
+  function openCheckoutLink(url) {
+    var checkoutUrl = String(url || '').trim();
+    if (!checkoutUrl) return;
+
+    // iOS Telegram WebView can block async window.open; prefer Telegram's native openLink API when available.
+    try {
+      if (window.Telegram && Telegram.WebApp && typeof Telegram.WebApp.openLink === 'function') {
+        Telegram.WebApp.openLink(checkoutUrl);
+        return;
+      }
+    } catch (e) {
+    }
+
+    try {
+      var opened = window.open(checkoutUrl, '_blank', 'noopener');
+      if (opened) return;
+    } catch (e) {
+    }
+
+    try {
+      window.location.assign(checkoutUrl);
+    } catch (e) {
+    }
+  }
+
   function topUpBalance() {
     if (!initData) return;
 
@@ -1921,9 +1946,7 @@
 
         var deposit = res.deposit;
         if (deposit.checkoutLink) {
-          try {
-            window.open(deposit.checkoutLink, '_blank', 'noopener');
-          } catch (e) { }
+          openCheckoutLink(deposit.checkoutLink);
         }
 
         setTopUpStatus(t('client.topup.created', 'Invoice created. Complete payment in BTCPay; status updates every 4s.'));
