@@ -42,15 +42,23 @@ public sealed class DeepLinksModel : PageModel
 
     public async Task OnGetAsync(CancellationToken ct)
     {
-        Rows = await _db.Users
+        var grouped = await _db.Users
             .AsNoTracking()
             .GroupBy(x => x.AcquisitionDeepLink)
-            .Select(x => new DeepLinkCountView(
-                string.IsNullOrWhiteSpace(x.Key) ? "(none)" : x.Key!,
-                x.Count()))
+            .Select(x => new
+            {
+                DeepLink = x.Key,
+                UserCount = x.Count()
+            })
             .OrderByDescending(x => x.UserCount)
             .ThenBy(x => x.DeepLink)
             .ToListAsync(ct);
+
+        Rows = grouped
+            .Select(x => new DeepLinkCountView(
+                string.IsNullOrWhiteSpace(x.DeepLink) ? "(none)" : x.DeepLink!,
+                x.UserCount))
+            .ToList();
     }
 
     public sealed record DeepLinkCountView(string DeepLink, int UserCount);
