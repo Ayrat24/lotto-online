@@ -252,8 +252,50 @@ public sealed class IndexModel : PageModel
                 pageSize = NormalizePageSize(PageSize)
             });
 
-        _db.Users.Remove(u);
-        await _db.SaveChangesAsync(ct);
+        try
+        {
+            await using var tx = await _db.Database.BeginTransactionAsync(ct);
+
+            var usersReferredByDeletedUser = await _db.Users
+                .Where(x => x.ReferredByUserId == u.Id)
+                .ToListAsync(ct);
+
+            foreach (var referredUser in usersReferredByDeletedUser)
+            {
+                referredUser.ReferredByUserId = null;
+                referredUser.ReferredAtUtc = null;
+            }
+
+            var rewardsLinkedToDeletedUser = await _db.ReferralRewards
+                .Where(x => x.InviterUserId == u.Id || x.InviteeUserId == u.Id || x.RecipientUserId == u.Id)
+                .ToListAsync(ct);
+
+            if (rewardsLinkedToDeletedUser.Count > 0)
+                _db.ReferralRewards.RemoveRange(rewardsLinkedToDeletedUser);
+
+            await _db.SaveChangesAsync(ct);
+
+            _db.Users.Remove(u);
+            await _db.SaveChangesAsync(ct);
+
+            await tx.CommitAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            FlashMessage = "Could not delete user because related records still reference this user.";
+            FlashIsError = true;
+
+            return RedirectToPage(new
+            {
+                searchPhone = SearchPhone,
+                searchTelegramId = SearchTelegramId,
+                searchDeepLink = SearchDeepLink,
+                sortBy = NormalizeSortBy(SortBy),
+                sortDir = NormalizeSortDir(SortDir),
+                pageNumber = NormalizePage(PageNumber),
+                pageSize = NormalizePageSize(PageSize)
+            });
+        }
 
         return RedirectToPage(new
         {
