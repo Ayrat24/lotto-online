@@ -63,24 +63,24 @@
         <thead>
         <tr>
             <th>
-                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-sortBy="id" asp-route-sortDir="@Model.GetNextSortDir("id")">Id@Model.GetSortSuffix("id")</a>
+                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-sortBy="id" asp-route-sortDir="@Model.GetNextSortDir("id")">Id@(Model.GetSortSuffix("id"))</a>
             </th>
             <th>
-                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-sortBy="telegramUserId" asp-route-sortDir="@Model.GetNextSortDir("telegramUserId")">TelegramUserId@Model.GetSortSuffix("telegramUserId")</a>
+                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-sortBy="telegramUserId" asp-route-sortDir="@Model.GetNextSortDir("telegramUserId")">TelegramUserId@(Model.GetSortSuffix("telegramUserId"))</a>
             </th>
             <th>Label</th>
             <th>Referral code</th>
             <th>
-                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-sortBy="number" asp-route-sortDir="@Model.GetNextSortDir("number")">Number@Model.GetSortSuffix("number")</a>
+                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-sortBy="number" asp-route-sortDir="@Model.GetNextSortDir("number")">Number@(Model.GetSortSuffix("number"))</a>
             </th>
             <th>
-                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-sortBy="balance" asp-route-sortDir="@Model.GetNextSortDir("balance")">Balance@Model.GetSortSuffix("balance")</a>
+                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-sortBy="balance" asp-route-sortDir="@Model.GetNextSortDir("balance")">Balance@(Model.GetSortSuffix("balance"))</a>
             </th>
             <th>
-                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-sortBy="createdAt" asp-route-sortDir="@Model.GetNextSortDir("createdAt")">Created (UTC)@Model.GetSortSuffix("createdAt")</a>
+                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-sortBy="createdAt" asp-route-sortDir="@Model.GetNextSortDir("createdAt")">Created (UTC)@(Model.GetSortSuffix("createdAt"))</a>
             </th>
             <th>
-                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-sortBy="lastSeenAt" asp-route-sortDir="@Model.GetNextSortDir("lastSeenAt")">Last seen (UTC)@Model.GetSortSuffix("lastSeenAt")</a>
+                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-sortBy="lastSeenAt" asp-route-sortDir="@Model.GetNextSortDir("lastSeenAt")">Last seen (UTC)@(Model.GetSortSuffix("lastSeenAt"))</a>
             </th>
             <th></th>
         </tr>
