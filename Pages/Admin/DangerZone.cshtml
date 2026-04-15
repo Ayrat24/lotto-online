@@ -1,19 +1,20 @@
 @page
 @model MiniApp.Pages.Admin.DangerZoneModel
 @{
-    ViewData["Title"] = "Danger zone";
+    ViewData["Title"] = Model.T("admin.danger.title", "Danger zone");
+    var resetConfirm = Model.T("admin.danger.resetConfirm", "RESET DATABASE? This will delete ALL data, recreate the schema, and reapply migrations. Are you absolutely sure?");
 }
 
-<h1>Danger zone</h1>
+<h1>@Model.T("admin.danger.heading", "Danger zone")</h1>
 
 <div class="alert alert-warning">
-    <strong>Warning:</strong> Actions on this page are destructive and irreversible.
-    Resetting the database deletes all data, recreates the <code>public</code> schema, and reapplies EF Core migrations.
+    <strong>@Model.T("admin.danger.warning", "Warning:")</strong> @Model.T("admin.danger.warningText", "Actions on this page are destructive and irreversible.")
+    @Model.T("admin.danger.warningDetails", "Resetting the database deletes all data, recreates the public schema, and reapplies EF Core migrations.")
 </div>
 
-<form method="post" asp-page-handler="DropAllTables" onsubmit="return confirm('RESET DATABASE? This will delete ALL data, recreate the schema, and reapply migrations. Are you absolutely sure?');">
+<form method="post" asp-page-handler="DropAllTables" onsubmit="return confirm('@resetConfirm');">
     @Html.AntiForgeryToken()
-    <button type="submit" class="btn btn-danger">Reset database</button>
+    <button type="submit" class="btn btn-danger">@Model.T("admin.danger.resetButton", "Reset database")</button>
 </form>
 
 @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))

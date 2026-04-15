@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using MiniApp.Admin;
 using MiniApp.Data;
@@ -10,15 +9,13 @@ using MiniApp.Features.Localization;
 namespace MiniApp.Pages.Admin.Users;
 
 [Authorize(Policy = AdminAuth.PolicyName)]
-public sealed class TicketsModel : PageModel
+public sealed class TicketsModel : MiniApp.Pages.Admin.LocalizedAdminPageModel
 {
     private readonly AppDbContext _db;
-    private readonly ILocalizationService _localization;
 
-    public TicketsModel(AppDbContext db, ILocalizationService localization)
+    public TicketsModel(AppDbContext db, ILocalizationService localization) : base(localization)
     {
         _db = db;
-        _localization = localization;
     }
 
     public MiniAppUser? SelectedUser { get; private set; }
@@ -54,8 +51,6 @@ public sealed class TicketsModel : PageModel
 
     public string? StatusMessage { get; private set; }
     public bool StatusIsError { get; private set; }
-    public IReadOnlyDictionary<string, string> UiText { get; private set; } = new Dictionary<string, string>(StringComparer.Ordinal);
-
     [TempData]
     public string? FlashMessage { get; set; }
 
@@ -64,7 +59,7 @@ public sealed class TicketsModel : PageModel
 
     public async Task<IActionResult> OnGetAsync(long id, CancellationToken ct)
     {
-        UiText = await _localization.GetDictionaryAsync(GetAdminLocale(), ct);
+        await LoadUiTextAsync(ct);
 
         if (!string.IsNullOrWhiteSpace(FlashMessage))
         {
@@ -177,14 +172,7 @@ public sealed class TicketsModel : PageModel
     }
 
     public string Text(string key, string fallback)
-        => UiText.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
-            ? value
-            : fallback;
-
-    private string GetAdminLocale() => _localization.NormalizeLocale(Request.Cookies["AdminUiLanguage"]);
-
-    private Task<string> GetTextAsync(string key, string fallback, CancellationToken ct)
-        => _localization.GetTextAsync(GetAdminLocale(), key, fallback, ct);
+        => T(key, fallback);
 
     private async Task<string> BuildValidationMessageAsync(string validationCode, CancellationToken ct)
     {

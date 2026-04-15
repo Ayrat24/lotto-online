@@ -1,8 +1,8 @@
 @page
 @model MiniApp.Pages.Admin.LogoutModel
 @{
-    ViewData["Title"] = "Logout";
+    ViewData["Title"] = Model.T("admin.logout.title", "Logout");
 }
 
-<p>Logging out...</p>
+<p>@Model.T("admin.logout.progress", "Logging out...")</p>
 

@@ -1,16 +1,16 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using MiniApp.Admin;
 using MiniApp.Data;
 using MiniApp.Features.Auth;
 using MiniApp.Features.Draws;
+using MiniApp.Features.Localization;
 
 namespace MiniApp.Pages.Admin.Draws;
 
 [Authorize(Policy = AdminAuth.PolicyName)]
-public sealed class EditModel : PageModel
+public sealed class EditModel : MiniApp.Pages.Admin.LocalizedAdminPageModel
 {
     public sealed record DrawTicketRow(string Numbers, long SelectionCount);
     public sealed record DrawTicketUserRow(long UserId, long TelegramUserId, string? Number, long TicketCount, DateTimeOffset LastPurchasedAtUtc);
@@ -19,7 +19,8 @@ public sealed class EditModel : PageModel
     private readonly IConfiguration _config;
     private readonly IWebHostEnvironment _env;
 
-    public EditModel(AppDbContext db, IConfiguration config, IWebHostEnvironment env)
+    public EditModel(AppDbContext db, IConfiguration config, IWebHostEnvironment env, ILocalizationService localization)
+        : base(localization)
     {
         _db = db;
         _config = config;
@@ -68,6 +69,7 @@ public sealed class EditModel : PageModel
 
     public async Task OnGetAsync(long id, int ticketPage = 1, string? ticketNumbers = null, CancellationToken ct = default)
     {
+        await LoadUiTextAsync(ct);
         await EnsureDebugSeedAsync(ct);
 
         SelectedDraw = await _db.Draws
@@ -85,7 +87,7 @@ public sealed class EditModel : PageModel
 
         if (SelectedDraw.State == DrawState.Finished)
         {
-            StatusMessage = "Finished draws cannot be edited.";
+            StatusMessage = await GetTextAsync("admin.draws.edit.flash.finishedReadonly", "Finished draws cannot be edited.", ct);
             StatusIsError = true;
         }
 
@@ -94,6 +96,7 @@ public sealed class EditModel : PageModel
 
     public async Task<IActionResult> OnPostAsync(long id, int ticketPage = 1, string? ticketNumbers = null, CancellationToken ct = default)
     {
+        await LoadUiTextAsync(ct);
         await EnsureDebugSeedAsync(ct);
 
         var draw = await _db.Draws.SingleOrDefaultAsync(x => x.Id == id, ct);
@@ -102,7 +105,7 @@ public sealed class EditModel : PageModel
 
         if (!DrawManagement.TryParseEditableState(State, out var parsedState))
         {
-            StatusMessage = "State must be active or upcoming.";
+            StatusMessage = await GetTextAsync("admin.draws.edit.flash.invalidState", "State must be active or upcoming.", ct);
             StatusIsError = true;
             SelectedDraw = draw;
             await SafeLoadTicketsAsync(id, ticketPage, ticketNumbers, ct);
@@ -112,7 +115,8 @@ public sealed class EditModel : PageModel
         try
         {
             await DrawManagement.UpdateDrawAsync(_db, draw, PrizePoolMatch3, PrizePoolMatch4, PrizePoolMatch5, TicketCost, parsedState, ct);
-            FlashMessage = $"Updated draw #{draw.Id}.";
+            var updatedTemplate = await GetTextAsync("admin.draws.edit.flash.updated", "Updated draw #{0}.", ct);
+            FlashMessage = string.Format(updatedTemplate, draw.Id);
             FlashIsError = false;
             return RedirectToPage("/Admin/Draws");
         }
@@ -128,6 +132,7 @@ public sealed class EditModel : PageModel
 
     public async Task<IActionResult> OnPostExecuteAsync(long id, bool randomize = false, int ticketPage = 1, string? ticketNumbers = null, CancellationToken ct = default)
     {
+        await LoadUiTextAsync(ct);
         await EnsureDebugSeedAsync(ct);
 
         var draw = await _db.Draws.SingleOrDefaultAsync(x => x.Id == id, ct);
@@ -138,7 +143,8 @@ public sealed class EditModel : PageModel
         {
             var manualNumbers = randomize ? null : ExecuteNumbers;
             await DrawManagement.ExecuteDrawAsync(_db, draw, manualNumbers, ct);
-            FlashMessage = $"Executed draw #{draw.Id}: {draw.Numbers}.";
+            var executedTemplate = await GetTextAsync("admin.draws.edit.flash.executed", "Executed draw #{0}: {1}.", ct);
+            FlashMessage = string.Format(executedTemplate, draw.Id, draw.Numbers);
             FlashIsError = false;
             return RedirectToPage("/Admin/Draws/Result", new { id = draw.Id });
         }
@@ -171,7 +177,8 @@ public sealed class EditModel : PageModel
             TicketsTotalCount = 0;
             TicketsTotalPages = 0;
             TicketsPage = 1;
-            StatusMessage = $"Failed to load draw tickets: {ex.Message}";
+            var failedTemplate = await GetTextAsync("admin.draws.edit.flash.loadTicketsFailed", "Failed to load draw tickets: {0}", ct);
+            StatusMessage = string.Format(failedTemplate, ex.Message);
             StatusIsError = true;
         }
     }

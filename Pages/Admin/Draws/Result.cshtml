@@ -1,10 +1,10 @@
 @page "{id:long}"
 @model MiniApp.Pages.Admin.Draws.ResultModel
 @{
-    ViewData["Title"] = "Draw results";
+    ViewData["Title"] = Model.T("admin.draws.result.title", "Draw results");
 }
 
-<h1>Draw results</h1>
+<h1>@Model.T("admin.draws.result.heading", "Draw results")</h1>
 
 @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
 {
@@ -13,23 +13,23 @@
 
 @if (Model.Draw is null)
 {
-    <a class="btn btn-secondary" asp-page="/Admin/Draws">Back</a>
+    <a class="btn btn-secondary" asp-page="/Admin/Draws">@Model.T("admin.draws.result.back", "Back")</a>
 }
 else
 {
     <div class="card mt-3">
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <h5 class="card-title mb-0">Draw #@Model.Draw.Id</h5>
+                <h5 class="card-title mb-0">@Model.T("admin.draws.result.drawPrefix", "Draw #")@Model.Draw.Id</h5>
                 <div class="d-flex gap-2">
-                    <a class="btn btn-sm btn-outline-primary" asp-page="/Admin/Draws/Edit" asp-route-id="@Model.Draw.Id">Edit draw</a>
-                    <a class="btn btn-sm btn-secondary" asp-page="/Admin/Draws">Back to draws</a>
+                    <a class="btn btn-sm btn-outline-primary" asp-page="/Admin/Draws/Edit" asp-route-id="@Model.Draw.Id">@Model.T("admin.draws.result.editDraw", "Edit draw")</a>
+                    <a class="btn btn-sm btn-secondary" asp-page="/Admin/Draws">@Model.T("admin.draws.result.backToDraws", "Back to draws")</a>
                 </div>
             </div>
             <div class="mt-3">
-                <div><strong>State:</strong> @Model.Draw.State</div>
-                <div><strong>Result numbers:</strong> <code>@(string.IsNullOrWhiteSpace(Model.Draw.Numbers) ? "-" : Model.Draw.Numbers)</code></div>
-                <div><strong>Created (UTC):</strong> @Model.Draw.CreatedAtUtc.ToString("u")</div>
+                <div><strong>@Model.T("admin.draws.result.state", "State"):</strong> @Model.Draw.State</div>
+                <div><strong>@Model.T("admin.draws.result.numbers", "Result numbers"):</strong> <code>@(string.IsNullOrWhiteSpace(Model.Draw.Numbers) ? "-" : Model.Draw.Numbers)</code></div>
+                <div><strong>@Model.T("admin.draws.result.createdUtc", "Created (UTC)"):</strong> @Model.Draw.CreatedAtUtc.ToString("u")</div>
             </div>
         </div>
     </div>
@@ -40,17 +40,17 @@ else
         {
             <div class="card mt-3">
                 <div class="card-body">
-                    <h5 class="card-title mb-3">Tier @tier.TierLabel</h5>
+                    <h5 class="card-title mb-3">@Model.T("admin.draws.result.tier", "Tier") @tier.TierLabel</h5>
                     <div class="row g-2 mb-3">
-                        <div class="col-sm-6 col-lg-3"><strong>Prize pool:</strong> @tier.PrizePool.ToString("0.00")</div>
-                        <div class="col-sm-6 col-lg-3"><strong>Winning tickets:</strong> @tier.WinningTicketsCount</div>
-                        <div class="col-sm-6 col-lg-3"><strong>Per ticket:</strong> @tier.WinningAmountPerTicket.ToString("0.00")</div>
-                        <div class="col-sm-6 col-lg-3"><strong>Total paid:</strong> @( (tier.WinningAmountPerTicket * tier.WinningTicketsCount).ToString("0.00") )</div>
+                        <div class="col-sm-6 col-lg-3"><strong>@Model.T("admin.draws.result.prizePool", "Prize pool"):</strong> @tier.PrizePool.ToString("0.00")</div>
+                        <div class="col-sm-6 col-lg-3"><strong>@Model.T("admin.draws.result.winningTickets", "Winning tickets"):</strong> @tier.WinningTicketsCount</div>
+                        <div class="col-sm-6 col-lg-3"><strong>@Model.T("admin.draws.result.perTicket", "Per ticket"):</strong> @tier.WinningAmountPerTicket.ToString("0.00")</div>
+                        <div class="col-sm-6 col-lg-3"><strong>@Model.T("admin.draws.result.totalPaid", "Total paid"):</strong> @( (tier.WinningAmountPerTicket * tier.WinningTicketsCount).ToString("0.00") )</div>
                     </div>
 
                     @if (tier.Winners.Count == 0)
                     {
-                        <div class="alert alert-secondary mb-0">No winners in this tier.</div>
+                        <div class="alert alert-secondary mb-0">@Model.T("admin.draws.result.noWinners", "No winners in this tier.")</div>
                     }
                     else
                     {
@@ -58,13 +58,13 @@ else
                             <table class="table table-sm align-middle mb-0">
                                 <thead>
                                 <tr>
-                                    <th>User Id</th>
-                                    <th>Telegram User Id</th>
-                                    <th>Number</th>
-                                    <th>Created (UTC)</th>
-                                    <th>Last seen (UTC)</th>
-                                    <th>Winning tickets</th>
-                                    <th>Winning amount</th>
+                                    <th>@Model.T("admin.draws.result.table.userId", "User Id")</th>
+                                    <th>@Model.T("admin.draws.result.table.telegramUserId", "Telegram User Id")</th>
+                                    <th>@Model.T("admin.draws.result.table.number", "Number")</th>
+                                    <th>@Model.T("admin.draws.result.table.createdUtc", "Created (UTC)")</th>
+                                    <th>@Model.T("admin.draws.result.table.lastSeenUtc", "Last seen (UTC)")</th>
+                                    <th>@Model.T("admin.draws.result.table.winningTickets", "Winning tickets")</th>
+                                    <th>@Model.T("admin.draws.result.table.winningAmount", "Winning amount")</th>
                                 </tr>
                                 </thead>
                                 <tbody>

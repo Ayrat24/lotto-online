@@ -1,14 +1,14 @@
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using MiniApp.Admin;
 using MiniApp.Data;
 using MiniApp.Features.Auth;
+using MiniApp.Features.Localization;
 
 namespace MiniApp.Pages.Admin.Draws;
 
 [Authorize(Policy = AdminAuth.PolicyName)]
-public sealed class ResultModel : PageModel
+public sealed class ResultModel : MiniApp.Pages.Admin.LocalizedAdminPageModel
 {
     private sealed record TicketMatchRow(
         long UserId,
@@ -38,7 +38,8 @@ public sealed class ResultModel : PageModel
     private readonly IConfiguration _config;
     private readonly IWebHostEnvironment _env;
 
-    public ResultModel(AppDbContext db, IConfiguration config, IWebHostEnvironment env)
+    public ResultModel(AppDbContext db, IConfiguration config, IWebHostEnvironment env, ILocalizationService localization)
+        : base(localization)
     {
         _db = db;
         _config = config;
@@ -52,6 +53,7 @@ public sealed class ResultModel : PageModel
 
     public async Task OnGetAsync(long id, CancellationToken ct)
     {
+        await LoadUiTextAsync(ct);
         await EnsureDebugSeedAsync(ct);
 
         Draw = await _db.Draws
@@ -60,14 +62,15 @@ public sealed class ResultModel : PageModel
 
         if (Draw is null)
         {
-            StatusMessage = $"Draw #{id} was not found.";
+            var template = await GetTextAsync("admin.draws.result.flash.notFound", "Draw #{0} was not found.", ct);
+            StatusMessage = string.Format(template, id);
             StatusIsError = true;
             return;
         }
 
         if (Draw.State != DrawState.Finished || string.IsNullOrWhiteSpace(Draw.Numbers))
         {
-            StatusMessage = "Results are available only for finished draws.";
+            StatusMessage = await GetTextAsync("admin.draws.result.flash.finishedOnly", "Results are available only for finished draws.", ct);
             StatusIsError = true;
             return;
         }
@@ -79,7 +82,7 @@ public sealed class ResultModel : PageModel
         }
         catch (Exception)
         {
-            StatusMessage = "Draw result numbers are invalid and cannot be processed.";
+            StatusMessage = await GetTextAsync("admin.draws.result.flash.invalidNumbers", "Draw result numbers are invalid and cannot be processed.", ct);
             StatusIsError = true;
             return;
         }

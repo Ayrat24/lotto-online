@@ -1,15 +1,15 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using MiniApp.Admin;
 using MiniApp.Data;
 using MiniApp.Features.Auth;
+using MiniApp.Features.Localization;
 
 namespace MiniApp.Pages.Admin;
 
 [Authorize(Policy = AdminAuth.PolicyName)]
-public sealed class ReferralsModel : PageModel
+public sealed class ReferralsModel : LocalizedAdminPageModel
 {
     public sealed record RewardRow(
         long Id,
@@ -39,7 +39,8 @@ public sealed class ReferralsModel : PageModel
     private readonly IWebHostEnvironment _env;
     private readonly IReferralService _referrals;
 
-    public ReferralsModel(AppDbContext db, IConfiguration config, IWebHostEnvironment env, IReferralService referrals)
+    public ReferralsModel(AppDbContext db, IConfiguration config, IWebHostEnvironment env, IReferralService referrals, ILocalizationService localization)
+        : base(localization)
     {
         _db = db;
         _config = config;
@@ -80,6 +81,7 @@ public sealed class ReferralsModel : PageModel
 
     public async Task OnGetAsync(CancellationToken ct)
     {
+        await LoadUiTextAsync(ct);
         if (!string.IsNullOrWhiteSpace(FlashMessage))
         {
             StatusMessage = FlashMessage;
@@ -93,7 +95,7 @@ public sealed class ReferralsModel : PageModel
     {
         if (InviterBonusAmount < 0m || InviteeBonusAmount < 0m || MinQualifyingDepositAmount < 0m || MonthlyInviterBonusCap < 0m || EligibilityWindowDays < 0)
         {
-            FlashMessage = "All referral settings must be zero or greater.";
+            FlashMessage = await GetTextAsync("admin.referrals.flash.validation", "All referral settings must be zero or greater.", ct);
             FlashIsError = true;
             return RedirectToPage();
         }
@@ -108,7 +110,7 @@ public sealed class ReferralsModel : PageModel
             User.Identity?.Name ?? "admin",
             ct);
 
-        FlashMessage = "Referral settings were saved.";
+        FlashMessage = await GetTextAsync("admin.referrals.flash.saved", "Referral settings were saved.", ct);
         FlashIsError = false;
         return RedirectToPage();
     }

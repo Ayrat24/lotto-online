@@ -1,18 +1,18 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using MiniApp.Admin;
 using MiniApp.Data;
+using MiniApp.Features.Localization;
 
 namespace MiniApp.Pages.Admin.Users;
 
 [Authorize(Policy = AdminAuth.PolicyName)]
-public sealed class EditModel : PageModel
+public sealed class EditModel : MiniApp.Pages.Admin.LocalizedAdminPageModel
 {
     private readonly AppDbContext _db;
 
-    public EditModel(AppDbContext db)
+    public EditModel(AppDbContext db, ILocalizationService localization) : base(localization)
     {
         _db = db;
     }
@@ -57,6 +57,7 @@ public sealed class EditModel : PageModel
 
     public async Task OnGetAsync(long id)
     {
+        await LoadUiTextAsync(HttpContext.RequestAborted);
         SelectedUser = await _db.Users.SingleOrDefaultAsync(x => x.Id == id);
         if (SelectedUser is null) return;
 

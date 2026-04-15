@@ -1,14 +1,14 @@
 @page "{id:long}"
 @model MiniApp.Pages.Admin.Users.EditModel
 @{
-    ViewData["Title"] = "Edit user";
+    ViewData["Title"] = Model.T("admin.users.edit.title", "Edit user");
 }
 
-<h1>Edit user</h1>
+<h1>@Model.T("admin.users.edit.heading", "Edit user")</h1>
 
 @if (Model.SelectedUser is null)
 {
-    <div class="alert alert-warning">User not found.</div>
+    <div class="alert alert-warning">@Model.T("admin.users.edit.userNotFound", "User not found.")</div>
 }
 else
 {
@@ -22,43 +22,43 @@ else
         <input type="hidden" asp-for="PageSize" />
 
         <div class="mb-3">
-            <label class="form-label">Id</label>
+            <label class="form-label">@Model.T("admin.users.edit.id", "Id")</label>
             <input class="form-control" value="@Model.SelectedUser.Id" disabled />
         </div>
 
         <div class="mb-3">
-            <label class="form-label">TelegramUserId</label>
+            <label class="form-label">@Model.T("admin.users.edit.telegramUserId", "TelegramUserId")</label>
             <input class="form-control" asp-for="TelegramUserId" />
         </div>
 
         <div class="mb-3">
-            <label class="form-label">Number</label>
+            <label class="form-label">@Model.T("admin.users.edit.number", "Number")</label>
             <input class="form-control" asp-for="Number" />
-            <div class="form-text">Collected from Telegram contact share on /start.</div>
+            <div class="form-text">@Model.T("admin.users.edit.numberHint", "Collected from Telegram contact share on /start.")</div>
         </div>
 
         <div class="mb-3">
-            <label class="form-label">Acquisition deep link</label>
+            <label class="form-label">@Model.T("admin.users.edit.deepLink", "Acquisition deep link")</label>
             <input class="form-control" asp-for="AcquisitionDeepLink" />
-            <div class="form-text">Stored from Telegram /start payload or Mini App initData start_param.</div>
+            <div class="form-text">@Model.T("admin.users.edit.deepLinkHint", "Stored from Telegram /start payload or Mini App initData start_param.")</div>
         </div>
 
         <div class="mb-3">
-            <label class="form-label">Balance</label>
+            <label class="form-label">@Model.T("admin.users.edit.balance", "Balance")</label>
             <input class="form-control" asp-for="Balance" type="number" step="0.01" />
         </div>
 
         <div class="mb-3">
-            <label class="form-label">CreatedAtUtc</label>
+            <label class="form-label">@Model.T("admin.users.edit.createdAtUtc", "CreatedAtUtc")</label>
             <input class="form-control" value="@Model.SelectedUser.CreatedAtUtc" disabled />
         </div>
 
         <div class="mb-3">
-            <label class="form-label">LastSeenAtUtc</label>
+            <label class="form-label">@Model.T("admin.users.edit.lastSeenAtUtc", "LastSeenAtUtc")</label>
             <input class="form-control" asp-for="LastSeenAtUtc" />
         </div>
 
-        <button class="btn btn-primary" type="submit">Save</button>
+        <button class="btn btn-primary" type="submit">@Model.T("admin.users.edit.save", "Save")</button>
         <a class="btn btn-secondary"
            asp-page="/Admin/Users/Index"
            asp-route-searchPhone="@Model.SearchPhone"
@@ -67,6 +67,6 @@ else
            asp-route-sortBy="@Model.SortBy"
            asp-route-sortDir="@Model.SortDir"
            asp-route-pageNumber="@Model.PageNumber"
-           asp-route-pageSize="@Model.PageSize">Back</a>
+           asp-route-pageSize="@Model.PageSize">@Model.T("admin.users.edit.back", "Back")</a>
     </form>
 }

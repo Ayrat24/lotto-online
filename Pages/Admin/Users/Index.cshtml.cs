@@ -1,21 +1,22 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using MiniApp.Admin;
 using MiniApp.Data;
 using MiniApp.Features.Auth;
+using MiniApp.Features.Localization;
 
 namespace MiniApp.Pages.Admin.Users;
 
 [Authorize(Policy = AdminAuth.PolicyName)]
-public sealed class IndexModel : PageModel
+public sealed class IndexModel : MiniApp.Pages.Admin.LocalizedAdminPageModel
 {
     private readonly AppDbContext _db;
     private readonly IConfiguration _config;
     private readonly IWebHostEnvironment _env;
 
-    public IndexModel(AppDbContext db, IConfiguration config, IWebHostEnvironment env)
+    public IndexModel(AppDbContext db, IConfiguration config, IWebHostEnvironment env, ILocalizationService localization)
+        : base(localization)
     {
         _db = db;
         _config = config;
@@ -106,6 +107,7 @@ public sealed class IndexModel : PageModel
 
     public async Task OnGetAsync()
     {
+        await LoadUiTextAsync(HttpContext.RequestAborted);
         SearchPhone = string.IsNullOrWhiteSpace(SearchPhone) ? null : SearchPhone.Trim();
         SearchTelegramId = string.IsNullOrWhiteSpace(SearchTelegramId) ? null : SearchTelegramId.Trim();
         SearchDeepLink = string.IsNullOrWhiteSpace(SearchDeepLink) ? null : SearchDeepLink.Trim();
@@ -132,7 +134,7 @@ public sealed class IndexModel : PageModel
         {
             if (!long.TryParse(SearchTelegramId, out var telegramUserId))
             {
-                StatusMessage = "Telegram user id filter must be a valid integer.";
+                StatusMessage = await GetTextAsync("admin.users.index.flash.invalidTelegramFilter", "Telegram user id filter must be a valid integer.", HttpContext.RequestAborted);
                 StatusIsError = true;
                 TotalCount = 0;
                 TotalPages = 1;
@@ -210,7 +212,8 @@ public sealed class IndexModel : PageModel
         _db.Users.Add(fake);
         await _db.SaveChangesAsync(ct);
 
-        FlashMessage = $"Fake user created (TelegramUserId={fake.TelegramUserId}, Balance={fake.Balance:0.00}).";
+        var fakeCreatedTemplate = await GetTextAsync("admin.users.index.flash.fakeCreated", "Fake user created (TelegramUserId={0}, Balance={1:0.00}).", ct);
+        FlashMessage = string.Format(fakeCreatedTemplate, fake.TelegramUserId, fake.Balance);
         FlashIsError = false;
         return RedirectToPage(new
         {
@@ -282,7 +285,7 @@ public sealed class IndexModel : PageModel
         }
         catch (DbUpdateException)
         {
-            FlashMessage = "Could not delete user because related records still reference this user.";
+            FlashMessage = await GetTextAsync("admin.users.index.flash.deleteFailed", "Could not delete user because related records still reference this user.", ct);
             FlashIsError = true;
 
             return RedirectToPage(new

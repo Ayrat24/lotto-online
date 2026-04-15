@@ -1,16 +1,16 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using MiniApp.Admin;
 using MiniApp.Data;
 using MiniApp.Features.Auth;
 using MiniApp.Features.Draws;
+using MiniApp.Features.Localization;
 
 namespace MiniApp.Pages.Admin;
 
 [Authorize(Policy = AdminAuth.PolicyName)]
-public sealed class DrawsModel : PageModel
+public sealed class DrawsModel : LocalizedAdminPageModel
 {
     public sealed record AdminDrawRow(
         long Id,
@@ -30,7 +30,8 @@ public sealed class DrawsModel : PageModel
     private readonly IConfiguration _config;
     private readonly IWebHostEnvironment _env;
 
-    public DrawsModel(AppDbContext db, IConfiguration config, IWebHostEnvironment env)
+    public DrawsModel(AppDbContext db, IConfiguration config, IWebHostEnvironment env, ILocalizationService localization)
+        : base(localization)
     {
         _db = db;
         _config = config;
@@ -49,6 +50,7 @@ public sealed class DrawsModel : PageModel
 
     public async Task OnGetAsync(CancellationToken ct)
     {
+        await LoadUiTextAsync(ct);
         await EnsureDebugSeedAsync(ct);
         if (!string.IsNullOrWhiteSpace(FlashMessage))
         {
@@ -60,11 +62,13 @@ public sealed class DrawsModel : PageModel
 
     public async Task<IActionResult> OnPostCreateAsync(decimal prizePoolMatch3, decimal prizePoolMatch4, decimal prizePoolMatch5, decimal ticketCost, CancellationToken ct)
     {
+        await LoadUiTextAsync(ct);
         await EnsureDebugSeedAsync(ct);
         try
         {
             var draw = await DrawManagement.CreateDrawAsync(_db, prizePoolMatch3, prizePoolMatch4, prizePoolMatch5, ticketCost, ct);
-            StatusMessage = $"Created draw #{draw.Id} in {DrawManagement.ToStateValue(draw.State)} state.";
+            var template = await GetTextAsync("admin.draws.flash.created", "Created draw #{0} in {1} state.", ct);
+            StatusMessage = string.Format(template, draw.Id, DrawManagement.ToStateValue(draw.State));
             StatusIsError = false;
         }
         catch (InvalidOperationException ex)

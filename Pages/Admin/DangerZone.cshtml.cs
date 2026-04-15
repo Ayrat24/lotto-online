@@ -1,17 +1,18 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.RazorPages;
 using MiniApp.Admin;
+using MiniApp.Features.Localization;
 
 namespace MiniApp.Pages.Admin
 {
     [Authorize(Policy = AdminAuth.PolicyName)]
-    public sealed class DangerZoneModel : PageModel
+    public sealed class DangerZoneModel : LocalizedAdminPageModel
     {
         private readonly DatabaseResetService _databaseResetService;
         private readonly ILogger<DangerZoneModel> _logger;
 
-        public DangerZoneModel(DatabaseResetService databaseResetService, ILogger<DangerZoneModel> logger)
+        public DangerZoneModel(DatabaseResetService databaseResetService, ILogger<DangerZoneModel> logger, ILocalizationService localization)
+            : base(localization)
         {
             _databaseResetService = databaseResetService;
             _logger = logger;
@@ -23,14 +24,14 @@ namespace MiniApp.Pages.Admin
         [TempData]
         public string? ErrorMessage { get; set; }
 
-        public void OnGet() { }
+        public async Task OnGetAsync(CancellationToken ct) => await LoadUiTextAsync(ct);
 
         public async Task<IActionResult> OnPostDropAllTablesAsync(CancellationToken ct)
         {
             try
             {
                 await _databaseResetService.ResetPublicSchemaAsync(ct);
-                StatusMessage = "Database reset completed. The schema was recreated and migrations were applied.";
+                StatusMessage = await GetTextAsync("admin.danger.flash.success", "Database reset completed. The schema was recreated and migrations were applied.", ct);
                 return RedirectToPage();
             }
             catch (OperationCanceledException)
@@ -40,7 +41,8 @@ namespace MiniApp.Pages.Admin
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Admin database reset failed.");
-                ErrorMessage = "Database reset failed. Check application logs for details.";
+                await LoadUiTextAsync(ct);
+                ErrorMessage = await GetTextAsync("admin.danger.flash.failed", "Database reset failed. Check application logs for details.", ct);
                 return Page();
             }
 

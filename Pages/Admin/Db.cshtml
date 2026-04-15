@@ -1,19 +1,19 @@
 @page
 @model MiniApp.Pages.Admin.DbModel
 @{
-    ViewData["Title"] = "Database";
+    ViewData["Title"] = Model.T("admin.db.title", "Database");
 }
 
-<h1>Database</h1>
+<h1>@Model.T("admin.db.heading", "Database")</h1>
 
 <dl class="row mt-3">
-    <dt class="col-sm-3">Provider</dt>
+    <dt class="col-sm-3">@Model.T("admin.db.provider", "Provider")</dt>
     <dd class="col-sm-9">@Model.Provider</dd>
 
-    <dt class="col-sm-3">Can connect</dt>
+    <dt class="col-sm-3">@Model.T("admin.db.canConnect", "Can connect")</dt>
     <dd class="col-sm-9">@Model.CanConnect</dd>
 
-    <dt class="col-sm-3">Users count</dt>
+    <dt class="col-sm-3">@Model.T("admin.db.usersCount", "Users count")</dt>
     <dd class="col-sm-9">@Model.UsersCount</dd>
 </dl>
 

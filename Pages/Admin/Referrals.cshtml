@@ -1,10 +1,10 @@
 @page
 @model MiniApp.Pages.Admin.ReferralsModel
 @{
-    ViewData["Title"] = "Referrals";
+    ViewData["Title"] = Model.T("admin.referrals.title", "Referrals");
 }
 
-<h1>Referral program</h1>
+<h1>@Model.T("admin.referrals.heading", "Referral program")</h1>
 
 @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
 {
@@ -13,60 +13,60 @@
 
 <div class="card mt-3">
     <div class="card-body">
-        <h5 class="card-title">Program settings</h5>
+        <h5 class="card-title">@Model.T("admin.referrals.settings.title", "Program settings")</h5>
         <form method="post" asp-page-handler="Save" class="row g-3 mt-1">
             @Html.AntiForgeryToken()
 
             <div class="col-12">
                 <div class="form-check form-switch">
                     <input asp-for="Enabled" class="form-check-input" />
-                    <label asp-for="Enabled" class="form-check-label">Enabled</label>
+                    <label asp-for="Enabled" class="form-check-label">@Model.T("admin.referrals.settings.enabled", "Enabled")</label>
                 </div>
             </div>
 
             <div class="col-md-4">
-                <label asp-for="InviterBonusAmount" class="form-label">Inviter bonus amount (USD)</label>
+                <label asp-for="InviterBonusAmount" class="form-label">@Model.T("admin.referrals.settings.inviterBonus", "Inviter bonus amount (USD)")</label>
                 <input asp-for="InviterBonusAmount" class="form-control" type="number" min="0" step="0.01" />
             </div>
 
             <div class="col-md-4">
-                <label asp-for="InviteeBonusAmount" class="form-label">Invitee bonus amount (USD)</label>
+                <label asp-for="InviteeBonusAmount" class="form-label">@Model.T("admin.referrals.settings.inviteeBonus", "Invitee bonus amount (USD)")</label>
                 <input asp-for="InviteeBonusAmount" class="form-control" type="number" min="0" step="0.01" />
             </div>
 
             <div class="col-md-4">
-                <label asp-for="MinQualifyingDepositAmount" class="form-label">Minimum qualifying deposit (USD)</label>
+                <label asp-for="MinQualifyingDepositAmount" class="form-label">@Model.T("admin.referrals.settings.minDeposit", "Minimum qualifying deposit (USD)")</label>
                 <input asp-for="MinQualifyingDepositAmount" class="form-control" type="number" min="0" step="0.01" />
             </div>
 
             <div class="col-md-6">
-                <label asp-for="EligibilityWindowDays" class="form-label">Eligibility window (days, 0 = no limit)</label>
+                <label asp-for="EligibilityWindowDays" class="form-label">@Model.T("admin.referrals.settings.windowDays", "Eligibility window (days, 0 = no limit)")</label>
                 <input asp-for="EligibilityWindowDays" class="form-control" type="number" min="0" step="1" />
             </div>
 
             <div class="col-md-6">
-                <label asp-for="MonthlyInviterBonusCap" class="form-label">Monthly inviter cap (USD, 0 = no cap)</label>
+                <label asp-for="MonthlyInviterBonusCap" class="form-label">@Model.T("admin.referrals.settings.monthlyCap", "Monthly inviter cap (USD, 0 = no cap)")</label>
                 <input asp-for="MonthlyInviterBonusCap" class="form-control" type="number" min="0" step="0.01" />
             </div>
 
             <div class="col-12">
-                <button class="btn btn-primary" type="submit">Save settings</button>
+                <button class="btn btn-primary" type="submit">@Model.T("admin.referrals.settings.save", "Save settings")</button>
             </div>
         </form>
 
         <hr />
         <div class="text-muted small">
-            Last updated: @Model.Settings.UpdatedAtUtc.ToString("u") by @(string.IsNullOrWhiteSpace(Model.Settings.UpdatedByAdmin) ? "-" : Model.Settings.UpdatedByAdmin)
+            @Model.T("admin.referrals.settings.lastUpdated", "Last updated"): @Model.Settings.UpdatedAtUtc.ToString("u") @Model.T("admin.referrals.settings.by", "by") @(string.IsNullOrWhiteSpace(Model.Settings.UpdatedByAdmin) ? "-" : Model.Settings.UpdatedByAdmin)
         </div>
     </div>
 </div>
 
 <div class="card mt-3">
     <div class="card-body">
-        <h5 class="card-title">Recent referral rewards</h5>
+        <h5 class="card-title">@Model.T("admin.referrals.rewards.title", "Recent referral rewards")</h5>
         @if (Model.RecentRewards.Count == 0)
         {
-            <div class="alert alert-secondary mb-0">No referral rewards yet.</div>
+            <div class="alert alert-secondary mb-0">@Model.T("admin.referrals.rewards.empty", "No referral rewards yet.")</div>
         }
         else
         {
@@ -74,13 +74,13 @@
                 <table class="table table-sm align-middle">
                     <thead>
                     <tr>
-                        <th>Time (UTC)</th>
-                        <th>Type</th>
-                        <th>Amount</th>
-                        <th>Inviter</th>
-                        <th>Invitee</th>
-                        <th>Recipient</th>
-                        <th>Deposit</th>
+                        <th>@Model.T("admin.referrals.rewards.timeUtc", "Time (UTC)")</th>
+                        <th>@Model.T("admin.referrals.rewards.type", "Type")</th>
+                        <th>@Model.T("admin.referrals.rewards.amount", "Amount")</th>
+                        <th>@Model.T("admin.referrals.rewards.inviter", "Inviter")</th>
+                        <th>@Model.T("admin.referrals.rewards.invitee", "Invitee")</th>
+                        <th>@Model.T("admin.referrals.rewards.recipient", "Recipient")</th>
+                        <th>@Model.T("admin.referrals.rewards.deposit", "Deposit")</th>
                     </tr>
                     </thead>
                     <tbody>

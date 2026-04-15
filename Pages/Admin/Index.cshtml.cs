@@ -1,14 +1,19 @@
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc.RazorPages;
 using MiniApp.Admin;
+using MiniApp.Features.Localization;
 
 namespace MiniApp.Pages.Admin;
 
 [Authorize(Policy = AdminAuth.PolicyName)]
-public sealed class IndexModel : PageModel
+public sealed class IndexModel : LocalizedAdminPageModel
 {
-    public void OnGet()
+    public IndexModel(ILocalizationService localization) : base(localization)
     {
+    }
+
+    public async Task OnGetAsync(CancellationToken ct)
+    {
+        await LoadUiTextAsync(ct);
     }
 }
 

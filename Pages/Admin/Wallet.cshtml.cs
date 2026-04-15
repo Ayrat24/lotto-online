@@ -1,15 +1,15 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using MiniApp.Admin;
 using MiniApp.Data;
 using MiniApp.Features.Auth;
+using MiniApp.Features.Localization;
 
 namespace MiniApp.Pages.Admin;
 
 [Authorize(Policy = AdminAuth.PolicyName)]
-public sealed class WalletModel : PageModel
+public sealed class WalletModel : LocalizedAdminPageModel
 {
     public sealed record WalletTransactionRow(
         long Id,
@@ -40,7 +40,8 @@ public sealed class WalletModel : PageModel
     private readonly IWebHostEnvironment _env;
     private readonly IWalletService _wallet;
 
-    public WalletModel(AppDbContext db, IConfiguration config, IWebHostEnvironment env, IWalletService wallet)
+    public WalletModel(AppDbContext db, IConfiguration config, IWebHostEnvironment env, IWalletService wallet, ILocalizationService localization)
+        : base(localization)
     {
         _db = db;
         _config = config;
@@ -65,6 +66,7 @@ public sealed class WalletModel : PageModel
 
     public async Task OnGetAsync(CancellationToken ct)
     {
+        await LoadUiTextAsync(ct);
         if (!string.IsNullOrWhiteSpace(FlashMessage))
         {
             StatusMessage = FlashMessage;
@@ -77,9 +79,9 @@ public sealed class WalletModel : PageModel
     public async Task<IActionResult> OnPostConfirmWithdrawalAsync(long id, CancellationToken ct)
     {
         var result = await _wallet.ConfirmWithdrawalAsync(id, User.Identity?.Name ?? "admin", ct);
-        FlashMessage = result.Success
-            ? $"Confirmed withdrawal request #{id}."
-            : result.Error ?? "Failed to confirm withdrawal request.";
+        var successTemplate = await GetTextAsync("admin.wallet.flash.confirmed", "Confirmed withdrawal request #{0}.", ct);
+        var failedText = await GetTextAsync("admin.wallet.flash.confirmFailed", "Failed to confirm withdrawal request.", ct);
+        FlashMessage = result.Success ? string.Format(successTemplate, id) : result.Error ?? failedText;
         FlashIsError = !result.Success;
         return RedirectToPage();
     }
@@ -87,9 +89,9 @@ public sealed class WalletModel : PageModel
     public async Task<IActionResult> OnPostDenyWithdrawalAsync(long id, string? note, CancellationToken ct)
     {
         var result = await _wallet.DenyWithdrawalAsync(id, User.Identity?.Name ?? "admin", note, ct);
-        FlashMessage = result.Success
-            ? $"Denied withdrawal request #{id}. Funds were returned to the user."
-            : result.Error ?? "Failed to deny withdrawal request.";
+        var successTemplate = await GetTextAsync("admin.wallet.flash.denied", "Denied withdrawal request #{0}. Funds were returned to the user.", ct);
+        var failedText = await GetTextAsync("admin.wallet.flash.denyFailed", "Failed to deny withdrawal request.", ct);
+        FlashMessage = result.Success ? string.Format(successTemplate, id) : result.Error ?? failedText;
         FlashIsError = !result.Success;
         return RedirectToPage();
     }

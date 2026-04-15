@@ -1,10 +1,10 @@
 @page "{id:long}"
 @model MiniApp.Pages.Admin.Draws.EditModel
 @{
-    ViewData["Title"] = "Edit draw";
+    ViewData["Title"] = Model.T("admin.draws.edit.title", "Edit draw");
 }
 
-<h1>Edit draw</h1>
+<h1>@Model.T("admin.draws.edit.heading", "Edit draw")</h1>
 
 @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
 {
@@ -13,8 +13,8 @@
 
 @if (Model.SelectedDraw is null)
 {
-    <div class="alert alert-warning mt-3">Draw not found.</div>
-    <a class="btn btn-secondary" asp-page="/Admin/Draws">Back</a>
+    <div class="alert alert-warning mt-3">@Model.T("admin.draws.edit.notFound", "Draw not found.")</div>
+    <a class="btn btn-secondary" asp-page="/Admin/Draws">@Model.T("admin.draws.edit.back", "Back")</a>
 }
 else if (Model.CanEdit)
 {
@@ -22,53 +22,53 @@ else if (Model.CanEdit)
         <input type="hidden" name="ticketPage" value="@Model.TicketsPage" />
         <input type="hidden" name="ticketNumbers" value="@Model.SelectedTicketNumbers" />
         <div class="mb-3">
-            <label class="form-label">Id</label>
+            <label class="form-label">@Model.T("admin.draws.edit.id", "Id")</label>
             <input class="form-control" value="@Model.SelectedDraw.Id" disabled />
         </div>
 
         <div class="mb-3">
-            <label class="form-label">State</label>
+            <label class="form-label">@Model.T("admin.draws.edit.state", "State")</label>
             <select asp-for="State" class="form-select">
-                <option value="active">active</option>
-                <option value="upcoming">upcoming</option>
+                <option value="active">@Model.T("admin.draws.edit.state.active", "active")</option>
+                <option value="upcoming">@Model.T("admin.draws.edit.state.upcoming", "upcoming")</option>
             </select>
         </div>
 
         <div class="row g-3">
             <div class="col-md-4">
-                <label class="form-label">Prize pool 3/5</label>
+                <label class="form-label">@Model.T("admin.draws.edit.pool3", "Prize pool 3/5")</label>
                 <input asp-for="PrizePoolMatch3" type="number" min="0" step="0.01" class="form-control" />
             </div>
             <div class="col-md-4">
-                <label class="form-label">Prize pool 4/5</label>
+                <label class="form-label">@Model.T("admin.draws.edit.pool4", "Prize pool 4/5")</label>
                 <input asp-for="PrizePoolMatch4" type="number" min="0" step="0.01" class="form-control" />
             </div>
             <div class="col-md-4">
-                <label class="form-label">Prize pool 5/5</label>
+                <label class="form-label">@Model.T("admin.draws.edit.pool5", "Prize pool 5/5")</label>
                 <input asp-for="PrizePoolMatch5" type="number" min="0" step="0.01" class="form-control" />
             </div>
             <div class="col-md-4">
-                <label class="form-label">Ticket cost</label>
+                <label class="form-label">@Model.T("admin.draws.edit.ticketCost", "Ticket cost")</label>
                 <input asp-for="TicketCost" type="number" min="0.01" step="0.01" class="form-control" />
             </div>
         </div>
 
-        <div class="form-text mt-2">Total pool: @((Model.PrizePoolMatch3 + Model.PrizePoolMatch4 + Model.PrizePoolMatch5).ToString("0.00"))</div>
+        <div class="form-text mt-2">@Model.T("admin.draws.edit.totalPool", "Total pool"): @((Model.PrizePoolMatch3 + Model.PrizePoolMatch4 + Model.PrizePoolMatch5).ToString("0.00"))</div>
 
         <div class="mt-4 d-flex gap-2">
-            <button class="btn btn-primary" type="submit">Save</button>
-            <a class="btn btn-secondary" asp-page="/Admin/Draws">Back</a>
+            <button class="btn btn-primary" type="submit">@Model.T("admin.draws.edit.save", "Save")</button>
+            <a class="btn btn-secondary" asp-page="/Admin/Draws">@Model.T("admin.draws.edit.back", "Back")</a>
         </div>
     </form>
 
     <div class="card mt-4">
         <div class="card-body">
-            <h5 class="card-title">Execute draw</h5>
-            <p class="text-muted mb-3">You can execute using manual numbers or execute with randomized numbers.</p>
+            <h5 class="card-title">@Model.T("admin.draws.edit.execute.title", "Execute draw")</h5>
+            <p class="text-muted mb-3">@Model.T("admin.draws.edit.execute.subtitle", "You can execute using manual numbers or execute with randomized numbers.")</p>
 
             @if (Model.State != "active")
             {
-                <div class="alert alert-secondary mb-0">Only active draws can be executed. Set state to <strong>active</strong>, save, then execute.</div>
+                <div class="alert alert-secondary mb-0">@Model.T("admin.draws.edit.execute.activeOnly", "Only active draws can be executed. Set state to active, save, then execute.")</div>
             }
             else
             {
@@ -76,14 +76,14 @@ else if (Model.CanEdit)
                     <input type="hidden" name="ticketPage" value="@Model.TicketsPage" />
                     <input type="hidden" name="ticketNumbers" value="@Model.SelectedTicketNumbers" />
                     <div class="col-md-6">
-                        <label asp-for="ExecuteNumbers" class="form-label">Manual result numbers</label>
-                        <input asp-for="ExecuteNumbers" class="form-control" placeholder="1,5,12,23,36" />
-                        <div class="form-text">Enter 5 unique numbers between 1 and 36 separated by commas.</div>
+                        <label asp-for="ExecuteNumbers" class="form-label">@Model.T("admin.draws.edit.execute.manualNumbers", "Manual result numbers")</label>
+                        <input asp-for="ExecuteNumbers" class="form-control" placeholder="@Model.T("admin.draws.edit.execute.placeholder", "1,5,12,23,36")" />
+                        <div class="form-text">@Model.T("admin.draws.edit.execute.hint", "Enter 5 unique numbers between 1 and 36 separated by commas.")</div>
                     </div>
                     <div class="col-md-6 d-flex gap-2 flex-wrap">
-                        <button type="button" id="randomizePreviewBtn" class="btn btn-outline-secondary">Randomize</button>
-                        <button type="submit" class="btn btn-danger" onclick="return confirm('Execute draw #@Model.SelectedDraw.Id with these numbers?');">Execute with manual numbers</button>
-                        <button type="submit" name="randomize" value="true" class="btn btn-danger" onclick="return confirm('Execute draw #@Model.SelectedDraw.Id with randomized numbers?');">Execute randomized</button>
+                        <button type="button" id="randomizePreviewBtn" class="btn btn-outline-secondary">@Model.T("admin.draws.edit.execute.randomize", "Randomize")</button>
+                        <button type="submit" class="btn btn-danger" onclick="return confirm('@string.Format(Model.T("admin.draws.edit.execute.confirmManual", "Execute draw #{0} with these numbers?"), Model.SelectedDraw.Id)');">@Model.T("admin.draws.edit.execute.manualSubmit", "Execute with manual numbers")</button>
+                        <button type="submit" name="randomize" value="true" class="btn btn-danger" onclick="return confirm('@string.Format(Model.T("admin.draws.edit.execute.confirmRandom", "Execute draw #{0} with randomized numbers?"), Model.SelectedDraw.Id)');">@Model.T("admin.draws.edit.execute.randomSubmit", "Execute randomized")</button>
                     </div>
                 </form>
             }
@@ -92,7 +92,7 @@ else if (Model.CanEdit)
 }
 else
 {
-    <a class="btn btn-secondary mt-3" asp-page="/Admin/Draws">Back</a>
+    <a class="btn btn-secondary mt-3" asp-page="/Admin/Draws">@Model.T("admin.draws.edit.back", "Back")</a>
 }
 
 @section Scripts {
@@ -119,12 +119,12 @@ else
 {
     <div class="card mt-4">
         <div class="card-body">
-            <h5 class="card-title">Bought tickets</h5>
-            <p class="text-muted mb-3">Showing tickets for draw #@Model.SelectedDraw.Id. Ordered by how often each number set was selected.</p>
+            <h5 class="card-title">@Model.T("admin.draws.edit.tickets.title", "Bought tickets")</h5>
+            <p class="text-muted mb-3">@string.Format(Model.T("admin.draws.edit.tickets.subtitle", "Showing tickets for draw #{0}. Ordered by how often each number set was selected."), Model.SelectedDraw.Id)</p>
 
             @if (Model.TicketsTotalCount == 0)
             {
-                <div class="alert alert-secondary mb-0">No tickets bought for this draw yet.</div>
+                <div class="alert alert-secondary mb-0">@Model.T("admin.draws.edit.tickets.empty", "No tickets bought for this draw yet.")</div>
             }
             else
             {
@@ -132,9 +132,9 @@ else
                     <table class="table table-sm align-middle">
                         <thead>
                         <tr>
-                            <th>Numbers</th>
-                            <th>Count among all users</th>
-                            <th>Actions</th>
+                            <th>@Model.T("admin.draws.edit.tickets.numbers", "Numbers")</th>
+                            <th>@Model.T("admin.draws.edit.tickets.count", "Count among all users")</th>
+                            <th>@Model.T("admin.draws.edit.tickets.actions", "Actions")</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -148,7 +148,7 @@ else
                                        asp-page="/Admin/Draws/Edit"
                                        asp-route-id="@Model.SelectedDraw.Id"
                                        asp-route-ticketPage="@Model.TicketsPage"
-                                       asp-route-ticketNumbers="@t.Numbers">Users</a>
+                                       asp-route-ticketNumbers="@t.Numbers">@Model.T("admin.draws.edit.tickets.users", "Users")</a>
                                 </td>
                             </tr>
                         }
@@ -157,18 +157,18 @@ else
                 </div>
 
                 <div class="d-flex justify-content-between align-items-center mt-2">
-                    <small class="text-muted">Page @Model.TicketsPage of @Model.TicketsTotalPages (@Model.TicketsTotalCount combinations)</small>
-                    <div class="btn-group" role="group" aria-label="Ticket pagination">
+                    <small class="text-muted">@Model.T("admin.draws.edit.tickets.page", "Page") @Model.TicketsPage @Model.T("admin.draws.edit.tickets.of", "of") @Model.TicketsTotalPages (@Model.TicketsTotalCount @Model.T("admin.draws.edit.tickets.combinations", "combinations"))</small>
+                    <div class="btn-group" role="group" aria-label="@Model.T("admin.draws.edit.tickets.paginationAria", "Ticket pagination")">
                         <a class="btn btn-sm btn-outline-secondary @(Model.TicketsPage <= 1 ? "disabled" : null)"
                            asp-page="/Admin/Draws/Edit"
                            asp-route-id="@Model.SelectedDraw.Id"
                            asp-route-ticketPage="@(Model.TicketsPage - 1)"
-                           asp-route-ticketNumbers="@Model.SelectedTicketNumbers">Previous</a>
+                           asp-route-ticketNumbers="@Model.SelectedTicketNumbers">@Model.T("admin.draws.edit.tickets.previous", "Previous")</a>
                         <a class="btn btn-sm btn-outline-secondary @(Model.TicketsPage >= Model.TicketsTotalPages ? "disabled" : null)"
                            asp-page="/Admin/Draws/Edit"
                            asp-route-id="@Model.SelectedDraw.Id"
                            asp-route-ticketPage="@(Model.TicketsPage + 1)"
-                           asp-route-ticketNumbers="@Model.SelectedTicketNumbers">Next</a>
+                           asp-route-ticketNumbers="@Model.SelectedTicketNumbers">@Model.T("admin.draws.edit.tickets.next", "Next")</a>
                     </div>
                 </div>
 
@@ -176,16 +176,16 @@ else
                 {
                     <div class="mt-4">
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h6 class="mb-0">Users with ticket <code>@Model.SelectedTicketNumbers</code></h6>
+                            <h6 class="mb-0">@Model.T("admin.draws.edit.ticketUsers.title", "Users with ticket") <code>@Model.SelectedTicketNumbers</code></h6>
                             <a class="btn btn-sm btn-outline-secondary"
                                asp-page="/Admin/Draws/Edit"
                                asp-route-id="@Model.SelectedDraw.Id"
-                               asp-route-ticketPage="@Model.TicketsPage">Close</a>
+                               asp-route-ticketPage="@Model.TicketsPage">@Model.T("admin.draws.edit.ticketUsers.close", "Close")</a>
                         </div>
 
                         @if (Model.TicketUsers.Count == 0)
                         {
-                            <div class="alert alert-secondary mb-0">No users found for this ticket combination.</div>
+                            <div class="alert alert-secondary mb-0">@Model.T("admin.draws.edit.ticketUsers.empty", "No users found for this ticket combination.")</div>
                         }
                         else
                         {
@@ -193,11 +193,11 @@ else
                                 <table class="table table-sm align-middle mb-0">
                                     <thead>
                                     <tr>
-                                        <th>User Id</th>
-                                        <th>Telegram User Id</th>
-                                        <th>Number</th>
-                                        <th>Tickets with this combination</th>
-                                        <th>Last bought (UTC)</th>
+                                        <th>@Model.T("admin.draws.edit.ticketUsers.userId", "User Id")</th>
+                                        <th>@Model.T("admin.draws.edit.ticketUsers.telegramUserId", "Telegram User Id")</th>
+                                        <th>@Model.T("admin.draws.edit.ticketUsers.number", "Number")</th>
+                                        <th>@Model.T("admin.draws.edit.ticketUsers.ticketCount", "Tickets with this combination")</th>
+                                        <th>@Model.T("admin.draws.edit.ticketUsers.lastBoughtUtc", "Last bought (UTC)")</th>
                                     </tr>
                                     </thead>
                                     <tbody>

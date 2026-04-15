@@ -1,19 +1,19 @@
 @page
 @model MiniApp.Pages.Admin.IndexModel
 @{
-    ViewData["Title"] = "Admin";
+    ViewData["Title"] = Model.T("admin.index.title", "Admin");
 }
 
-<h1>Admin panel</h1>
+<h1>@Model.T("admin.index.heading", "Admin panel")</h1>
 
 <div class="list-group mt-3">
-    <a class="list-group-item list-group-item-action" asp-page="/Admin/Draws">Draws</a>
-    <a class="list-group-item list-group-item-action" asp-page="/Admin/Wallet">Wallet</a>
-    <a class="list-group-item list-group-item-action" asp-page="/Admin/Referrals">Referrals</a>
-    <a class="list-group-item list-group-item-action" asp-page="/Admin/Users/Index">Users</a>
-    <a class="list-group-item list-group-item-action" asp-page="/Admin/Users/DeepLinks">Deep-link analytics</a>
-    <a class="list-group-item list-group-item-action" asp-page="/Admin/Localization">Localization</a>
-    <a class="list-group-item list-group-item-action" asp-page="/Admin/DangerZone">Danger zone</a>
-    <a class="list-group-item list-group-item-action" asp-page="/Admin/Db">Database info</a>
-    <a class="list-group-item list-group-item-action" asp-page="/Admin/Logout">Logout</a>
+    <a class="list-group-item list-group-item-action" asp-page="/Admin/Draws">@Model.T("admin.index.nav.draws", "Draws")</a>
+    <a class="list-group-item list-group-item-action" asp-page="/Admin/Wallet">@Model.T("admin.index.nav.wallet", "Wallet")</a>
+    <a class="list-group-item list-group-item-action" asp-page="/Admin/Referrals">@Model.T("admin.index.nav.referrals", "Referrals")</a>
+    <a class="list-group-item list-group-item-action" asp-page="/Admin/Users/Index">@Model.T("admin.index.nav.users", "Users")</a>
+    <a class="list-group-item list-group-item-action" asp-page="/Admin/Users/DeepLinks">@Model.T("admin.index.nav.deepLinks", "Deep-link analytics")</a>
+    <a class="list-group-item list-group-item-action" asp-page="/Admin/Localization">@Model.T("admin.index.nav.localization", "Localization")</a>
+    <a class="list-group-item list-group-item-action" asp-page="/Admin/DangerZone">@Model.T("admin.index.nav.dangerZone", "Danger zone")</a>
+    <a class="list-group-item list-group-item-action" asp-page="/Admin/Db">@Model.T("admin.index.nav.database", "Database info")</a>
+    <a class="list-group-item list-group-item-action" asp-page="/Admin/Logout">@Model.T("admin.index.nav.logout", "Logout")</a>
 </div>

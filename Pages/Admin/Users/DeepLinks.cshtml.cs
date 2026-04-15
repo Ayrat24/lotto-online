@@ -1,18 +1,18 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using MiniApp.Admin;
 using MiniApp.Data;
+using MiniApp.Features.Localization;
 
 namespace MiniApp.Pages.Admin.Users;
 
 [Authorize(Policy = AdminAuth.PolicyName)]
-public sealed class DeepLinksModel : PageModel
+public sealed class DeepLinksModel : MiniApp.Pages.Admin.LocalizedAdminPageModel
 {
     private readonly AppDbContext _db;
 
-    public DeepLinksModel(AppDbContext db)
+    public DeepLinksModel(AppDbContext db, ILocalizationService localization) : base(localization)
     {
         _db = db;
     }
@@ -42,6 +42,7 @@ public sealed class DeepLinksModel : PageModel
 
     public async Task OnGetAsync(CancellationToken ct)
     {
+        await LoadUiTextAsync(ct);
         var grouped = await _db.Users
             .AsNoTracking()
             .GroupBy(x => x.AcquisitionDeepLink)
@@ -56,7 +57,7 @@ public sealed class DeepLinksModel : PageModel
 
         Rows = grouped
             .Select(x => new DeepLinkCountView(
-                string.IsNullOrWhiteSpace(x.DeepLink) ? "(none)" : x.DeepLink!,
+                string.IsNullOrWhiteSpace(x.DeepLink) ? T("admin.users.deepLinks.none", "(none)") : x.DeepLink!,
                 x.UserCount))
             .ToList();
     }

@@ -1,35 +1,35 @@
 @page
 @model MiniApp.Pages.Admin.DrawsModel
 @{
-    ViewData["Title"] = "Draws";
+    ViewData["Title"] = Model.T("admin.draws.title", "Draws");
 }
 
-<h1 style="margin-bottom:10px;">Draws</h1>
+<h1 style="margin-bottom:10px;">@Model.T("admin.draws.heading", "Draws")</h1>
 
 <div class="card" style="margin-top:0;">
     <div class="card-body">
-        <h5 class="card-title">Create draw instance</h5>
-        <p class="text-muted mb-3">A new draw is created as <strong>active</strong>. Multiple active draws can run at the same time.</p>
+        <h5 class="card-title">@Model.T("admin.draws.create.title", "Create draw instance")</h5>
+        <p class="text-muted mb-3">@Model.T("admin.draws.create.subtitle", "A new draw is created as active. Multiple active draws can run at the same time.")</p>
 
         <form method="post" asp-page-handler="Create" class="row g-2 align-items-end">
             <div class="col-sm-6 col-md-4">
-                <label for="createPrizePoolMatch3" class="form-label">Prize pool 3/5</label>
+                <label for="createPrizePoolMatch3" class="form-label">@Model.T("admin.draws.create.pool3", "Prize pool 3/5")</label>
                 <input id="createPrizePoolMatch3" name="prizePoolMatch3" type="number" min="0" step="0.01" value="0" class="form-control" />
             </div>
             <div class="col-sm-6 col-md-4">
-                <label for="createPrizePoolMatch4" class="form-label">Prize pool 4/5</label>
+                <label for="createPrizePoolMatch4" class="form-label">@Model.T("admin.draws.create.pool4", "Prize pool 4/5")</label>
                 <input id="createPrizePoolMatch4" name="prizePoolMatch4" type="number" min="0" step="0.01" value="0" class="form-control" />
             </div>
             <div class="col-sm-6 col-md-4">
-                <label for="createPrizePoolMatch5" class="form-label">Prize pool 5/5</label>
+                <label for="createPrizePoolMatch5" class="form-label">@Model.T("admin.draws.create.pool5", "Prize pool 5/5")</label>
                 <input id="createPrizePoolMatch5" name="prizePoolMatch5" type="number" min="0" step="0.01" value="0" class="form-control" />
             </div>
             <div class="col-sm-6 col-md-4">
-                <label for="createTicketCost" class="form-label">Ticket cost</label>
+                <label for="createTicketCost" class="form-label">@Model.T("admin.draws.create.ticketCost", "Ticket cost")</label>
                 <input id="createTicketCost" name="ticketCost" type="number" min="0.01" step="0.01" value="2" class="form-control" />
             </div>
             <div class="col-sm-6 col-md-4">
-                <button type="submit" class="btn btn-danger w-100">Create draw</button>
+                <button type="submit" class="btn btn-danger w-100">@Model.T("admin.draws.create.submit", "Create draw")</button>
             </div>
         </form>
     </div>
@@ -42,26 +42,26 @@
 
 @if (Model.Draws.Count == 0)
 {
-    <div class="alert alert-secondary" style="margin-top:10px;">No draws yet.</div>
+    <div class="alert alert-secondary" style="margin-top:10px;">@Model.T("admin.draws.empty", "No draws yet.")</div>
 }
 else
 {
     <div class="card" style="margin-top:10px;">
         <div class="card-body">
-            <h5 class="card-title">Manage draws</h5>
+            <h5 class="card-title">@Model.T("admin.draws.manage.title", "Manage draws")</h5>
             <div class="table-responsive">
                 <table class="table table-sm align-middle">
                     <thead>
                     <tr>
-                        <th>Id</th>
-                        <th>Tickets</th>
-                        <th>State</th>
-                        <th>Ticket cost</th>
-                        <th>Total pool</th>
-                        <th>Pools (3/5, 4/5, 5/5)</th>
-                        <th>Created (UTC)</th>
-                        <th>Numbers</th>
-                        <th>Actions</th>
+                        <th>@Model.T("admin.draws.table.id", "Id")</th>
+                        <th>@Model.T("admin.draws.table.tickets", "Tickets")</th>
+                        <th>@Model.T("admin.draws.table.state", "State")</th>
+                        <th>@Model.T("admin.draws.table.ticketCost", "Ticket cost")</th>
+                        <th>@Model.T("admin.draws.table.totalPool", "Total pool")</th>
+                        <th>@Model.T("admin.draws.table.pools", "Pools (3/5, 4/5, 5/5)")</th>
+                        <th>@Model.T("admin.draws.table.createdUtc", "Created (UTC)")</th>
+                        <th>@Model.T("admin.draws.table.numbers", "Numbers")</th>
+                        <th>@Model.T("admin.draws.table.actions", "Actions")</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -86,7 +86,7 @@ else
                             <td>
                                 @if (string.IsNullOrWhiteSpace(d.Numbers))
                                 {
-                                    <span class="text-muted">Not executed yet</span>
+                                    <span class="text-muted">@Model.T("admin.draws.table.notExecuted", "Not executed yet")</span>
                                 }
                                 else
                                 {
@@ -96,11 +96,11 @@ else
                             <td>
                                 @if (d.State == "active" || d.State == "upcoming")
                                 {
-                                    <a class="btn btn-sm btn-outline-primary" asp-page="/Admin/Draws/Edit" asp-route-id="@d.Id">Edit</a>
+                                    <a class="btn btn-sm btn-outline-primary" asp-page="/Admin/Draws/Edit" asp-route-id="@d.Id">@Model.T("admin.draws.action.edit", "Edit")</a>
                                 }
                                 else if (d.State == "finished")
                                 {
-                                    <a class="btn btn-sm btn-outline-dark" asp-page="/Admin/Draws/Result" asp-route-id="@d.Id">Results</a>
+                                    <a class="btn btn-sm btn-outline-dark" asp-page="/Admin/Draws/Result" asp-route-id="@d.Id">@Model.T("admin.draws.action.results", "Results")</a>
                                 }
                                 else
                                 {
