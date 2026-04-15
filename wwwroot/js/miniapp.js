@@ -361,6 +361,12 @@
     return amount.toLocaleString(getIntlLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
+  function formatPrizeTierPool(value) {
+    var amount = Number(value || 0);
+    if (!Number.isFinite(amount)) amount = 0;
+    return Math.round(amount).toLocaleString(getIntlLocale(), { maximumFractionDigits: 0 });
+  }
+
   function formatJackpot(value) {
     var amount = Number(value || 0);
     if (!Number.isFinite(amount)) amount = 0;
@@ -371,6 +377,12 @@
     var amount = Number(value || 0);
     if (!Number.isFinite(amount)) amount = 0;
     return '$' + amount.toLocaleString(getIntlLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function formatWinningsCurrency(value) {
+    var amount = Number(value || 0);
+    if (!Number.isFinite(amount)) amount = 0;
+    return '$' + Math.round(amount).toLocaleString(getIntlLocale(), { maximumFractionDigits: 0 });
   }
 
   function renderBalance(balanceValue) {
@@ -1025,7 +1037,7 @@
       var claimBtn = document.createElement('button');
       claimBtn.type = 'button';
       claimBtn.className = 'ticket-claim-btn';
-      claimBtn.textContent = t('client.ticket.claimPrefix', 'Claim') + ' ' + formatCurrency(winningAmount);
+      claimBtn.textContent = t('client.ticket.claimPrefix', 'Claim') + ' ' + formatWinningsCurrency(winningAmount);
       claimBtn.addEventListener('click', function () {
         claimTicket(ticket.id, claimBtn);
       });
@@ -1033,7 +1045,7 @@
     } else if ((ticket && ticket.status === 'winnings_claimed') && Number.isFinite(winningAmount) && winningAmount > 0) {
       var claimedLabel = document.createElement('div');
       claimedLabel.className = 'ticket-claimed-label';
-      claimedLabel.textContent = t('client.ticket.claimedPrefix', 'Claimed') + ' ' + formatCurrency(winningAmount);
+      claimedLabel.textContent = t('client.ticket.claimedPrefix', 'Claimed') + ' ' + formatWinningsCurrency(winningAmount);
       footer.appendChild(claimedLabel);
     }
 
@@ -1108,8 +1120,12 @@
   }
 
   function renderCurrentDraw(draw, currentTickets, hasMultipleActiveDraws) {
-      // allow rendering when the old current-draw card was removed — require badge or title elements
-      if (!currentDrawStateBadgeEl) return;
+    // Re-bind key nodes if DOM was not ready at initial script evaluation.
+    if (!currentDrawStateBadgeEl) currentDrawStateBadgeEl = document.getElementById('currentDrawStateBadge') || document.getElementById('jackpotGameStateBadge');
+    if (!currentDrawPrizeTiersEl) currentDrawPrizeTiersEl = document.getElementById('currentDrawPrizeTiers');
+    if (!currentDrawPrizePool3El) currentDrawPrizePool3El = document.getElementById('currentDrawPrizePool3');
+    if (!currentDrawPrizePool4El) currentDrawPrizePool4El = document.getElementById('currentDrawPrizePool4');
+    if (!currentDrawPrizePool5El) currentDrawPrizePool5El = document.getElementById('currentDrawPrizePool5');
 
     // legacy picker removed; banners will be rendered instead
 
@@ -1158,9 +1174,9 @@
     if (currentDrawCreatedAtEl) currentDrawCreatedAtEl.textContent = (draw.state === 'finished' ? t('client.currentDraw.concludedPrefix', 'Concluded ') : t('client.currentDraw.openedPrefix', 'Opened ')) + formatUtc(draw.createdAtUtc);
     if (jackpotAmountEl) jackpotAmountEl.textContent = formatJackpot(draw.prizePool);
     if (currentDrawPrizeTiersEl) currentDrawPrizeTiersEl.hidden = false;
-    if (currentDrawPrizePool3El) currentDrawPrizePool3El.textContent = '$' + formatPrizePool(draw.prizePoolMatch3);
-    if (currentDrawPrizePool4El) currentDrawPrizePool4El.textContent = '$' + formatPrizePool(draw.prizePoolMatch4);
-    if (currentDrawPrizePool5El) currentDrawPrizePool5El.textContent = '$' + formatPrizePool(draw.prizePoolMatch5);
+    if (currentDrawPrizePool3El) currentDrawPrizePool3El.textContent = '$' + formatPrizeTierPool(draw.prizePoolMatch3);
+    if (currentDrawPrizePool4El) currentDrawPrizePool4El.textContent = '$' + formatPrizeTierPool(draw.prizePoolMatch4);
+    if (currentDrawPrizePool5El) currentDrawPrizePool5El.textContent = '$' + formatPrizeTierPool(draw.prizePoolMatch5);
     if (currentDrawTicketCostEl) currentDrawTicketCostEl.textContent = formatCurrency(draw.ticketCost);
 
     // Update jackpot purchase price and track the displayed draw id
@@ -1588,6 +1604,9 @@
         currentDraw: state && state.currentDraw ? {
           id: state.currentDraw.id,
           prizePool: state.currentDraw.prizePool,
+          prizePoolMatch3: state.currentDraw.prizePoolMatch3,
+          prizePoolMatch4: state.currentDraw.prizePoolMatch4,
+          prizePoolMatch5: state.currentDraw.prizePoolMatch5,
           ticketCost: state.currentDraw.ticketCost,
           state: state.currentDraw.state,
           numbers: state.currentDraw.numbers || null,
@@ -1597,6 +1616,9 @@
           return {
             id: draw.id,
             prizePool: draw.prizePool,
+            prizePoolMatch3: draw.prizePoolMatch3,
+            prizePoolMatch4: draw.prizePoolMatch4,
+            prizePoolMatch5: draw.prizePoolMatch5,
             ticketCost: draw.ticketCost,
             state: draw.state,
             numbers: draw.numbers || null,
@@ -1736,7 +1758,7 @@
 
         latestState.balance = Number(res.balance || 0);
         renderBalance(latestState.balance);
-        setPurchaseStatus(t('client.ticket.claimedPrefix', 'Claimed') + ' ' + formatCurrency(res.amount || 0) + '.');
+        setPurchaseStatus(t('client.ticket.claimedPrefix', 'Claimed') + ' ' + formatWinningsCurrency(res.amount || 0) + '.');
         return refreshState();
       })
       .catch(function (err) {

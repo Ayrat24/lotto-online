@@ -1377,12 +1377,12 @@ button:disabled {
 /* Small arrow back button positioned top-left above the profile card */
 .profile-back-btn {
   position: absolute;
-  left: 16px;
-  top: 16px; /* inside the card, top-left with padding so it doesn't overlap header */
+  left: var(--profile-back-inset);
+  top: var(--profile-back-inset);
   z-index: 46;
   box-sizing: border-box;
-  width: 42px;
-  height: 42px;
+  width: var(--profile-back-size);
+  height: var(--profile-back-size);
   min-height: 0;
   padding: 0;
   border-radius: 10px;
@@ -1402,12 +1402,14 @@ button:disabled {
 /* Ensure profile screens are relatively positioned so the absolute back button aligns */
 .profile-screen {
   position: relative;
+  --profile-back-size: 42px;
+  --profile-back-inset: 16px;
 }
 
-/* Ensure headers inside profile screens leave space for the back button */
-.profile-screen .section-header,
-.profile-screen .sheet-header {
-  padding-left: 72px; /* leaves room for 40px back button + spacing */
+/* Reserve layout space for the floating back button only where it exists. */
+.profile-back-btn + .section-header {
+  padding-left: calc(var(--profile-back-size) + 14px);
+  min-height: var(--profile-back-size);
 }
 
 .tx-row {
@@ -1559,6 +1561,11 @@ button:disabled {
   .draw-header-top {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .profile-back-btn + .section-header {
+    align-items: center;
+    flex-direction: row;
   }
 
   .ticket-picker-grid {
