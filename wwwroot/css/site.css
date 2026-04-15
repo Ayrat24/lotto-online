@@ -20,6 +20,9 @@ html {
   --ui-subtitle-size: clamp(0.95rem, 0.4vw + 0.85rem, 1.05rem);
   --ui-button-size: 0.95rem;
   --ui-control-height: 42px;
+  --admin-table-line: rgba(0, 0, 0, 0.11);
+  --admin-table-line-strong: rgba(0, 0, 0, 0.18);
+  --admin-table-head-bg: rgba(0, 0, 0, 0.03);
 }
 
 .btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
@@ -103,11 +106,24 @@ body {
   margin-bottom: 0;
 }
 
+.admin-layout .table > :not(caption) > * > * {
+  border-bottom-color: var(--admin-table-line);
+}
+
+.admin-layout .table > :not(caption) > * > * + * {
+  border-left: 1px solid var(--admin-table-line);
+}
+
 .admin-layout .table th {
   white-space: nowrap;
   font-size: 0.84rem;
   text-transform: uppercase;
   letter-spacing: 0.02em;
+}
+
+.admin-layout .table thead th {
+  background: var(--admin-table-head-bg);
+  border-bottom: 2px solid var(--admin-table-line-strong);
 }
 
 @media (max-width: 767.98px) {
