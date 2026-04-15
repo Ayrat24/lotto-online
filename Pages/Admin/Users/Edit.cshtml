@@ -13,6 +13,14 @@
 else
 {
     <form method="post" class="mt-3">
+        <input type="hidden" asp-for="SearchPhone" />
+        <input type="hidden" asp-for="SearchTelegramId" />
+        <input type="hidden" asp-for="SearchDeepLink" />
+        <input type="hidden" asp-for="SortBy" />
+        <input type="hidden" asp-for="SortDir" />
+        <input type="hidden" asp-for="PageNumber" />
+        <input type="hidden" asp-for="PageSize" />
+
         <div class="mb-3">
             <label class="form-label">Id</label>
             <input class="form-control" value="@Model.SelectedUser.Id" disabled />
@@ -51,6 +59,14 @@ else
         </div>
 
         <button class="btn btn-primary" type="submit">Save</button>
-        <a class="btn btn-secondary" asp-page="/Admin/Users/Index">Back</a>
+        <a class="btn btn-secondary"
+           asp-page="/Admin/Users/Index"
+           asp-route-searchPhone="@Model.SearchPhone"
+           asp-route-searchTelegramId="@Model.SearchTelegramId"
+           asp-route-searchDeepLink="@Model.SearchDeepLink"
+           asp-route-sortBy="@Model.SortBy"
+           asp-route-sortDir="@Model.SortDir"
+           asp-route-pageNumber="@Model.PageNumber"
+           asp-route-pageSize="@Model.PageSize">Back</a>
     </form>
 }

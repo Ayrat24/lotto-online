@@ -34,6 +34,27 @@ public sealed class EditModel : PageModel
     [BindProperty]
     public DateTimeOffset LastSeenAtUtc { get; set; }
 
+    [BindProperty(SupportsGet = true)]
+    public string? SearchPhone { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public string? SearchTelegramId { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public string? SearchDeepLink { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public string? SortBy { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public string? SortDir { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public int? PageNumber { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public int? PageSize { get; set; }
+
     public async Task OnGetAsync(long id)
     {
         SelectedUser = await _db.Users.SingleOrDefaultAsync(x => x.Id == id);
@@ -58,6 +79,15 @@ public sealed class EditModel : PageModel
         u.LastSeenAtUtc = LastSeenAtUtc;
 
         await _db.SaveChangesAsync();
-        return RedirectToPage("/Admin/Users/Index");
+        return RedirectToPage("/Admin/Users/Index", new
+        {
+            searchPhone = SearchPhone,
+            searchTelegramId = SearchTelegramId,
+            searchDeepLink = SearchDeepLink,
+            sortBy = SortBy,
+            sortDir = SortDir,
+            pageNumber = PageNumber,
+            pageSize = PageSize
+        });
     }
 }

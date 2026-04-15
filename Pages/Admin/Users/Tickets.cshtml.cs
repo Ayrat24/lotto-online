@@ -28,6 +28,27 @@ public sealed class TicketsModel : PageModel
     [BindProperty]
     public string TicketNumbers { get; set; } = string.Empty;
 
+    [BindProperty(SupportsGet = true)]
+    public string? SearchPhone { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public string? SearchTelegramId { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public string? SearchDeepLink { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public string? SortBy { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public string? SortDir { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public int? PageNumber { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public int? PageSize { get; set; }
+
     public string? StatusMessage { get; private set; }
     public bool StatusIsError { get; private set; }
 
@@ -57,7 +78,17 @@ public sealed class TicketsModel : PageModel
         {
             FlashMessage = "User was not found.";
             FlashIsError = true;
-            return RedirectToPage(new { id });
+            return RedirectToPage(new
+            {
+                id,
+                searchPhone = SearchPhone,
+                searchTelegramId = SearchTelegramId,
+                searchDeepLink = SearchDeepLink,
+                sortBy = SortBy,
+                sortDir = SortDir,
+                pageNumber = PageNumber,
+                pageSize = PageSize
+            });
         }
 
         var draw = await _db.Draws.SingleOrDefaultAsync(x => x.Id == SelectedDrawId, ct);
@@ -65,14 +96,34 @@ public sealed class TicketsModel : PageModel
         {
             FlashMessage = "Draw was not found.";
             FlashIsError = true;
-            return RedirectToPage(new { id });
+            return RedirectToPage(new
+            {
+                id,
+                searchPhone = SearchPhone,
+                searchTelegramId = SearchTelegramId,
+                searchDeepLink = SearchDeepLink,
+                sortBy = SortBy,
+                sortDir = SortDir,
+                pageNumber = PageNumber,
+                pageSize = PageSize
+            });
         }
 
         if (!TryNormalizeSelectedNumbers(TicketNumbers, out var normalizedNumbers, out var signature, out var validationError))
         {
             FlashMessage = validationError;
             FlashIsError = true;
-            return RedirectToPage(new { id });
+            return RedirectToPage(new
+            {
+                id,
+                searchPhone = SearchPhone,
+                searchTelegramId = SearchTelegramId,
+                searchDeepLink = SearchDeepLink,
+                sortBy = SortBy,
+                sortDir = SortDir,
+                pageNumber = PageNumber,
+                pageSize = PageSize
+            });
         }
 
         var status = draw.State == DrawState.Finished && !string.IsNullOrWhiteSpace(draw.Numbers)
@@ -105,7 +156,17 @@ public sealed class TicketsModel : PageModel
 
         FlashMessage = $"Ticket added for user #{user.Id} in draw #{draw.Id}.";
         FlashIsError = false;
-        return RedirectToPage(new { id });
+        return RedirectToPage(new
+        {
+            id,
+            searchPhone = SearchPhone,
+            searchTelegramId = SearchTelegramId,
+            searchDeepLink = SearchDeepLink,
+            sortBy = SortBy,
+            sortDir = SortDir,
+            pageNumber = PageNumber,
+            pageSize = PageSize
+        });
     }
 
     public async Task<IActionResult> OnPostDeleteTicketAsync(long id, long ticketId, CancellationToken ct)
@@ -117,7 +178,17 @@ public sealed class TicketsModel : PageModel
             await _db.SaveChangesAsync(ct);
         }
 
-        return RedirectToPage(new { id });
+        return RedirectToPage(new
+        {
+            id,
+            searchPhone = SearchPhone,
+            searchTelegramId = SearchTelegramId,
+            searchDeepLink = SearchDeepLink,
+            sortBy = SortBy,
+            sortDir = SortDir,
+            pageNumber = PageNumber,
+            pageSize = PageSize
+        });
     }
 
     private async Task LoadAsync(long id, CancellationToken ct)

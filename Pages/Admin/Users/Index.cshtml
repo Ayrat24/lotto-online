@@ -7,7 +7,15 @@
 <h1>Users</h1>
 
 <div class="mt-2">
-    <a class="btn btn-sm btn-outline-dark" asp-page="/Admin/Users/DeepLinks">Deep-link analytics</a>
+    <a class="btn btn-sm btn-outline-dark"
+       asp-page="/Admin/Users/DeepLinks"
+       asp-route-searchPhone="@Model.SearchPhone"
+       asp-route-searchTelegramId="@Model.SearchTelegramId"
+       asp-route-searchDeepLink="@Model.SearchDeepLink"
+       asp-route-sortBy="@Model.SortBy"
+       asp-route-sortDir="@Model.SortDir"
+       asp-route-pageNumber="@Model.PageNumber"
+       asp-route-pageSize="@Model.PageSize">Deep-link analytics</a>
 </div>
 
 @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
@@ -25,6 +33,8 @@
             <input type="hidden" asp-for="SearchDeepLink" />
             <input type="hidden" asp-for="SortBy" />
             <input type="hidden" asp-for="SortDir" />
+            <input type="hidden" asp-for="PageNumber" />
+            <input type="hidden" asp-for="PageSize" />
             <div class="col-sm-4 col-md-3">
                 <label asp-for="FakeUserBalance" class="form-label">Initial balance</label>
                 <input asp-for="FakeUserBalance" type="number" min="0" step="0.01" class="form-control" />
@@ -55,8 +65,18 @@
                 <label asp-for="SearchDeepLink" class="form-label">Deep link</label>
                 <input asp-for="SearchDeepLink" class="form-control" />
             </div>
+            <div class="col-sm-6 col-md-2">
+                <label asp-for="PageSize" class="form-label">Users per page</label>
+                <select asp-for="PageSize" class="form-select">
+                    @foreach (var size in Model.AllowedPageSizes)
+                    {
+                        <option value="@size">@size</option>
+                    }
+                </select>
+            </div>
             <input type="hidden" asp-for="SortBy" />
             <input type="hidden" asp-for="SortDir" />
+            <input type="hidden" name="pageNumber" value="1" />
             <div class="col-auto">
                 <button class="btn btn-primary" type="submit">Search</button>
             </div>
@@ -67,32 +87,70 @@
     </div>
 </div>
 
+<div class="d-flex justify-content-between align-items-center mt-3">
+    <div class="small text-muted">
+        Showing @Model.StartItemNumber-@Model.EndItemNumber of @Model.TotalCount users
+    </div>
+    <div class="btn-group" role="group">
+        <a class="btn btn-sm btn-outline-secondary @(Model.PageNumber <= 1 ? "disabled" : string.Empty)"
+           asp-page="./Index"
+           asp-route-searchPhone="@Model.SearchPhone"
+           asp-route-searchTelegramId="@Model.SearchTelegramId"
+           asp-route-searchDeepLink="@Model.SearchDeepLink"
+           asp-route-sortBy="@Model.SortBy"
+           asp-route-sortDir="@Model.SortDir"
+           asp-route-pageNumber="@(Model.PageNumber - 1)"
+           asp-route-pageSize="@Model.PageSize">Previous</a>
+        @foreach (var pageNo in Model.GetPageNumberButtons())
+        {
+            <a class="btn btn-sm @(pageNo == Model.PageNumber ? "btn-primary" : "btn-outline-secondary")"
+               asp-page="./Index"
+               asp-route-searchPhone="@Model.SearchPhone"
+               asp-route-searchTelegramId="@Model.SearchTelegramId"
+               asp-route-searchDeepLink="@Model.SearchDeepLink"
+               asp-route-sortBy="@Model.SortBy"
+               asp-route-sortDir="@Model.SortDir"
+               asp-route-pageNumber="@pageNo"
+               asp-route-pageSize="@Model.PageSize">@pageNo</a>
+        }
+        <a class="btn btn-sm btn-outline-secondary @(Model.PageNumber >= Model.TotalPages ? "disabled" : string.Empty)"
+           asp-page="./Index"
+           asp-route-searchPhone="@Model.SearchPhone"
+           asp-route-searchTelegramId="@Model.SearchTelegramId"
+           asp-route-searchDeepLink="@Model.SearchDeepLink"
+           asp-route-sortBy="@Model.SortBy"
+           asp-route-sortDir="@Model.SortDir"
+           asp-route-pageNumber="@(Model.PageNumber + 1)"
+           asp-route-pageSize="@Model.PageSize">Next</a>
+    </div>
+</div>
+
 <div class="table-responsive mt-3">
     <table class="table table-striped align-middle mb-0">
         <thead>
         <tr>
             <th>
-                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-searchDeepLink="@Model.SearchDeepLink" asp-route-sortBy="id" asp-route-sortDir="@Model.GetNextSortDir("id")">Id@(Model.GetSortSuffix("id"))</a>
+                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-searchDeepLink="@Model.SearchDeepLink" asp-route-sortBy="id" asp-route-sortDir="@Model.GetNextSortDir("id")" asp-route-pageNumber="@Model.PageNumber" asp-route-pageSize="@Model.PageSize">Id@(Model.GetSortSuffix("id"))</a>
             </th>
             <th>
-                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-searchDeepLink="@Model.SearchDeepLink" asp-route-sortBy="telegramUserId" asp-route-sortDir="@Model.GetNextSortDir("telegramUserId")">TelegramUserId@(Model.GetSortSuffix("telegramUserId"))</a>
+                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-searchDeepLink="@Model.SearchDeepLink" asp-route-sortBy="telegramUserId" asp-route-sortDir="@Model.GetNextSortDir("telegramUserId")" asp-route-pageNumber="@Model.PageNumber" asp-route-pageSize="@Model.PageSize">TelegramUserId@(Model.GetSortSuffix("telegramUserId"))</a>
             </th>
             <th>Label</th>
             <th>Referral code</th>
             <th>
-                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-searchDeepLink="@Model.SearchDeepLink" asp-route-sortBy="number" asp-route-sortDir="@Model.GetNextSortDir("number")">Number@(Model.GetSortSuffix("number"))</a>
+                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-searchDeepLink="@Model.SearchDeepLink" asp-route-sortBy="number" asp-route-sortDir="@Model.GetNextSortDir("number")" asp-route-pageNumber="@Model.PageNumber" asp-route-pageSize="@Model.PageSize">Number@(Model.GetSortSuffix("number"))</a>
             </th>
             <th>
-                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-searchDeepLink="@Model.SearchDeepLink" asp-route-sortBy="acquisitionDeepLink" asp-route-sortDir="@Model.GetNextSortDir("acquisitionDeepLink")">Deep link@(Model.GetSortSuffix("acquisitionDeepLink"))</a>
+                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-searchDeepLink="@Model.SearchDeepLink" asp-route-sortBy="acquisitionDeepLink" asp-route-sortDir="@Model.GetNextSortDir("acquisitionDeepLink")" asp-route-pageNumber="@Model.PageNumber" asp-route-pageSize="@Model.PageSize">Deep link@(Model.GetSortSuffix("acquisitionDeepLink"))</a>
             </th>
             <th>
-                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-searchDeepLink="@Model.SearchDeepLink" asp-route-sortBy="balance" asp-route-sortDir="@Model.GetNextSortDir("balance")">Balance@(Model.GetSortSuffix("balance"))</a>
+                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-searchDeepLink="@Model.SearchDeepLink" asp-route-sortBy="balance" asp-route-sortDir="@Model.GetNextSortDir("balance")" asp-route-pageNumber="@Model.PageNumber" asp-route-pageSize="@Model.PageSize">Balance@(Model.GetSortSuffix("balance"))</a>
             </th>
             <th>
-                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-searchDeepLink="@Model.SearchDeepLink" asp-route-sortBy="createdAt" asp-route-sortDir="@Model.GetNextSortDir("createdAt")">Created (UTC)@(Model.GetSortSuffix("createdAt"))</a>
+                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-searchDeepLink="@Model.SearchDeepLink" asp-route-sortBy="createdAt" asp-route-sortDir="@Model.GetNextSortDir("createdAt")" asp-route-pageNumber="@Model.PageNumber" asp-route-pageSize="@Model.PageSize">Created (UTC)@(Model.GetSortSuffix("createdAt"))</a>
             </th>
             <th>
-                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-searchDeepLink="@Model.SearchDeepLink" asp-route-sortBy="lastSeenAt" asp-route-sortDir="@Model.GetNextSortDir("lastSeenAt")">Last seen (UTC)@(Model.GetSortSuffix("lastSeenAt"))</a>
+                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-searchDeepLink="@Model.SearchDeepLink" asp-route-sortBy="lastSeenAt" asp-route-sortDir="@Model.GetNextSortDir("lastSeenAt")" asp-route-pageNumber="@Model.PageNumber" asp-route-pageSize="@Model.PageSize">Last seen (UTC)@(Model.GetSortSuffix("lastSeenAt"))</a>
             </th>
             <th></th>
         </tr>
@@ -130,11 +188,11 @@
                     <td>
                         <div class="d-flex gap-2">
                             <div class="btn-group" role="group">
-                                <a class="btn btn-sm btn-outline-primary" asp-page="/Admin/Users/Edit" asp-route-id="@u.Id">Edit</a>
-                                <a class="btn btn-sm btn-outline-success" asp-page="/Admin/Users/Tickets" asp-route-id="@u.Id">Tickets</a>
+                                <a class="btn btn-sm btn-outline-primary" asp-page="/Admin/Users/Edit" asp-route-id="@u.Id" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-searchDeepLink="@Model.SearchDeepLink" asp-route-sortBy="@Model.SortBy" asp-route-sortDir="@Model.SortDir" asp-route-pageNumber="@Model.PageNumber" asp-route-pageSize="@Model.PageSize">Edit</a>
+                                <a class="btn btn-sm btn-outline-success" asp-page="/Admin/Users/Tickets" asp-route-id="@u.Id" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-searchDeepLink="@Model.SearchDeepLink" asp-route-sortBy="@Model.SortBy" asp-route-sortDir="@Model.SortDir" asp-route-pageNumber="@Model.PageNumber" asp-route-pageSize="@Model.PageSize">Tickets</a>
                             </div>
 
-                            <form method="post" asp-page-handler="Delete" asp-route-id="@u.Id" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-searchDeepLink="@Model.SearchDeepLink" asp-route-sortBy="@Model.SortBy" asp-route-sortDir="@Model.SortDir" onsubmit="return confirm('Delete this user and ALL their tickets?');">
+                            <form method="post" asp-page-handler="Delete" asp-route-id="@u.Id" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-searchDeepLink="@Model.SearchDeepLink" asp-route-sortBy="@Model.SortBy" asp-route-sortDir="@Model.SortDir" asp-route-pageNumber="@Model.PageNumber" asp-route-pageSize="@Model.PageSize" onsubmit="return confirm('Delete this user and ALL their tickets?');">
                                 @Html.AntiForgeryToken()
                                 <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
                             </form>

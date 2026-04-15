@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using MiniApp.Admin;
@@ -16,45 +17,42 @@ public sealed class DeepLinksModel : PageModel
         _db = db;
     }
 
-    public List<DeepLinkGroupView> Groups { get; private set; } = new();
+    public List<DeepLinkCountView> Rows { get; private set; } = new();
+
+    [BindProperty(SupportsGet = true)]
+    public string? SearchPhone { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public string? SearchTelegramId { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public string? SearchDeepLink { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public string? SortBy { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public string? SortDir { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public int? PageNumber { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public int? PageSize { get; set; }
 
     public async Task OnGetAsync(CancellationToken ct)
     {
-        var users = await _db.Users
+        Rows = await _db.Users
             .AsNoTracking()
-            .OrderByDescending(x => x.CreatedAtUtc)
-            .Select(x => new DeepLinkUserView(
-                x.Id,
-                x.TelegramUserId,
-                x.Number,
-                x.Balance,
-                x.CreatedAtUtc,
-                x.LastSeenAtUtc,
-                x.IsFake,
-                x.AcquisitionDeepLink))
+            .GroupBy(x => x.AcquisitionDeepLink)
+            .Select(x => new DeepLinkCountView(
+                string.IsNullOrWhiteSpace(x.Key) ? "(none)" : x.Key!,
+                x.Count()))
+            .OrderByDescending(x => x.UserCount)
+            .ThenBy(x => x.DeepLink)
             .ToListAsync(ct);
-
-        Groups = users
-            .GroupBy(x => string.IsNullOrWhiteSpace(x.AcquisitionDeepLink) ? "(none)" : x.AcquisitionDeepLink!, StringComparer.Ordinal)
-            .OrderByDescending(x => x.Count())
-            .ThenBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
-            .Select(x => new DeepLinkGroupView(x.Key, x.ToList()))
-            .ToList();
     }
 
-    public sealed record DeepLinkGroupView(string DeepLink, List<DeepLinkUserView> Users)
-    {
-        public int UserCount => Users.Count;
-    }
-
-    public sealed record DeepLinkUserView(
-        long Id,
-        long TelegramUserId,
-        string? Number,
-        decimal Balance,
-        DateTimeOffset CreatedAtUtc,
-        DateTimeOffset LastSeenAtUtc,
-        bool IsFake,
-        string? AcquisitionDeepLink);
+    public sealed record DeepLinkCountView(string DeepLink, int UserCount);
 }
 

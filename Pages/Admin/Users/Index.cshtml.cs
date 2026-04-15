@@ -39,6 +39,22 @@ public sealed class IndexModel : PageModel
     [BindProperty(SupportsGet = true)]
     public string SortDir { get; set; } = "desc";
 
+    [BindProperty(SupportsGet = true)]
+    public int PageNumber { get; set; } = 1;
+
+    [BindProperty(SupportsGet = true)]
+    public int PageSize { get; set; } = 50;
+
+    public int TotalCount { get; private set; }
+
+    public int TotalPages { get; private set; }
+
+    public int StartItemNumber { get; private set; }
+
+    public int EndItemNumber { get; private set; }
+
+    public IReadOnlyList<int> AllowedPageSizes { get; } = [25, 50, 100, 200];
+
     [BindProperty]
     public decimal FakeUserBalance { get; set; } = 25m;
 
@@ -66,6 +82,28 @@ public sealed class IndexModel : PageModel
         return string.Equals(SortDir, "asc", StringComparison.OrdinalIgnoreCase) ? " (asc)" : " (desc)";
     }
 
+    public IReadOnlyList<int> GetPageNumberButtons(int maxButtons = 7)
+    {
+        if (TotalPages <= 0)
+            return [1];
+
+        if (maxButtons <= 0)
+            maxButtons = 7;
+
+        var half = maxButtons / 2;
+        var start = Math.Max(1, PageNumber - half);
+        var end = Math.Min(TotalPages, start + maxButtons - 1);
+
+        // If we're near the end, shift the window left to keep the same amount of buttons.
+        start = Math.Max(1, end - maxButtons + 1);
+
+        var pages = new List<int>(end - start + 1);
+        for (var i = start; i <= end; i++)
+            pages.Add(i);
+
+        return pages;
+    }
+
     public async Task OnGetAsync()
     {
         SearchPhone = string.IsNullOrWhiteSpace(SearchPhone) ? null : SearchPhone.Trim();
@@ -73,6 +111,8 @@ public sealed class IndexModel : PageModel
         SearchDeepLink = string.IsNullOrWhiteSpace(SearchDeepLink) ? null : SearchDeepLink.Trim();
         SortBy = NormalizeSortBy(SortBy);
         SortDir = NormalizeSortDir(SortDir);
+        PageSize = NormalizePageSize(PageSize);
+        PageNumber = NormalizePage(PageNumber);
 
         if (!string.IsNullOrWhiteSpace(FlashMessage))
         {
@@ -94,6 +134,10 @@ public sealed class IndexModel : PageModel
             {
                 StatusMessage = "Telegram user id filter must be a valid integer.";
                 StatusIsError = true;
+                TotalCount = 0;
+                TotalPages = 1;
+                StartItemNumber = 0;
+                EndItemNumber = 0;
                 Users = new List<MiniAppUser>();
                 return;
             }
@@ -104,10 +148,27 @@ public sealed class IndexModel : PageModel
         if (!string.IsNullOrWhiteSpace(SearchDeepLink))
             query = query.Where(x => x.AcquisitionDeepLink != null && x.AcquisitionDeepLink.Contains(SearchDeepLink));
 
+        TotalCount = await query.CountAsync(HttpContext.RequestAborted);
+        TotalPages = TotalCount == 0 ? 1 : (int)Math.Ceiling(TotalCount / (double)PageSize);
+        if (PageNumber > TotalPages)
+            PageNumber = TotalPages;
+
         query = ApplySort(query, SortBy, SortDir)
-            .Take(200);
+            .Skip((PageNumber - 1) * PageSize)
+            .Take(PageSize);
 
         Users = await query.ToListAsync();
+
+        if (Users.Count == 0)
+        {
+            StartItemNumber = 0;
+            EndItemNumber = 0;
+        }
+        else
+        {
+            StartItemNumber = (PageNumber - 1) * PageSize + 1;
+            EndItemNumber = StartItemNumber + Users.Count - 1;
+        }
 
         var changed = false;
         foreach (var user in Users)
@@ -157,7 +218,9 @@ public sealed class IndexModel : PageModel
             searchTelegramId = SearchTelegramId,
             searchDeepLink = SearchDeepLink,
             sortBy = NormalizeSortBy(SortBy),
-            sortDir = NormalizeSortDir(SortDir)
+            sortDir = NormalizeSortDir(SortDir),
+            pageNumber = NormalizePage(PageNumber),
+            pageSize = NormalizePageSize(PageSize)
         });
     }
 
@@ -184,7 +247,9 @@ public sealed class IndexModel : PageModel
                 searchTelegramId = SearchTelegramId,
                 searchDeepLink = SearchDeepLink,
                 sortBy = NormalizeSortBy(SortBy),
-                sortDir = NormalizeSortDir(SortDir)
+                sortDir = NormalizeSortDir(SortDir),
+                pageNumber = NormalizePage(PageNumber),
+                pageSize = NormalizePageSize(PageSize)
             });
 
         _db.Users.Remove(u);
@@ -196,9 +261,21 @@ public sealed class IndexModel : PageModel
             searchTelegramId = SearchTelegramId,
             searchDeepLink = SearchDeepLink,
             sortBy = NormalizeSortBy(SortBy),
-            sortDir = NormalizeSortDir(SortDir)
+            sortDir = NormalizeSortDir(SortDir),
+            pageNumber = NormalizePage(PageNumber),
+            pageSize = NormalizePageSize(PageSize)
         });
     }
+
+    private static int NormalizePage(int value)
+        => value <= 0 ? 1 : value;
+
+    private static int NormalizePageSize(int value)
+        => value switch
+        {
+            25 or 50 or 100 or 200 => value,
+            _ => 50
+        };
 
     private static string NormalizeSortBy(string? value)
         => value?.Trim().ToLowerInvariant() switch
