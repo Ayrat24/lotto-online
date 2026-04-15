@@ -161,8 +161,15 @@ app.UseAuthorization();
 
 app.MapRazorPages();
 
-app.MapPost("/Admin/set-language", (HttpContext http, string lang, string? returnUrl) =>
+app.MapPost("/Admin/set-language", async (HttpContext http, CancellationToken ct) =>
 {
+    var form = http.Request.HasFormContentType
+        ? await http.Request.ReadFormAsync(ct)
+        : null;
+
+    var lang = form?["lang"].ToString();
+    var returnUrl = form?["returnUrl"].ToString();
+
     var normalized = (lang ?? string.Empty).Trim().ToLowerInvariant();
     if (normalized != "ru" && normalized != "uz")
         normalized = "en";
