@@ -16,6 +16,10 @@
         <h5 class="card-title">Testing tools</h5>
         <form method="post" asp-page-handler="CreateFake" class="row g-2 align-items-end">
             @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="SearchPhone" />
+            <input type="hidden" asp-for="SearchTelegramId" />
+            <input type="hidden" asp-for="SortBy" />
+            <input type="hidden" asp-for="SortDir" />
             <div class="col-sm-4 col-md-3">
                 <label asp-for="FakeUserBalance" class="form-label">Initial balance</label>
                 <input asp-for="FakeUserBalance" type="number" min="0" step="0.01" class="form-control" />
@@ -30,56 +34,101 @@
     </div>
 </div>
 
+<div class="card mt-3">
+    <div class="card-body">
+        <h5 class="card-title">Search users</h5>
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-sm-6 col-md-4">
+                <label asp-for="SearchPhone" class="form-label">Phone number</label>
+                <input asp-for="SearchPhone" class="form-control" />
+            </div>
+            <div class="col-sm-6 col-md-4">
+                <label asp-for="SearchTelegramId" class="form-label">Telegram user id</label>
+                <input asp-for="SearchTelegramId" class="form-control" inputmode="numeric" />
+            </div>
+            <input type="hidden" asp-for="SortBy" />
+            <input type="hidden" asp-for="SortDir" />
+            <div class="col-auto">
+                <button class="btn btn-primary" type="submit">Search</button>
+            </div>
+            <div class="col-auto">
+                <a class="btn btn-outline-secondary" asp-page="./Index">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="table-responsive mt-3">
     <table class="table table-striped align-middle mb-0">
         <thead>
         <tr>
-            <th>Id</th>
-            <th>TelegramUserId</th>
+            <th>
+                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-sortBy="id" asp-route-sortDir="@Model.GetNextSortDir("id")">Id@Model.GetSortSuffix("id")</a>
+            </th>
+            <th>
+                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-sortBy="telegramUserId" asp-route-sortDir="@Model.GetNextSortDir("telegramUserId")">TelegramUserId@Model.GetSortSuffix("telegramUserId")</a>
+            </th>
             <th>Label</th>
             <th>Referral code</th>
-            <th>Number</th>
-            <th>Balance</th>
-            <th>Created (UTC)</th>
-            <th>Last seen (UTC)</th>
+            <th>
+                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-sortBy="number" asp-route-sortDir="@Model.GetNextSortDir("number")">Number@Model.GetSortSuffix("number")</a>
+            </th>
+            <th>
+                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-sortBy="balance" asp-route-sortDir="@Model.GetNextSortDir("balance")">Balance@Model.GetSortSuffix("balance")</a>
+            </th>
+            <th>
+                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-sortBy="createdAt" asp-route-sortDir="@Model.GetNextSortDir("createdAt")">Created (UTC)@Model.GetSortSuffix("createdAt")</a>
+            </th>
+            <th>
+                <a class="link-dark text-decoration-none" asp-page="./Index" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-sortBy="lastSeenAt" asp-route-sortDir="@Model.GetNextSortDir("lastSeenAt")">Last seen (UTC)@Model.GetSortSuffix("lastSeenAt")</a>
+            </th>
             <th></th>
         </tr>
         </thead>
         <tbody>
-        @foreach (var u in Model.Users)
+        @if (Model.Users.Count == 0)
         {
             <tr>
-                <td>@u.Id</td>
-                <td>@u.TelegramUserId</td>
-                <td>
-                    @if (u.IsFake)
-                    {
-                        <span class="badge text-bg-warning">FAKE</span>
-                    }
-                    else
-                    {
-                        <span class="text-muted">real</span>
-                    }
-                </td>
-                <td><code>@(string.IsNullOrWhiteSpace(u.InviteCode) ? "-" : u.InviteCode)</code></td>
-                <td>@(string.IsNullOrWhiteSpace(u.Number) ? "-" : u.Number)</td>
-                <td>@u.Balance.ToString("0.00")</td>
-                <td>@u.CreatedAtUtc</td>
-                <td>@u.LastSeenAtUtc</td>
-                <td>
-                    <div class="d-flex gap-2">
-                        <div class="btn-group" role="group">
-                            <a class="btn btn-sm btn-outline-primary" asp-page="/Admin/Users/Edit" asp-route-id="@u.Id">Edit</a>
-                            <a class="btn btn-sm btn-outline-success" asp-page="/Admin/Users/Tickets" asp-route-id="@u.Id">Tickets</a>
-                        </div>
-
-                        <form method="post" asp-page-handler="Delete" asp-route-id="@u.Id" onsubmit="return confirm('Delete this user and ALL their tickets?');">
-                            @Html.AntiForgeryToken()
-                            <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
-                        </form>
-                    </div>
-                </td>
+                <td colspan="9" class="text-muted">No users found.</td>
             </tr>
+        }
+        else
+        {
+            @foreach (var u in Model.Users)
+            {
+                <tr>
+                    <td>@u.Id</td>
+                    <td>@u.TelegramUserId</td>
+                    <td>
+                        @if (u.IsFake)
+                        {
+                            <span class="badge text-bg-warning">FAKE</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">real</span>
+                        }
+                    </td>
+                    <td><code>@(string.IsNullOrWhiteSpace(u.InviteCode) ? "-" : u.InviteCode)</code></td>
+                    <td>@(string.IsNullOrWhiteSpace(u.Number) ? "-" : u.Number)</td>
+                    <td>@u.Balance.ToString("0.00")</td>
+                    <td>@u.CreatedAtUtc</td>
+                    <td>@u.LastSeenAtUtc</td>
+                    <td>
+                        <div class="d-flex gap-2">
+                            <div class="btn-group" role="group">
+                                <a class="btn btn-sm btn-outline-primary" asp-page="/Admin/Users/Edit" asp-route-id="@u.Id">Edit</a>
+                                <a class="btn btn-sm btn-outline-success" asp-page="/Admin/Users/Tickets" asp-route-id="@u.Id">Tickets</a>
+                            </div>
+
+                            <form method="post" asp-page-handler="Delete" asp-route-id="@u.Id" asp-route-searchPhone="@Model.SearchPhone" asp-route-searchTelegramId="@Model.SearchTelegramId" asp-route-sortBy="@Model.SortBy" asp-route-sortDir="@Model.SortDir" onsubmit="return confirm('Delete this user and ALL their tickets?');">
+                                @Html.AntiForgeryToken()
+                                <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            }
         }
         </tbody>
     </table>

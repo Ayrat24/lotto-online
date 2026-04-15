@@ -24,6 +24,18 @@ public sealed class IndexModel : PageModel
 
     public List<MiniAppUser> Users { get; private set; } = new();
 
+    [BindProperty(SupportsGet = true)]
+    public string? SearchPhone { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public string? SearchTelegramId { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public string SortBy { get; set; } = "lastSeenAt";
+
+    [BindProperty(SupportsGet = true)]
+    public string SortDir { get; set; } = "desc";
+
     [BindProperty]
     public decimal FakeUserBalance { get; set; } = 25m;
 
@@ -37,8 +49,27 @@ public sealed class IndexModel : PageModel
 
     public bool StatusIsError { get; private set; }
 
+    public string GetNextSortDir(string column)
+        => string.Equals(SortBy, column, StringComparison.OrdinalIgnoreCase)
+           && string.Equals(SortDir, "asc", StringComparison.OrdinalIgnoreCase)
+            ? "desc"
+            : "asc";
+
+    public string GetSortSuffix(string column)
+    {
+        if (!string.Equals(SortBy, column, StringComparison.OrdinalIgnoreCase))
+            return string.Empty;
+
+        return string.Equals(SortDir, "asc", StringComparison.OrdinalIgnoreCase) ? " (asc)" : " (desc)";
+    }
+
     public async Task OnGetAsync()
     {
+        SearchPhone = string.IsNullOrWhiteSpace(SearchPhone) ? null : SearchPhone.Trim();
+        SearchTelegramId = string.IsNullOrWhiteSpace(SearchTelegramId) ? null : SearchTelegramId.Trim();
+        SortBy = NormalizeSortBy(SortBy);
+        SortDir = NormalizeSortDir(SortDir);
+
         if (!string.IsNullOrWhiteSpace(FlashMessage))
         {
             StatusMessage = FlashMessage;
@@ -48,10 +79,28 @@ public sealed class IndexModel : PageModel
         if (LocalDebugMode.TryGetDebugTelegramUserId(HttpContext, _config, _env, out var debugTelegramUserId))
             await LocalDebugSeed.EnsureSeededAsync(_db, debugTelegramUserId, HttpContext.RequestAborted);
 
-        Users = await _db.Users
-            .OrderByDescending(x => x.LastSeenAtUtc)
-            .Take(200)
-            .ToListAsync();
+        IQueryable<MiniAppUser> query = _db.Users;
+
+        if (!string.IsNullOrWhiteSpace(SearchPhone))
+            query = query.Where(x => x.Number != null && x.Number.Contains(SearchPhone));
+
+        if (!string.IsNullOrWhiteSpace(SearchTelegramId))
+        {
+            if (!long.TryParse(SearchTelegramId, out var telegramUserId))
+            {
+                StatusMessage = "Telegram user id filter must be a valid integer.";
+                StatusIsError = true;
+                Users = new List<MiniAppUser>();
+                return;
+            }
+
+            query = query.Where(x => x.TelegramUserId == telegramUserId);
+        }
+
+        query = ApplySort(query, SortBy, SortDir)
+            .Take(200);
+
+        Users = await query.ToListAsync();
 
         var changed = false;
         foreach (var user in Users)
@@ -94,7 +143,13 @@ public sealed class IndexModel : PageModel
 
         FlashMessage = $"Fake user created (TelegramUserId={fake.TelegramUserId}, Balance={fake.Balance:0.00}).";
         FlashIsError = false;
-        return RedirectToPage();
+        return RedirectToPage(new
+        {
+            searchPhone = SearchPhone,
+            searchTelegramId = SearchTelegramId,
+            sortBy = NormalizeSortBy(SortBy),
+            sortDir = NormalizeSortDir(SortDir)
+        });
     }
 
     private async Task<string> GenerateInviteCodeAsync(CancellationToken ct)
@@ -114,11 +169,57 @@ public sealed class IndexModel : PageModel
     {
         var u = await _db.Users.SingleOrDefaultAsync(x => x.Id == id, ct);
         if (u is null)
-            return RedirectToPage();
+            return RedirectToPage(new
+            {
+                searchPhone = SearchPhone,
+                searchTelegramId = SearchTelegramId,
+                sortBy = NormalizeSortBy(SortBy),
+                sortDir = NormalizeSortDir(SortDir)
+            });
 
         _db.Users.Remove(u);
         await _db.SaveChangesAsync(ct);
 
-        return RedirectToPage();
+        return RedirectToPage(new
+        {
+            searchPhone = SearchPhone,
+            searchTelegramId = SearchTelegramId,
+            sortBy = NormalizeSortBy(SortBy),
+            sortDir = NormalizeSortDir(SortDir)
+        });
+    }
+
+    private static string NormalizeSortBy(string? value)
+        => value?.Trim().ToLowerInvariant() switch
+        {
+            "id" => "id",
+            "telegramuserid" => "telegramUserId",
+            "number" => "number",
+            "balance" => "balance",
+            "createdat" => "createdAt",
+            "createdatutc" => "createdAt",
+            "lastseenat" => "lastSeenAt",
+            "lastseenatutc" => "lastSeenAt",
+            _ => "lastSeenAt"
+        };
+
+    private static string NormalizeSortDir(string? value)
+        => string.Equals(value?.Trim(), "asc", StringComparison.OrdinalIgnoreCase)
+            ? "asc"
+            : "desc";
+
+    private static IQueryable<MiniAppUser> ApplySort(IQueryable<MiniAppUser> query, string sortBy, string sortDir)
+    {
+        var isAsc = string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase);
+
+        return sortBy switch
+        {
+            "id" => isAsc ? query.OrderBy(x => x.Id) : query.OrderByDescending(x => x.Id),
+            "telegramUserId" => isAsc ? query.OrderBy(x => x.TelegramUserId) : query.OrderByDescending(x => x.TelegramUserId),
+            "number" => isAsc ? query.OrderBy(x => x.Number) : query.OrderByDescending(x => x.Number),
+            "balance" => isAsc ? query.OrderBy(x => x.Balance) : query.OrderByDescending(x => x.Balance),
+            "createdAt" => isAsc ? query.OrderBy(x => x.CreatedAtUtc) : query.OrderByDescending(x => x.CreatedAtUtc),
+            _ => isAsc ? query.OrderBy(x => x.LastSeenAtUtc) : query.OrderByDescending(x => x.LastSeenAtUtc)
+        };
     }
 }
