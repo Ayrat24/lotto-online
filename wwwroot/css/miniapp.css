@@ -716,7 +716,19 @@ button:disabled {
 .jackpot-buy-price-label { color: #f2afc5; font-size: 0.95rem; }
 .jackpot-buy-price { font-weight: 900; font-size: 2rem; color: #fff; }
 
-.jackpot-buy-right { text-align: right; }
+.jackpot-buy-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  text-align: right;
+}
+
+.jackpot-buy-ticket-count {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.2;
+}
 .jackpot-buy-btn {
   background: linear-gradient(180deg, #ff6c9f, #f15d93);
   color: #fff;
@@ -782,6 +794,14 @@ button:disabled {
 
   .jackpot-buy-price {
     font-size: 1.8rem;
+  }
+
+  .jackpot-buy-right {
+    gap: 6px;
+  }
+
+  .jackpot-buy-ticket-count {
+    font-size: 0.8rem;
   }
 
   .jackpot-buy-btn {

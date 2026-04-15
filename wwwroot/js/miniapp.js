@@ -65,6 +65,7 @@
   var currentDrawTicketPriceRowEl = document.getElementById('currentDrawTicketPriceRow');
   var currentDrawTicketCostEl = document.getElementById('currentDrawTicketCost');
   var currentDrawPurchaseBlockEl = document.getElementById('currentDrawPurchaseBlock');
+  var featuredJackpotCardEl = document.getElementById('featuredJackpotCard');
   var jackpotCardsContainerEl = document.getElementById('jackpotCardsContainer');
   var currentDisplayedDrawId = null;
   var appShellEl = document.getElementById('appShell');
@@ -1127,8 +1128,18 @@
       if (!jackpotCardsContainerEl) return;
     }
 
+    if (!featuredJackpotCardEl) {
+      featuredJackpotCardEl = document.getElementById('featuredJackpotCard');
+    }
+
     var draws = Array.isArray(activeDraws) ? activeDraws.filter(function (x) { return !!x; }) : [];
-    if (draws.length <= 1) {
+    var showMultiDrawBanners = draws.length > 1;
+
+    if (featuredJackpotCardEl) {
+      featuredJackpotCardEl.hidden = showMultiDrawBanners;
+    }
+
+    if (!showMultiDrawBanners) {
       jackpotCardsContainerEl.innerHTML = '';
       jackpotCardsContainerEl.hidden = true;
       return;
@@ -1228,9 +1239,34 @@
       buyRight.className = 'jackpot-buy-right';
 
       var countText = document.createElement('div');
-      countText.className = 'muted';
+      countText.className = 'jackpot-buy-ticket-count';
       countText.textContent = t('client.tickets.title', 'My tickets') + ': ' + (ticketCountByDrawId[draw.id] || 0);
+
+      var buyBtn = document.createElement('button');
+      buyBtn.type = 'button';
+      buyBtn.className = 'jackpot-buy-btn';
+      buyBtn.textContent = t('client.button.purchase', 'Purchase ticket');
+      buyBtn.disabled = draw.state !== 'active';
+      buyBtn.title = draw.state === 'active' ? '' : t('client.currentDraw.activeOnlyTitle', 'Only the active draw accepts purchases.');
+
+      buyBtn.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (draw.state !== 'active') {
+          setPurchaseStatus(t('client.status.noActiveDraw', 'There is no active draw right now.'));
+          return;
+        }
+
+        selectedActiveDrawId = draw.id;
+        currentDisplayedDrawId = draw.id;
+        setPurchaseStatus('');
+        openTicketPicker();
+        renderActiveDrawBanners(getActiveDraws(latestState), getActiveTicketGroups(latestState));
+      });
+
       buyRight.appendChild(countText);
+      buyRight.appendChild(buyBtn);
 
       buyRow.appendChild(buyLeft);
       buyRow.appendChild(buyRight);
