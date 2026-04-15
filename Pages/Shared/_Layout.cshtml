@@ -1,4 +1,5 @@
-﻿@{
+﻿@inject MiniApp.Features.Localization.ILocalizationService Localization
+@{
     var isAdminPath = Context?.Request.Path.StartsWithSegments("/Admin", StringComparison.OrdinalIgnoreCase) ?? false;
     var cookieLang = Context?.Request.Cookies["AdminUiLanguage"];
     var selectedAdminLang = string.Equals(cookieLang, "ru", StringComparison.OrdinalIgnoreCase)
@@ -7,6 +8,14 @@
             ? "uz"
             : "en";
     var currentAdminReturnUrl = (Context?.Request.Path.Value ?? "/Admin") + (Context?.Request.QueryString.Value ?? string.Empty);
+    var requestAborted = Context?.RequestAborted ?? CancellationToken.None;
+    var navHomeText = isAdminPath
+        ? await Localization.GetTextAsync(selectedAdminLang, "admin.layout.home", "Home", requestAborted)
+        : "Home";
+    var navPrivacyText = isAdminPath
+        ? await Localization.GetTextAsync(selectedAdminLang, "admin.layout.privacy", "Privacy", requestAborted)
+        : "Privacy";
+    var languageLabelText = await Localization.GetTextAsync(selectedAdminLang, "admin.layout.language", "Language", requestAborted);
 }
 <!DOCTYPE html>
 <html lang="@selectedAdminLang">
@@ -33,17 +42,17 @@
                 <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
                     <ul class="navbar-nav flex-grow-1">
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-page="/Index">Home</a>
+                            <a class="nav-link text-dark" asp-area="" asp-page="/Index">@navHomeText</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-page="/Privacy">Privacy</a>
+                            <a class="nav-link text-dark" asp-area="" asp-page="/Privacy">@navPrivacyText</a>
                         </li>
                     </ul>
                     @if (isAdminPath)
                     {
                         <form class="d-flex align-items-center gap-2" method="post" action="/Admin/set-language">
                             <input type="hidden" name="returnUrl" value="@currentAdminReturnUrl" />
-                            <label class="small text-muted mb-0" for="adminLangSelect">Language</label>
+                            <label class="small text-muted mb-0" for="adminLangSelect">@languageLabelText</label>
                             <select id="adminLangSelect" name="lang" class="form-select form-select-sm" onchange="this.form.submit()">
                                 <option value="en" selected="@(selectedAdminLang == "en")">English</option>
                                 <option value="ru" selected="@(selectedAdminLang == "ru")">Русский</option>

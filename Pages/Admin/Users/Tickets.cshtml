@@ -1,10 +1,10 @@
 @page "{id:long}/Tickets"
 @model MiniApp.Pages.Admin.Users.TicketsModel
 @{
-    ViewData["Title"] = "User tickets";
+    ViewData["Title"] = Model.Text("admin.users.tickets.title", "User tickets");
 }
 
-<h1>User tickets</h1>
+<h1>@Model.Text("admin.users.tickets.title", "User tickets")</h1>
 
 <div class="mb-3">
     <a class="btn btn-sm btn-outline-secondary"
@@ -15,12 +15,12 @@
        asp-route-sortBy="@Model.SortBy"
        asp-route-sortDir="@Model.SortDir"
        asp-route-pageNumber="@Model.PageNumber"
-       asp-route-pageSize="@Model.PageSize">Back to users</a>
+        asp-route-pageSize="@Model.PageSize">@Model.Text("admin.users.tickets.backToUsers", "Back to users")</a>
 </div>
 
 @if (Model.SelectedUser is null)
 {
-    <div class="alert alert-warning">User not found.</div>
+    <div class="alert alert-warning">@Model.Text("admin.users.tickets.userNotFound", "User not found.")</div>
     return;
 }
 
@@ -33,19 +33,19 @@
     <div class="card-body">
         <div><strong>User Id:</strong> @Model.SelectedUser.Id</div>
         <div><strong>TelegramUserId:</strong> @Model.SelectedUser.TelegramUserId</div>
-        <div><strong>Balance:</strong> @Model.SelectedUser.Balance.ToString("0.00")</div>
-        <div><strong>Created:</strong> @Model.SelectedUser.CreatedAtUtc</div>
-        <div><strong>Last seen:</strong> @Model.SelectedUser.LastSeenAtUtc</div>
+        <div><strong>@Model.Text("admin.users.tickets.balance", "Balance"):</strong> @Model.SelectedUser.Balance.ToString("0.00")</div>
+        <div><strong>@Model.Text("admin.users.tickets.created", "Created"):</strong> @Model.SelectedUser.CreatedAtUtc</div>
+        <div><strong>@Model.Text("admin.users.tickets.lastSeen", "Last seen"):</strong> @Model.SelectedUser.LastSeenAtUtc</div>
     </div>
 </div>
 
 <div class="card mb-3">
     <div class="card-body">
-        <h2 class="h5">Add ticket</h2>
+        <h2 class="h5">@Model.Text("admin.users.tickets.addTitle", "Add ticket")</h2>
 
         @if (Model.Draws.Count == 0)
         {
-            <div class="alert alert-secondary mb-0">No draws found. Create a draw first.</div>
+            <div class="alert alert-secondary mb-0">@Model.Text("admin.users.tickets.noDraws", "No draws found. Create a draw first.")</div>
         }
         else
         {
@@ -60,7 +60,7 @@
                 <input type="hidden" asp-for="PageSize" />
 
                 <div class="col-md-4">
-                    <label asp-for="SelectedDrawId" class="form-label">Draw</label>
+                    <label asp-for="SelectedDrawId" class="form-label">@Model.Text("admin.users.tickets.draw", "Draw")</label>
                     <select asp-for="SelectedDrawId" class="form-select">
                         @foreach (var draw in Model.Draws)
                         {
@@ -70,27 +70,27 @@
                 </div>
 
                 <div class="col-md-4">
-                    <label asp-for="TicketNumbers" class="form-label">Numbers</label>
-                    <input asp-for="TicketNumbers" class="form-control" placeholder="e.g. 1,7,14,23,36" />
+                    <label asp-for="TicketNumbers" class="form-label">@Model.Text("admin.users.tickets.numbers", "Numbers")</label>
+                    <input asp-for="TicketNumbers" class="form-control" placeholder="@Model.Text("admin.users.tickets.numbersPlaceholder", "e.g. 1,7,14,23,36")" />
                 </div>
 
                 <div class="col-auto">
-                    <button class="btn btn-primary" type="submit">Add ticket</button>
+                    <button class="btn btn-primary" type="submit">@Model.Text("admin.users.tickets.addButton", "Add ticket")</button>
                 </div>
 
                 <div class="col-12 text-muted small">
-                    Enter exactly 5 unique numbers from 1 to 36, separated by commas.
+                    @Model.Text("admin.users.tickets.hint", "Enter exactly 5 unique numbers from 1 to 36, separated by commas.")
                 </div>
             </form>
         }
     </div>
 </div>
 
-<h2>Tickets (@Model.Tickets.Count)</h2>
+<h2>@Model.Text("admin.users.tickets.listTitle", "Tickets") (@Model.Tickets.Count)</h2>
 
 @if (Model.Tickets.Count == 0)
 {
-    <div class="muted">No tickets yet.</div>
+    <div class="muted">@Model.Text("admin.users.tickets.empty", "No tickets yet.")</div>
 }
 else
 {
@@ -100,9 +100,9 @@ else
             <tr>
                 <th>Id</th>
                 <th>DrawId</th>
-                <th>Numbers</th>
-                <th>Status</th>
-                <th>Purchased (UTC)</th>
+                <th>@Model.Text("admin.users.tickets.numbers", "Numbers")</th>
+                <th>@Model.Text("admin.users.tickets.status", "Status")</th>
+                <th>@Model.Text("admin.users.tickets.purchasedUtc", "Purchased (UTC)")</th>
                 <th></th>
             </tr>
             </thead>
@@ -117,7 +117,7 @@ else
                     <td>@t.PurchasedAtUtc</td>
                     <td class="text-end">
                         <form method="post" asp-page-handler="DeleteTicket" asp-route-id="@Model.SelectedUser.Id" asp-route-ticketId="@t.Id"
-                              onsubmit="return confirm('Delete this ticket?');">
+                              onsubmit="return confirm('@Model.Text("admin.users.tickets.confirmDelete", "Delete this ticket?")');">
                             @Html.AntiForgeryToken()
                             <input type="hidden" asp-for="SearchPhone" />
                             <input type="hidden" asp-for="SearchTelegramId" />
@@ -126,7 +126,7 @@ else
                             <input type="hidden" asp-for="SortDir" />
                             <input type="hidden" asp-for="PageNumber" />
                             <input type="hidden" asp-for="PageSize" />
-                            <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                            <button class="btn btn-sm btn-outline-danger" type="submit">@Model.Text("admin.users.tickets.delete", "Delete")</button>
                         </form>
                     </td>
                 </tr>

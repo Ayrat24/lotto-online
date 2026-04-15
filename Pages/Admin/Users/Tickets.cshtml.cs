@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using MiniApp.Admin;
 using MiniApp.Data;
 using MiniApp.Features.Draws;
+using MiniApp.Features.Localization;
 
 namespace MiniApp.Pages.Admin.Users;
 
@@ -12,10 +13,12 @@ namespace MiniApp.Pages.Admin.Users;
 public sealed class TicketsModel : PageModel
 {
     private readonly AppDbContext _db;
+    private readonly ILocalizationService _localization;
 
-    public TicketsModel(AppDbContext db)
+    public TicketsModel(AppDbContext db, ILocalizationService localization)
     {
         _db = db;
+        _localization = localization;
     }
 
     public MiniAppUser? SelectedUser { get; private set; }
@@ -51,6 +54,7 @@ public sealed class TicketsModel : PageModel
 
     public string? StatusMessage { get; private set; }
     public bool StatusIsError { get; private set; }
+    public IReadOnlyDictionary<string, string> UiText { get; private set; } = new Dictionary<string, string>(StringComparer.Ordinal);
 
     [TempData]
     public string? FlashMessage { get; set; }
@@ -60,6 +64,8 @@ public sealed class TicketsModel : PageModel
 
     public async Task<IActionResult> OnGetAsync(long id, CancellationToken ct)
     {
+        UiText = await _localization.GetDictionaryAsync(GetAdminLocale(), ct);
+
         if (!string.IsNullOrWhiteSpace(FlashMessage))
         {
             StatusMessage = FlashMessage;
@@ -76,7 +82,7 @@ public sealed class TicketsModel : PageModel
         var user = await _db.Users.SingleOrDefaultAsync(x => x.Id == id, ct);
         if (user is null)
         {
-            FlashMessage = "User was not found.";
+            FlashMessage = await GetTextAsync("admin.users.tickets.flash.userNotFound", "User was not found.", ct);
             FlashIsError = true;
             return RedirectToPage(new
             {
@@ -94,7 +100,7 @@ public sealed class TicketsModel : PageModel
         var draw = await _db.Draws.SingleOrDefaultAsync(x => x.Id == SelectedDrawId, ct);
         if (draw is null)
         {
-            FlashMessage = "Draw was not found.";
+            FlashMessage = await GetTextAsync("admin.users.tickets.flash.drawNotFound", "Draw was not found.", ct);
             FlashIsError = true;
             return RedirectToPage(new
             {
@@ -111,7 +117,7 @@ public sealed class TicketsModel : PageModel
 
         if (!TryNormalizeSelectedNumbers(TicketNumbers, out var normalizedNumbers, out var signature, out var validationError))
         {
-            FlashMessage = validationError;
+            FlashMessage = await BuildValidationMessageAsync(validationError, ct);
             FlashIsError = true;
             return RedirectToPage(new
             {
@@ -149,12 +155,13 @@ public sealed class TicketsModel : PageModel
         catch (DbUpdateException ex) when (ex.InnerException?.Message?.Contains("IX_tickets_UserId_DrawId_NumbersSignature", StringComparison.OrdinalIgnoreCase) == true
                                         || ex.Message.Contains("IX_tickets_UserId_DrawId_NumbersSignature", StringComparison.OrdinalIgnoreCase))
         {
-            FlashMessage = "This user already has a ticket with the same number set for that draw.";
+            FlashMessage = await GetTextAsync("admin.users.tickets.flash.duplicate", "This user already has a ticket with the same number set for that draw.", ct);
             FlashIsError = true;
             return RedirectToPage(new { id });
         }
 
-        FlashMessage = $"Ticket added for user #{user.Id} in draw #{draw.Id}.";
+        var successTemplate = await GetTextAsync("admin.users.tickets.flash.added", "Ticket added for user #{0} in draw #{1}.", ct);
+        FlashMessage = string.Format(successTemplate, user.Id, draw.Id);
         FlashIsError = false;
         return RedirectToPage(new
         {
@@ -167,6 +174,39 @@ public sealed class TicketsModel : PageModel
             pageNumber = PageNumber,
             pageSize = PageSize
         });
+    }
+
+    public string Text(string key, string fallback)
+        => UiText.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
+            ? value
+            : fallback;
+
+    private string GetAdminLocale() => _localization.NormalizeLocale(Request.Cookies["AdminUiLanguage"]);
+
+    private Task<string> GetTextAsync(string key, string fallback, CancellationToken ct)
+        => _localization.GetTextAsync(GetAdminLocale(), key, fallback, ct);
+
+    private async Task<string> BuildValidationMessageAsync(string validationCode, CancellationToken ct)
+    {
+        return validationCode switch
+        {
+            "exactly_numbers_required" => string.Format(
+                await GetTextAsync("admin.users.tickets.validation.exactly_numbers_required", "Exactly {0} numbers are required.", ct),
+                DrawManagement.NumbersPerDraw),
+            "all_numbers_must_be_integers" => await GetTextAsync(
+                "admin.users.tickets.validation.all_numbers_must_be_integers",
+                "All numbers must be valid integers.",
+                ct),
+            "number_out_of_range" => string.Format(
+                await GetTextAsync("admin.users.tickets.validation.number_out_of_range", "Each number must be between {0} and {1}.", ct),
+                DrawManagement.MinNumber,
+                DrawManagement.MaxNumber),
+            "numbers_must_be_unique" => await GetTextAsync(
+                "admin.users.tickets.validation.numbers_must_be_unique",
+                "Numbers must be unique.",
+                ct),
+            _ => validationCode
+        };
     }
 
     public async Task<IActionResult> OnPostDeleteTicketAsync(long id, long ticketId, CancellationToken ct)
@@ -229,7 +269,7 @@ public sealed class TicketsModel : PageModel
 
         if (parts.Length != DrawManagement.NumbersPerDraw)
         {
-            error = $"Exactly {DrawManagement.NumbersPerDraw} numbers are required.";
+            error = "exactly_numbers_required";
             return false;
         }
 
@@ -239,19 +279,19 @@ public sealed class TicketsModel : PageModel
         {
             if (!int.TryParse(part, out var n))
             {
-                error = "All numbers must be valid integers.";
+                error = "all_numbers_must_be_integers";
                 return false;
             }
 
             if (n < DrawManagement.MinNumber || n > DrawManagement.MaxNumber)
             {
-                error = $"Each number must be between {DrawManagement.MinNumber} and {DrawManagement.MaxNumber}.";
+                error = "number_out_of_range";
                 return false;
             }
 
             if (!unique.Add(n))
             {
-                error = "Numbers must be unique.";
+                error = "numbers_must_be_unique";
                 return false;
             }
 

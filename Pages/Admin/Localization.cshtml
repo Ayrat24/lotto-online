@@ -1,11 +1,11 @@
 @page
 @model MiniApp.Pages.Admin.LocalizationModel
 @{
-    ViewData["Title"] = "Localization";
+    ViewData["Title"] = Model.TitleText;
 }
 
-<h1>Localization</h1>
-<p class="text-muted">Update en / ru / uz UI strings.</p>
+<h1>@Model.TitleText</h1>
+<p class="text-muted">@Model.SubtitleText</p>
 
 @if (!string.IsNullOrWhiteSpace(Model.Toast))
 {
@@ -16,10 +16,10 @@
     <table class="table table-sm align-middle">
         <thead>
         <tr>
-            <th style="width: 20%;">Key</th>
-            <th style="width: 24%;">English</th>
-            <th style="width: 24%;">Russian</th>
-            <th style="width: 24%;">Uzbek</th>
+            <th style="width: 20%;">@Model.KeyColumnText</th>
+            <th style="width: 24%;">@Model.EnglishColumnText</th>
+            <th style="width: 24%;">@Model.RussianColumnText</th>
+            <th style="width: 24%;">@Model.UzbekColumnText</th>
             <th style="width: 8%;"></th>
         </tr>
         </thead>
@@ -41,7 +41,7 @@
                         <textarea class="form-control form-control-sm" name="uzbekValue" rows="2">@item.UzbekValue</textarea>
                     </td>
                     <td>
-                        <button class="btn btn-primary btn-sm" type="submit">Save</button>
+                        <button class="btn btn-primary btn-sm" type="submit">@Model.SaveActionText</button>
                     </td>
                 </form>
             </tr>
