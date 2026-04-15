@@ -51,7 +51,7 @@ public static class LocalDebugSeed
             finishedDraws.Add(finished);
         }
 
-        var targetActiveDrawCount = GetTargetActiveDrawCount(debugTelegramUserId, now);
+        var targetActiveDrawCount = GetTargetActiveDrawCount();
         var activeDraws = draws
             .Where(x => x.State == DrawState.Active)
             .OrderByDescending(x => x.Id)
@@ -172,14 +172,10 @@ public static class LocalDebugSeed
         await db.SaveChangesAsync(ct);
     }
 
-    private static int GetTargetActiveDrawCount(long debugTelegramUserId, DateTimeOffset now)
+    private static int GetTargetActiveDrawCount()
     {
-        // Keep randomization stable throughout the day to avoid draw state flapping during polling.
-        var dayOfYear = now.UtcDateTime.DayOfYear;
-        var year = now.UtcDateTime.Year;
-        var seed = HashCode.Combine(debugTelegramUserId, year, dayOfYear);
-        var rng = new Random(seed);
-        return rng.Next(1, 3);
+        // Keep debug UX deterministic: always have at least two active draws to exercise multi-draw UI.
+        return 2;
     }
 
     private static int CountMatches(string ticketNumbers, string drawNumbers)
