@@ -23,6 +23,11 @@ public sealed class MiniAppUser
     /// </summary>
     public string? PreferredLanguage { get; set; }
 
+    /// <summary>
+    /// First Telegram deep-link payload associated with this user.
+    /// </summary>
+    public string? AcquisitionDeepLink { get; set; }
+
     public string? WalletAddress { get; set; }
 
     public string? InviteCode { get; set; }

@@ -31,6 +31,9 @@ public sealed class IndexModel : PageModel
     public string? SearchTelegramId { get; set; }
 
     [BindProperty(SupportsGet = true)]
+    public string? SearchDeepLink { get; set; }
+
+    [BindProperty(SupportsGet = true)]
     public string SortBy { get; set; } = "lastSeenAt";
 
     [BindProperty(SupportsGet = true)]
@@ -67,6 +70,7 @@ public sealed class IndexModel : PageModel
     {
         SearchPhone = string.IsNullOrWhiteSpace(SearchPhone) ? null : SearchPhone.Trim();
         SearchTelegramId = string.IsNullOrWhiteSpace(SearchTelegramId) ? null : SearchTelegramId.Trim();
+        SearchDeepLink = string.IsNullOrWhiteSpace(SearchDeepLink) ? null : SearchDeepLink.Trim();
         SortBy = NormalizeSortBy(SortBy);
         SortDir = NormalizeSortDir(SortDir);
 
@@ -96,6 +100,9 @@ public sealed class IndexModel : PageModel
 
             query = query.Where(x => x.TelegramUserId == telegramUserId);
         }
+
+        if (!string.IsNullOrWhiteSpace(SearchDeepLink))
+            query = query.Where(x => x.AcquisitionDeepLink != null && x.AcquisitionDeepLink.Contains(SearchDeepLink));
 
         query = ApplySort(query, SortBy, SortDir)
             .Take(200);
@@ -130,6 +137,7 @@ public sealed class IndexModel : PageModel
             TelegramUserId = nextTelegramUserId,
             Number = $"+1999{nextTelegramUserId}",
             PreferredLanguage = "en",
+            AcquisitionDeepLink = "admin-fake-user",
             InviteCode = await GenerateInviteCodeAsync(ct),
             ReferredByUserIdOrUnbound = MiniAppUser.UnboundReferralUserId,
             IsFake = true,
@@ -147,6 +155,7 @@ public sealed class IndexModel : PageModel
         {
             searchPhone = SearchPhone,
             searchTelegramId = SearchTelegramId,
+            searchDeepLink = SearchDeepLink,
             sortBy = NormalizeSortBy(SortBy),
             sortDir = NormalizeSortDir(SortDir)
         });
@@ -173,6 +182,7 @@ public sealed class IndexModel : PageModel
             {
                 searchPhone = SearchPhone,
                 searchTelegramId = SearchTelegramId,
+                searchDeepLink = SearchDeepLink,
                 sortBy = NormalizeSortBy(SortBy),
                 sortDir = NormalizeSortDir(SortDir)
             });
@@ -184,6 +194,7 @@ public sealed class IndexModel : PageModel
         {
             searchPhone = SearchPhone,
             searchTelegramId = SearchTelegramId,
+            searchDeepLink = SearchDeepLink,
             sortBy = NormalizeSortBy(SortBy),
             sortDir = NormalizeSortDir(SortDir)
         });
@@ -198,6 +209,8 @@ public sealed class IndexModel : PageModel
             "balance" => "balance",
             "createdat" => "createdAt",
             "createdatutc" => "createdAt",
+            "acquisitiondeeplink" => "acquisitionDeepLink",
+            "deeplink" => "acquisitionDeepLink",
             "lastseenat" => "lastSeenAt",
             "lastseenatutc" => "lastSeenAt",
             _ => "lastSeenAt"
@@ -217,6 +230,7 @@ public sealed class IndexModel : PageModel
             "id" => isAsc ? query.OrderBy(x => x.Id) : query.OrderByDescending(x => x.Id),
             "telegramUserId" => isAsc ? query.OrderBy(x => x.TelegramUserId) : query.OrderByDescending(x => x.TelegramUserId),
             "number" => isAsc ? query.OrderBy(x => x.Number) : query.OrderByDescending(x => x.Number),
+            "acquisitionDeepLink" => isAsc ? query.OrderBy(x => x.AcquisitionDeepLink) : query.OrderByDescending(x => x.AcquisitionDeepLink),
             "balance" => isAsc ? query.OrderBy(x => x.Balance) : query.OrderByDescending(x => x.Balance),
             "createdAt" => isAsc ? query.OrderBy(x => x.CreatedAtUtc) : query.OrderByDescending(x => x.CreatedAtUtc),
             _ => isAsc ? query.OrderBy(x => x.LastSeenAtUtc) : query.OrderByDescending(x => x.LastSeenAtUtc)

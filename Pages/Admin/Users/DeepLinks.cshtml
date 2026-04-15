@@ -1,0 +1,77 @@
+@page
+@model MiniApp.Pages.Admin.Users.DeepLinksModel
+@{
+	ViewData["Title"] = "Deep-link analytics";
+}
+
+<h1>Deep-link analytics</h1>
+
+<div class="mt-2 d-flex gap-2">
+	<a class="btn btn-sm btn-outline-secondary" asp-page="/Admin/Users/Index">Back to users</a>
+</div>
+
+@if (Model.Groups.Count == 0)
+{
+	<div class="alert alert-secondary mt-3">No users found.</div>
+}
+else
+{
+	@foreach (var group in Model.Groups)
+	{
+		<div class="card mt-3">
+			<div class="card-body">
+				<div class="d-flex justify-content-between align-items-center mb-2">
+					<h5 class="card-title mb-0"><code>@group.DeepLink</code></h5>
+					<span class="badge text-bg-primary">@group.UserCount user(s)</span>
+				</div>
+
+				<div class="table-responsive">
+					<table class="table table-sm align-middle mb-0">
+						<thead>
+						<tr>
+							<th>Id</th>
+							<th>TelegramUserId</th>
+							<th>Number</th>
+							<th>Label</th>
+							<th>Balance</th>
+							<th>Created (UTC)</th>
+							<th>Last seen (UTC)</th>
+							<th>Actions</th>
+						</tr>
+						</thead>
+						<tbody>
+						@foreach (var u in group.Users)
+						{
+							<tr>
+								<td>@u.Id</td>
+								<td>@u.TelegramUserId</td>
+								<td>@(string.IsNullOrWhiteSpace(u.Number) ? "-" : u.Number)</td>
+								<td>
+									@if (u.IsFake)
+									{
+										<span class="badge text-bg-warning">FAKE</span>
+									}
+									else
+									{
+										<span class="text-muted">real</span>
+									}
+								</td>
+								<td>@u.Balance.ToString("0.00")</td>
+								<td>@u.CreatedAtUtc</td>
+								<td>@u.LastSeenAtUtc</td>
+								<td>
+									<div class="btn-group" role="group">
+										<a class="btn btn-sm btn-outline-primary" asp-page="/Admin/Users/Edit" asp-route-id="@u.Id">Edit</a>
+										<a class="btn btn-sm btn-outline-success" asp-page="/Admin/Users/Tickets" asp-route-id="@u.Id">Tickets</a>
+									</div>
+								</td>
+							</tr>
+						}
+						</tbody>
+					</table>
+				</div>
+			</div>
+		</div>
+	}
+}
+

@@ -26,6 +26,9 @@ public sealed class EditModel : PageModel
     public string? Number { get; set; }
 
     [BindProperty]
+    public string? AcquisitionDeepLink { get; set; }
+
+    [BindProperty]
     public decimal Balance { get; set; }
 
     [BindProperty]
@@ -38,6 +41,7 @@ public sealed class EditModel : PageModel
 
         TelegramUserId = SelectedUser.TelegramUserId;
         Number = SelectedUser.Number;
+        AcquisitionDeepLink = SelectedUser.AcquisitionDeepLink;
         Balance = SelectedUser.Balance;
         LastSeenAtUtc = SelectedUser.LastSeenAtUtc;
     }
@@ -49,6 +53,7 @@ public sealed class EditModel : PageModel
 
         u.TelegramUserId = TelegramUserId;
         u.Number = string.IsNullOrWhiteSpace(Number) ? null : Number.Trim();
+        u.AcquisitionDeepLink = string.IsNullOrWhiteSpace(AcquisitionDeepLink) ? null : AcquisitionDeepLink.Trim();
         u.Balance = decimal.Round(Balance, 2, MidpointRounding.AwayFromZero);
         u.LastSeenAtUtc = LastSeenAtUtc;
 

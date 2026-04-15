@@ -5,7 +5,7 @@ public interface IUserService
     /// <summary>
     /// Ensures a user exists and updates LastSeenAtUtc.
     /// </summary>
-    Task<MiniAppUser> TouchUserAsync(long telegramUserId, CancellationToken ct);
+    Task<MiniAppUser> TouchUserAsync(long telegramUserId, CancellationToken ct, string? acquisitionDeepLink = null);
 
     /// <summary>
     /// Ensures a user exists and stores the provided number.

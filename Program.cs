@@ -354,6 +354,32 @@ static class BotUpdateHandler
             return "en";
         }
 
+        static bool TryParseStartCommand(string? commandText, out string? payload)
+        {
+            payload = null;
+            if (string.IsNullOrWhiteSpace(commandText))
+                return false;
+
+            var trimmed = commandText.Trim();
+            if (!trimmed.StartsWith("/start", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            var separatorIndex = trimmed.IndexOfAny([' ', '\t', '\r', '\n']);
+            var commandToken = separatorIndex < 0 ? trimmed : trimmed[..separatorIndex];
+            if (commandToken.Length > 6 && commandToken[6] != '@')
+                return false;
+
+            if (separatorIndex < 0)
+                return true;
+
+            var rawPayload = trimmed[(separatorIndex + 1)..].Trim();
+            if (rawPayload.Length == 0)
+                return true;
+
+            payload = rawPayload.Length > 128 ? rawPayload[..128] : rawPayload;
+            return true;
+        }
+
         async Task<string> GetTextAsync(string locale, string key, string fallback)
             => await localization.GetTextAsync(locale, key, fallback, ct);
 
@@ -500,7 +526,8 @@ static class BotUpdateHandler
         }
 
         var text = update.Message.Text?.Trim();
-        var touchedUser = await userService.TouchUserAsync(telegramUserId.Value, ct);
+        var isStartCommand = TryParseStartCommand(text, out var startPayload);
+        var touchedUser = await userService.TouchUserAsync(telegramUserId.Value, ct, startPayload);
         var locale = NormalizeLanguageCode(touchedUser.PreferredLanguage);
 
         if (string.Equals(text, "/language", StringComparison.OrdinalIgnoreCase))
@@ -510,7 +537,7 @@ static class BotUpdateHandler
         }
 
         // /start: ensure user exists, and if number isn't stored -> ask for contact.
-        if (string.Equals(text, "/start", StringComparison.OrdinalIgnoreCase))
+        if (isStartCommand)
         {
             var user = touchedUser;
             if (string.IsNullOrWhiteSpace(user.PreferredLanguage))

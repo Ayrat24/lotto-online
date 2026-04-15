@@ -14,11 +14,15 @@ public sealed class UserRepository : IUserRepository
     public Task<MiniAppUser?> FindByTelegramUserIdAsync(long telegramUserId, CancellationToken ct)
         => _db.Users.SingleOrDefaultAsync(x => x.TelegramUserId == telegramUserId, ct);
 
-    public async Task<MiniAppUser> UpsertByTelegramUserIdAsync(long telegramUserId, CancellationToken ct)
+    public async Task<MiniAppUser> UpsertByTelegramUserIdAsync(long telegramUserId, CancellationToken ct, string? acquisitionDeepLink = null)
     {
+        var normalizedDeepLink = NormalizeDeepLink(acquisitionDeepLink);
         var existing = await _db.Users.SingleOrDefaultAsync(x => x.TelegramUserId == telegramUserId, ct);
         if (existing is not null)
         {
+            if (string.IsNullOrWhiteSpace(existing.AcquisitionDeepLink) && !string.IsNullOrWhiteSpace(normalizedDeepLink))
+                existing.AcquisitionDeepLink = normalizedDeepLink;
+
             existing.LastSeenAtUtc = DateTimeOffset.UtcNow;
             await _db.SaveChangesAsync(ct);
             return existing;
@@ -27,6 +31,7 @@ public sealed class UserRepository : IUserRepository
         var user = new MiniAppUser
         {
             TelegramUserId = telegramUserId,
+            AcquisitionDeepLink = normalizedDeepLink,
             ReferredByUserIdOrUnbound = MiniAppUser.UnboundReferralUserId,
             CreatedAtUtc = DateTimeOffset.UtcNow,
             LastSeenAtUtc = DateTimeOffset.UtcNow
@@ -53,5 +58,17 @@ public sealed class UserRepository : IUserRepository
         user.LastSeenAtUtc = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
         return user;
+    }
+
+    private static string? NormalizeDeepLink(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        var trimmed = value.Trim();
+        if (trimmed.Length > 128)
+            trimmed = trimmed[..128];
+
+        return trimmed;
     }
 }

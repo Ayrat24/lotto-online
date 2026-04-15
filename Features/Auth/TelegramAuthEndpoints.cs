@@ -43,7 +43,7 @@ public static class TelegramAuthEndpoints
             if (string.IsNullOrWhiteSpace(botToken))
                 return Results.Problem("BotToken is not configured.", statusCode: 500);
 
-            if (!TelegramInitDataValidator.TryValidateInitData(initData, botToken, TimeSpan.FromMinutes(10), out var tgUser, out var error))
+            if (!TelegramInitDataValidator.TryValidateInitData(initData, botToken, TimeSpan.FromMinutes(10), out var tgUser, out var startParam, out var error))
             {
                 logger.LogWarning("Telegram initData validation failed: {Error}", error);
 
@@ -54,7 +54,7 @@ public static class TelegramAuthEndpoints
                 return Results.Unauthorized();
             }
 
-            var u = await users.TouchUserAsync(tgUser!.Id, ct);
+            var u = await users.TouchUserAsync(tgUser!.Id, ct, startParam);
             logger.LogInformation("Upserted user with TelegramUserId={TelegramUserId}", u.TelegramUserId);
 
             return Results.Ok(new TelegramAuthResult(

@@ -30,6 +30,7 @@ public sealed class AppDbContext : DbContext
             b.HasKey(x => x.Id);
 
             b.HasIndex(x => x.TelegramUserId).IsUnique();
+            b.HasIndex(x => x.AcquisitionDeepLink);
             b.HasIndex(x => x.InviteCode)
                 .IsUnique()
                 .HasFilter("\"InviteCode\" IS NOT NULL");
@@ -37,6 +38,7 @@ public sealed class AppDbContext : DbContext
             b.Property(x => x.TelegramUserId).IsRequired();
             b.Property(x => x.Number).HasMaxLength(64);
             b.Property(x => x.PreferredLanguage).HasMaxLength(8);
+            b.Property(x => x.AcquisitionDeepLink).HasMaxLength(128);
             b.Property(x => x.WalletAddress).HasMaxLength(256);
             b.Property(x => x.InviteCode).HasMaxLength(32);
             b.Property(x => x.IsFake).IsRequired().HasDefaultValue(false);

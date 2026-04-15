@@ -11,8 +11,18 @@ namespace MiniApp.TelegramLogin;
 public static class TelegramInitDataValidator
 {
     public static bool TryValidateInitData(string initData, string botToken, TimeSpan maxAge, out TelegramInitDataUser? user, out string? error)
+        => TryValidateInitData(initData, botToken, maxAge, out user, out _, out error);
+
+    public static bool TryValidateInitData(
+        string initData,
+        string botToken,
+        TimeSpan maxAge,
+        out TelegramInitDataUser? user,
+        out string? startParam,
+        out string? error)
     {
         user = null;
+        startParam = null;
         error = null;
 
         if (string.IsNullOrWhiteSpace(initData))
@@ -22,6 +32,7 @@ public static class TelegramInitDataValidator
         }
 
         var dict = ParseQueryString(initData);
+        startParam = NormalizeStartParam(dict.TryGetValue("start_param", out var parsedStartParam) ? parsedStartParam : null);
 
         if (!dict.TryGetValue("hash", out var hash) || string.IsNullOrWhiteSpace(hash))
         {
@@ -136,6 +147,18 @@ public static class TelegramInitDataValidator
         var aBytes = Encoding.UTF8.GetBytes(a);
         var bBytes = Encoding.UTF8.GetBytes(b);
         return CryptographicOperations.FixedTimeEquals(aBytes, bBytes);
+    }
+
+    private static string? NormalizeStartParam(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        var trimmed = value.Trim();
+        if (trimmed.Length > 128)
+            trimmed = trimmed[..128];
+
+        return trimmed;
     }
 }
 

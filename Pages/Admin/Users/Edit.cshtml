@@ -30,6 +30,12 @@ else
         </div>
 
         <div class="mb-3">
+            <label class="form-label">Acquisition deep link</label>
+            <input class="form-control" asp-for="AcquisitionDeepLink" />
+            <div class="form-text">Stored from Telegram /start payload or Mini App initData start_param.</div>
+        </div>
+
+        <div class="mb-3">
             <label class="form-label">Balance</label>
             <input class="form-control" asp-for="Balance" type="number" step="0.01" />
         </div>
