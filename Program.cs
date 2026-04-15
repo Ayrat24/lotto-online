@@ -447,8 +447,8 @@ static class BotUpdateHandler
                 text: askLanguage,
                 replyMarkup: new InlineKeyboardMarkup([
                     [InlineKeyboardButton.WithCallbackData("English", "lang:set:en")],
-                    [InlineKeyboardButton.WithCallbackData("Russkiy", "lang:set:ru")],
-                    [InlineKeyboardButton.WithCallbackData("Ozbekcha", "lang:set:uz")]
+                    [InlineKeyboardButton.WithCallbackData("Русский", "lang:set:ru")],
+                    [InlineKeyboardButton.WithCallbackData("O'zbekcha", "lang:set:uz")]
                 ]),
                 cancellationToken: ct);
         }
