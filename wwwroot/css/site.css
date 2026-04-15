@@ -126,6 +126,12 @@ body {
   border-bottom: 2px solid var(--admin-table-line-strong);
 }
 
+.admin-layout .fake-user-badge {
+  color: #b42318;
+  background-color: #fee4e2;
+  border: 1px solid #fecdca;
+}
+
 @media (max-width: 767.98px) {
   :root {
     --ui-space-3: 12px;
