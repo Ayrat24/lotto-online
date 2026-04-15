@@ -79,35 +79,37 @@
 }
 else
 {
-    <table class="table table-striped mt-3">
-        <thead>
-        <tr>
-            <th>Id</th>
-            <th>DrawId</th>
-            <th>Numbers</th>
-            <th>Status</th>
-            <th>Purchased (UTC)</th>
-            <th></th>
-        </tr>
-        </thead>
-        <tbody>
-        @foreach (var t in Model.Tickets)
-        {
+    <div class="table-responsive mt-3">
+        <table class="table table-striped align-middle mb-0">
+            <thead>
             <tr>
-                <td>@t.Id</td>
-                <td><strong>@t.DrawId</strong></td>
-                <td><code>@t.Numbers</code></td>
-                <td>@t.Status</td>
-                <td>@t.PurchasedAtUtc</td>
-                <td class="text-end">
-                    <form method="post" asp-page-handler="DeleteTicket" asp-route-id="@Model.SelectedUser.Id" asp-route-ticketId="@t.Id"
-                          onsubmit="return confirm('Delete this ticket?');">
-                        @Html.AntiForgeryToken()
-                        <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
-                    </form>
-                </td>
+                <th>Id</th>
+                <th>DrawId</th>
+                <th>Numbers</th>
+                <th>Status</th>
+                <th>Purchased (UTC)</th>
+                <th></th>
             </tr>
-        }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+            @foreach (var t in Model.Tickets)
+            {
+                <tr>
+                    <td>@t.Id</td>
+                    <td><strong>@t.DrawId</strong></td>
+                    <td><code>@t.Numbers</code></td>
+                    <td>@t.Status</td>
+                    <td>@t.PurchasedAtUtc</td>
+                    <td class="text-end">
+                        <form method="post" asp-page-handler="DeleteTicket" asp-route-id="@Model.SelectedUser.Id" asp-route-ticketId="@t.Id"
+                              onsubmit="return confirm('Delete this ticket?');">
+                            @Html.AntiForgeryToken()
+                            <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
 }

@@ -30,55 +30,57 @@
     </div>
 </div>
 
-<table class="table table-striped mt-3">
-    <thead>
-    <tr>
-        <th>Id</th>
-        <th>TelegramUserId</th>
-        <th>Label</th>
-        <th>Referral code</th>
-        <th>Number</th>
-        <th>Balance</th>
-        <th>Created (UTC)</th>
-        <th>Last seen (UTC)</th>
-        <th></th>
-    </tr>
-    </thead>
-    <tbody>
-    @foreach (var u in Model.Users)
-    {
+<div class="table-responsive mt-3">
+    <table class="table table-striped align-middle mb-0">
+        <thead>
         <tr>
-            <td>@u.Id</td>
-            <td>@u.TelegramUserId</td>
-            <td>
-                @if (u.IsFake)
-                {
-                    <span class="badge text-bg-warning">FAKE</span>
-                }
-                else
-                {
-                    <span class="text-muted">real</span>
-                }
-            </td>
-            <td><code>@(string.IsNullOrWhiteSpace(u.InviteCode) ? "-" : u.InviteCode)</code></td>
-            <td>@(string.IsNullOrWhiteSpace(u.Number) ? "-" : u.Number)</td>
-            <td>@u.Balance.ToString("0.00")</td>
-            <td>@u.CreatedAtUtc</td>
-            <td>@u.LastSeenAtUtc</td>
-            <td>
-                <div class="d-flex gap-2">
-                    <div class="btn-group" role="group">
-                        <a class="btn btn-sm btn-outline-primary" asp-page="/Admin/Users/Edit" asp-route-id="@u.Id">Edit</a>
-                        <a class="btn btn-sm btn-outline-success" asp-page="/Admin/Users/Tickets" asp-route-id="@u.Id">Tickets</a>
-                    </div>
-
-                    <form method="post" asp-page-handler="Delete" asp-route-id="@u.Id" onsubmit="return confirm('Delete this user and ALL their tickets?');">
-                        @Html.AntiForgeryToken()
-                        <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
-                    </form>
-                </div>
-            </td>
+            <th>Id</th>
+            <th>TelegramUserId</th>
+            <th>Label</th>
+            <th>Referral code</th>
+            <th>Number</th>
+            <th>Balance</th>
+            <th>Created (UTC)</th>
+            <th>Last seen (UTC)</th>
+            <th></th>
         </tr>
-    }
-    </tbody>
-</table>
+        </thead>
+        <tbody>
+        @foreach (var u in Model.Users)
+        {
+            <tr>
+                <td>@u.Id</td>
+                <td>@u.TelegramUserId</td>
+                <td>
+                    @if (u.IsFake)
+                    {
+                        <span class="badge text-bg-warning">FAKE</span>
+                    }
+                    else
+                    {
+                        <span class="text-muted">real</span>
+                    }
+                </td>
+                <td><code>@(string.IsNullOrWhiteSpace(u.InviteCode) ? "-" : u.InviteCode)</code></td>
+                <td>@(string.IsNullOrWhiteSpace(u.Number) ? "-" : u.Number)</td>
+                <td>@u.Balance.ToString("0.00")</td>
+                <td>@u.CreatedAtUtc</td>
+                <td>@u.LastSeenAtUtc</td>
+                <td>
+                    <div class="d-flex gap-2">
+                        <div class="btn-group" role="group">
+                            <a class="btn btn-sm btn-outline-primary" asp-page="/Admin/Users/Edit" asp-route-id="@u.Id">Edit</a>
+                            <a class="btn btn-sm btn-outline-success" asp-page="/Admin/Users/Tickets" asp-route-id="@u.Id">Tickets</a>
+                        </div>
+
+                        <form method="post" asp-page-handler="Delete" asp-route-id="@u.Id" onsubmit="return confirm('Delete this user and ALL their tickets?');">
+                            @Html.AntiForgeryToken()
+                            <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>

@@ -4,14 +4,14 @@
     ViewData["Title"] = "Draws";
 }
 
-<h1>Draws</h1>
+<h1 style="margin-bottom:10px;">Draws</h1>
 
-<div class="card mt-3">
+<div class="card" style="margin-top:0;">
     <div class="card-body">
         <h5 class="card-title">Create draw instance</h5>
         <p class="text-muted mb-3">A new draw is created as <strong>active</strong>. Multiple active draws can run at the same time.</p>
 
-        <form method="post" asp-page-handler="Create" class="row g-3 align-items-end">
+        <form method="post" asp-page-handler="Create" class="row g-2 align-items-end">
             <div class="col-sm-6 col-md-4">
                 <label for="createPrizePoolMatch3" class="form-label">Prize pool 3/5</label>
                 <input id="createPrizePoolMatch3" name="prizePoolMatch3" type="number" min="0" step="0.01" value="0" class="form-control" />
@@ -37,16 +37,16 @@
 
 @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
 {
-    <div class="alert @(Model.StatusIsError ? "alert-danger" : "alert-info") mt-3">@Model.StatusMessage</div>
+    <div class="alert @(Model.StatusIsError ? "alert-danger" : "alert-info")" style="margin-top:10px;">@Model.StatusMessage</div>
 }
 
 @if (Model.Draws.Count == 0)
 {
-    <div class="alert alert-secondary mt-3">No draws yet.</div>
+    <div class="alert alert-secondary" style="margin-top:10px;">No draws yet.</div>
 }
 else
 {
-    <div class="card mt-3">
+    <div class="card" style="margin-top:10px;">
         <div class="card-body">
             <h5 class="card-title">Manage draws</h5>
             <div class="table-responsive">
