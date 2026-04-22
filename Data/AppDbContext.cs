@@ -19,6 +19,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<LocalizationText> LocalizationTexts => Set<LocalizationText>();
     public DbSet<ReferralProgramSettings> ReferralProgramSettings => Set<ReferralProgramSettings>();
     public DbSet<ReferralReward> ReferralRewards => Set<ReferralReward>();
+    public DbSet<NewsBanner> NewsBanners => Set<NewsBanner>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -117,6 +118,23 @@ public sealed class AppDbContext : DbContext
             b.Property(x => x.EnglishValue).HasMaxLength(2048).IsRequired();
             b.Property(x => x.RussianValue).HasMaxLength(2048).IsRequired();
             b.Property(x => x.UzbekValue).HasMaxLength(2048).IsRequired();
+            b.Property(x => x.UpdatedAtUtc).IsRequired();
+        });
+
+        modelBuilder.Entity<NewsBanner>(b =>
+        {
+            b.ToTable("news_banners");
+            b.HasKey(x => x.Id);
+
+            b.HasIndex(x => new { x.IsPublished, x.DisplayOrder, x.CreatedAtUtc });
+            b.HasIndex(x => x.UpdatedAtUtc);
+
+            b.Property(x => x.ImagePath).HasMaxLength(512).IsRequired();
+            b.Property(x => x.ActionType).HasMaxLength(32).IsRequired().HasDefaultValue("none");
+            b.Property(x => x.ActionValue).HasMaxLength(1024);
+            b.Property(x => x.DisplayOrder).IsRequired();
+            b.Property(x => x.IsPublished).IsRequired().HasDefaultValue(true);
+            b.Property(x => x.CreatedAtUtc).IsRequired();
             b.Property(x => x.UpdatedAtUtc).IsRequired();
         });
 

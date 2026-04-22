@@ -208,7 +208,6 @@ public sealed class LocalizationService : ILocalizationService
 
         var items = await _db.LocalizationTexts
             .AsNoTracking()
-            .Where(x => !x.Key.StartsWith("admin."))
             .OrderBy(x => x.Key)
             .Select(x => new LocalizationAdminItem(
                 x.Key,
@@ -227,8 +226,6 @@ public sealed class LocalizationService : ILocalizationService
         if (string.IsNullOrWhiteSpace(key) || key.Length > 128)
             return new LocalizationAdminUpdateResult(false, "Localization key is invalid.");
 
-        if (key.StartsWith("admin.", StringComparison.OrdinalIgnoreCase))
-            return new LocalizationAdminUpdateResult(false, "Admin UI localization keys are read-only.");
 
         var english = request.EnglishValue.Trim();
         var russian = request.RussianValue.Trim();

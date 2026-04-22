@@ -34,6 +34,8 @@ services:
 
     ports:
       - "8080:8080"
+    volumes:
+      - miniapp_uploads:/app/wwwroot/uploads
 
   db:
     image: postgres:16-alpine
@@ -53,3 +55,4 @@ services:
 
 volumes:
   miniapp_pgdata:
+  miniapp_uploads:

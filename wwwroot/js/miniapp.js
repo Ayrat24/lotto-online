@@ -60,6 +60,9 @@
   var currentDrawPrizePool3El = document.getElementById('currentDrawPrizePool3');
   var currentDrawPrizePool4El = document.getElementById('currentDrawPrizePool4');
   var currentDrawPrizePool5El = document.getElementById('currentDrawPrizePool5');
+  var newsBannerSectionEl = document.getElementById('newsBannerSection');
+  var newsBannerTrackEl = document.getElementById('newsBannerTrack');
+  var newsBannerDotsEl = document.getElementById('newsBannerDots');
   var currentDrawNumbersWrapEl = document.getElementById('currentDrawNumbersWrap');
   var currentDrawNumbersEl = document.getElementById('currentDrawNumbers');
   var currentDrawTicketPriceRowEl = document.getElementById('currentDrawTicketPriceRow');
@@ -100,6 +103,9 @@
   var activeTabName = 'lottery';
   var activeProfileScreen = 'home';
   var historyEntries = [];
+  var newsBanners = [];
+  var newsBannerIndex = 0;
+  var newsBannerAutoplayTimerId = null;
   var referralInviteCode = '';
   var referralInviteLink = '';
   var referralCodeFromQuery = '';
@@ -145,6 +151,7 @@
 
   function reapplyLocalizedRuntimeTexts() {
     var selected = resolveSelectedDrawSnapshot(latestState);
+    renderNewsBanners(newsBanners);
     renderCurrentDraw(selected.draw, selected.tickets, selected.hasMultipleActiveDraws);
     renderActiveDrawBanners(getActiveDraws(latestState), getActiveTicketGroups(latestState));
     renderMyTickets(latestState);
@@ -392,6 +399,195 @@
     var formatted = formatCurrency(balanceValue);
     if (userBalanceTextEl) userBalanceTextEl.textContent = formatted;
     if (profileBalanceTextEl) profileBalanceTextEl.textContent = formatted;
+  }
+
+  function stopNewsBannerAutoplay() {
+    if (!newsBannerAutoplayTimerId) return;
+
+    try {
+      clearInterval(newsBannerAutoplayTimerId);
+    } catch (e) {
+    }
+
+    newsBannerAutoplayTimerId = null;
+  }
+
+  function updateNewsBannerPosition() {
+    if (newsBannerTrackEl) {
+      newsBannerTrackEl.style.transform = 'translateX(-' + (newsBannerIndex * 100) + '%)';
+    }
+
+    if (!newsBannerDotsEl) return;
+
+    var dots = newsBannerDotsEl.querySelectorAll('.news-banner-dot');
+    for (var i = 0; i < dots.length; i++) {
+      var isActive = i === newsBannerIndex;
+      dots[i].classList.toggle('news-banner-dot-active', isActive);
+      dots[i].setAttribute('aria-current', isActive ? 'true' : 'false');
+    }
+  }
+
+  function startNewsBannerAutoplay() {
+    stopNewsBannerAutoplay();
+
+    if (!newsBannerSectionEl || newsBannerSectionEl.hidden || newsBanners.length <= 1) {
+      return;
+    }
+
+    newsBannerAutoplayTimerId = setInterval(function () {
+      if (document.hidden || newsBanners.length <= 1) return;
+
+      newsBannerIndex = (newsBannerIndex + 1) % newsBanners.length;
+      updateNewsBannerPosition();
+    }, 4500);
+  }
+
+  function normalizeNewsBannerActionType(actionType) {
+    var value = String(actionType || '').trim().toLowerCase();
+    if (value === 'app_section' || value === 'external_url') return value;
+    return 'none';
+  }
+
+  function getNewsBannerActionValue(banner) {
+    if (!banner) return '';
+    return String(banner.actionValue || '').trim();
+  }
+
+  function isNewsBannerInteractive(banner) {
+    var actionType = normalizeNewsBannerActionType(banner && banner.actionType);
+    return actionType !== 'none' && getNewsBannerActionValue(banner).length > 0;
+  }
+
+  function openNewsBannerAction(banner) {
+    var actionType = normalizeNewsBannerActionType(banner && banner.actionType);
+    var actionValue = getNewsBannerActionValue(banner);
+    if (actionType === 'none' || !actionValue) return;
+
+    if (actionType === 'external_url') {
+      openCheckoutLink(actionValue);
+      return;
+    }
+
+    if (actionValue === 'lottery') {
+      setActiveTab('lottery');
+      return;
+    }
+
+    if (actionValue === 'tickets') {
+      setActiveTab('tickets');
+      return;
+    }
+
+    if (actionValue === 'profile') {
+      setActiveTab('profile');
+      return;
+    }
+
+    if (actionValue.indexOf('profile/') === 0) {
+      setActiveTab('profile');
+      setProfileScreen(actionValue.substring('profile/'.length));
+    }
+  }
+
+  function renderNewsBanners(items) {
+    newsBanners = Array.isArray(items)
+      ? items.filter(function (item) {
+          return item && item.imageUrl && String(item.imageUrl).trim().length > 0;
+        })
+      : [];
+
+    if (!newsBannerSectionEl) newsBannerSectionEl = document.getElementById('newsBannerSection');
+    if (!newsBannerTrackEl) newsBannerTrackEl = document.getElementById('newsBannerTrack');
+    if (!newsBannerDotsEl) newsBannerDotsEl = document.getElementById('newsBannerDots');
+
+    if (!newsBannerSectionEl || !newsBannerTrackEl || !newsBannerDotsEl) {
+      return;
+    }
+
+    stopNewsBannerAutoplay();
+    newsBannerTrackEl.innerHTML = '';
+    newsBannerDotsEl.innerHTML = '';
+
+    if (newsBanners.length === 0) {
+      newsBannerSectionEl.hidden = true;
+      newsBannerIndex = 0;
+      return;
+    }
+
+    newsBannerIndex = Math.min(newsBannerIndex, newsBanners.length - 1);
+    if (newsBannerIndex < 0) newsBannerIndex = 0;
+    newsBannerSectionEl.hidden = false;
+
+    newsBanners.forEach(function (banner, index) {
+      var actionType = normalizeNewsBannerActionType(banner && banner.actionType);
+      var interactive = isNewsBannerInteractive(banner);
+      var slide = document.createElement(interactive ? 'button' : 'article');
+      slide.className = 'news-banner-slide';
+
+      if (interactive) {
+        slide.type = 'button';
+        slide.classList.add('news-banner-slide-actionable');
+        slide.setAttribute('aria-label', t('client.news.bannerAltPrefix', 'News banner') + ' ' + (index + 1));
+        slide.addEventListener('click', function () {
+          openNewsBannerAction(banner);
+        });
+      }
+
+      var image = document.createElement('img');
+      image.className = 'news-banner-image';
+      image.src = String(banner.imageUrl || '');
+      image.alt = t('client.news.bannerAltPrefix', 'News banner') + ' ' + (index + 1);
+      image.decoding = 'async';
+      image.loading = index === 0 ? 'eager' : 'lazy';
+
+      if (interactive && actionType === 'external_url') {
+        image.alt = image.alt + ' ↗';
+      }
+
+      slide.appendChild(image);
+      newsBannerTrackEl.appendChild(slide);
+
+      var dot = document.createElement('button');
+      dot.type = 'button';
+      dot.className = 'news-banner-dot';
+      dot.setAttribute('aria-label', t('client.news.dotAriaPrefix', 'Go to banner') + ' ' + (index + 1));
+      dot.addEventListener('click', function () {
+        newsBannerIndex = index;
+        updateNewsBannerPosition();
+        startNewsBannerAutoplay();
+      });
+
+      newsBannerDotsEl.appendChild(dot);
+    });
+
+    newsBannerDotsEl.hidden = newsBanners.length <= 1;
+    updateNewsBannerPosition();
+    startNewsBannerAutoplay();
+  }
+
+  function getJson(url) {
+    return fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
+      }
+    }).then(function (r) {
+      if (!r.ok) {
+        throw new Error('HTTP ' + r.status);
+      }
+
+      return r.json();
+    });
+  }
+
+  function loadNewsBanners() {
+    return getJson('/api/news-banners')
+      .then(function (res) {
+        renderNewsBanners(res && Array.isArray(res.banners) ? res.banners : []);
+      })
+      .catch(function () {
+        renderNewsBanners([]);
+      });
   }
 
   function setTicketsWinningPin(count) {
@@ -2408,6 +2604,14 @@
   if (backFromInviteBtn) backFromInviteBtn.addEventListener('click', function () { setProfileScreen('home'); });
   if (backFromWithdrawBtn) backFromWithdrawBtn.addEventListener('click', function () { setProfileScreen('home'); });
   if (closeHistoryBtn) closeHistoryBtn.addEventListener('click', function () { setProfileScreen('home'); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) {
+      stopNewsBannerAutoplay();
+      return;
+    }
+
+    startNewsBannerAutoplay();
+  });
 
   var search = '';
   try {
@@ -2456,7 +2660,10 @@
     }, 5000);
 
     loadRemoteLocale(initData)
-      .then(function () { return postJson('/api/auth/telegram', { initData: initData }); })
+      .then(function () {
+        loadNewsBanners();
+        return postJson('/api/auth/telegram', { initData: initData });
+      })
       .then(function () { return loadReferralProfile(); })
       .then(function () { return bindReferralCodeFromQuery(); })
       .then(function () { return refreshState(); })
@@ -2493,7 +2700,10 @@
   try {
     initData = Telegram.WebApp.initData;
     loadRemoteLocale(initData)
-      .then(function () { return postJson('/api/auth/telegram', { initData: initData }); })
+      .then(function () {
+        loadNewsBanners();
+        return postJson('/api/auth/telegram', { initData: initData });
+      })
       .then(function () { return loadReferralProfile(); })
       .then(function () { return bindReferralCodeFromQuery(); })
       .then(function () { return refreshState(); })

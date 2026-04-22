@@ -274,6 +274,84 @@ body.app-loading .loading-shell {
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
 }
 
+.news-banner-section {
+  padding: 14px;
+  overflow: hidden;
+}
+
+.news-banner-header {
+  margin-bottom: 10px;
+}
+
+.news-banner-title {
+  font-size: 1.1rem;
+}
+
+.news-banner-carousel {
+  overflow: hidden;
+}
+
+.news-banner-track {
+  display: flex;
+  transition: transform 260ms ease;
+  will-change: transform;
+}
+
+.news-banner-slide {
+  flex: 0 0 100%;
+  min-width: 100%;
+}
+
+.news-banner-slide-actionable {
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.news-banner-slide-actionable:active {
+  transform: scale(0.994);
+}
+
+.news-banner-image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  object-fit: cover;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #0c1320;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.28);
+}
+
+.news-banner-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.news-banner-dot {
+  width: 10px;
+  min-width: 10px;
+  min-height: 10px;
+  height: 10px;
+  padding: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 0;
+  box-shadow: none;
+}
+
+.news-banner-dot-active {
+  background: #ff6f98;
+  transform: scale(1.18);
+}
+
 .topbar {
   display: flex;
   justify-content: space-between;

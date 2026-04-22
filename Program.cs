@@ -11,6 +11,7 @@ using MiniApp.Features.Timeline;
 using MiniApp.Features.Wallet;
 using MiniApp.Features.Payments;
 using MiniApp.Features.Localization;
+using MiniApp.Features.NewsBanners;
 using MiniApp.Features.Referrals;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
@@ -207,6 +208,7 @@ app.MapTimelineEndpoints();
 app.MapWalletEndpoints();
 app.MapPaymentsEndpoints();
 app.MapLocalizationEndpoints();
+app.MapNewsBannersEndpoints();
 app.MapReferralsEndpoints();
 
 // Small health check / default landing page

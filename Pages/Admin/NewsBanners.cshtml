@@ -1,0 +1,151 @@
+@page
+@model MiniApp.Pages.Admin.NewsBannersModel
+@{
+    ViewData["Title"] = Model.T("admin.newsBanners.title", "News banners");
+}
+
+<h1>@Model.T("admin.newsBanners.heading", "News banners")</h1>
+<p class="text-muted">@Model.T("admin.newsBanners.subtitle", "Upload mobile-optimized JPEG banners for the Mini App home screen carousel.")</p>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <div class="alert @(Model.StatusIsError ? "alert-danger" : "alert-info")" role="status">@Model.StatusMessage</div>
+}
+
+<div class="card mb-3">
+    <div class="card-body">
+        <h5 class="card-title">@Model.T("admin.newsBanners.create.title", "Create banner")</h5>
+        <p class="text-muted mb-3">@string.Format(Model.T("admin.newsBanners.create.requirements", "Upload a .jpg/.jpeg image sized exactly {0}×{1}px. Keep file size under {2} MB for fast mobile loading."), Model.RequiredWidth, Model.RequiredHeight, Model.MaxUploadMegabytes)</p>
+
+        <form method="post" asp-page-handler="Create" enctype="multipart/form-data" class="row g-3 align-items-end">
+            <div class="col-12 col-lg-6">
+                <label for="newsBannerImageFile" class="form-label">@Model.T("admin.newsBanners.create.image", "JPEG image")</label>
+                <input id="newsBannerImageFile" name="imageFile" type="file" accept=".jpg,.jpeg,image/jpeg" class="form-control" required />
+            </div>
+            <div class="col-6 col-lg-2">
+                <label for="newsBannerDisplayOrder" class="form-label">@Model.T("admin.newsBanners.create.order", "Display order")</label>
+                <input id="newsBannerDisplayOrder" name="displayOrder" type="number" min="0" step="1" value="0" class="form-control" />
+            </div>
+            <div class="col-6 col-lg-4">
+                <label for="newsBannerActionType" class="form-label">@Model.T("admin.newsBanners.create.actionType", "Tap action")</label>
+                <select id="newsBannerActionType" name="actionType" class="form-select">
+                    @foreach (var option in Model.ActionTypeOptions)
+                    {
+                        <option value="@option.Value">@Model.T(option.LabelKey, option.FallbackLabel)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-12 col-lg-8">
+                <label for="newsBannerActionValue" class="form-label">@Model.T("admin.newsBanners.create.actionValue", "Action target")</label>
+                <input id="newsBannerActionValue" name="actionValue" type="text" maxlength="1024" class="form-control" placeholder="https://example.com or profile/deposit" />
+                <div class="form-text">@string.Format(Model.T("admin.newsBanners.create.actionHelp", "Use one of these app targets: {0}. External links must be absolute HTTPS URLs."), string.Join(", ", Model.AppSectionOptions))</div>
+            </div>
+            <div class="col-6 col-lg-2">
+                <div class="form-check mt-lg-4 pt-lg-2">
+                    <input id="newsBannerIsPublished" name="isPublished" type="checkbox" value="true" class="form-check-input" checked />
+                    <label for="newsBannerIsPublished" class="form-check-label">@Model.T("admin.newsBanners.create.published", "Published")</label>
+                </div>
+            </div>
+            <div class="col-12 col-lg-2">
+                <button type="submit" class="btn btn-primary w-100">@Model.T("admin.newsBanners.create.submit", "Upload banner")</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (Model.Items.Count == 0)
+{
+    <div class="alert alert-secondary">@Model.T("admin.newsBanners.empty", "No banners yet.")</div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">@Model.T("admin.newsBanners.manage.title", "Manage banners")</h5>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                    <tr>
+                        <th>@Model.T("admin.newsBanners.table.preview", "Preview")</th>
+                        <th>@Model.T("admin.newsBanners.table.path", "Path")</th>
+                        <th>@Model.T("admin.newsBanners.table.actionType", "Tap action")</th>
+                        <th>@Model.T("admin.newsBanners.table.actionValue", "Action target")</th>
+                        <th>@Model.T("admin.newsBanners.table.order", "Order")</th>
+                        <th>@Model.T("admin.newsBanners.table.status", "Status")</th>
+                        <th>@Model.T("admin.newsBanners.table.createdUtc", "Created (UTC)")</th>
+                        <th>@Model.T("admin.newsBanners.table.updatedUtc", "Updated (UTC)")</th>
+                        <th>@Model.T("admin.newsBanners.table.actions", "Actions")</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var item in Model.Items)
+                    {
+                        <tr>
+                            <form method="post" asp-page-handler="Update">
+                                <input type="hidden" name="id" value="@item.Id" />
+                                <td>
+                                    <img src="@Url.Content(item.ImagePath)" alt="" style="width: 180px; max-width: 100%; aspect-ratio: 2 / 1; object-fit: cover; border-radius: 12px; border: 1px solid rgba(0,0,0,.08);" />
+                                </td>
+                                <td><code>@item.ImagePath</code></td>
+                                <td style="min-width: 180px;">
+                                    <select name="actionType" class="form-select form-select-sm">
+                                        @foreach (var option in Model.ActionTypeOptions)
+                                        {
+                                            if (string.Equals(item.ActionType, option.Value, StringComparison.Ordinal))
+                                            {
+                                                <option value="@option.Value" selected>@Model.T(option.LabelKey, option.FallbackLabel)</option>
+                                            }
+                                            else
+                                            {
+                                                <option value="@option.Value">@Model.T(option.LabelKey, option.FallbackLabel)</option>
+                                            }
+                                        }
+                                    </select>
+                                </td>
+                                <td style="min-width: 250px;">
+                                    <input name="actionValue" type="text" maxlength="1024" value="@item.ActionValue" class="form-control form-control-sm" placeholder="https://example.com or profile/deposit" />
+                                </td>
+                                <td style="max-width: 110px;">
+                                    <input name="displayOrder" type="number" min="0" step="1" value="@item.DisplayOrder" class="form-control form-control-sm" />
+                                </td>
+                                <td>
+                                    <div class="form-check mb-2">
+                                        @if (item.IsPublished)
+                                        {
+                                            <input id="published_@item.Id" name="isPublished" type="checkbox" value="true" class="form-check-input" checked />
+                                        }
+                                        else
+                                        {
+                                            <input id="published_@item.Id" name="isPublished" type="checkbox" value="true" class="form-check-input" />
+                                        }
+                                        <label for="published_@item.Id" class="form-check-label">@Model.T("admin.newsBanners.create.published", "Published")</label>
+                                    </div>
+                                    <span class="badge @(item.IsPublished ? "bg-success-subtle text-dark border border-success-subtle" : "bg-secondary-subtle text-dark border border-secondary-subtle")">
+                                        @(item.IsPublished ? Model.T("admin.newsBanners.status.published", "Published") : Model.T("admin.newsBanners.status.hidden", "Hidden"))
+                                    </span>
+                                </td>
+                                <td>@item.CreatedAtUtc.ToString("u")</td>
+                                <td>@item.UpdatedAtUtc.ToString("u")</td>
+                                <td class="text-nowrap">
+                                    <button type="submit" class="btn btn-sm btn-outline-primary">@Model.T("admin.newsBanners.action.save", "Save")</button>
+                                    <button type="submit"
+                                            class="btn btn-sm btn-outline-danger"
+                                            formmethod="post"
+                                            formaction="?handler=Delete"
+                                            name="id"
+                                            value="@item.Id"
+                                            onclick="return confirm('@Model.T("admin.newsBanners.confirm.delete", "Delete this banner?")');">
+                                        @Model.T("admin.newsBanners.action.delete", "Delete")
+                                    </button>
+                                </td>
+                            </form>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+
