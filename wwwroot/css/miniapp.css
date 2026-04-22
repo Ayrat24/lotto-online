@@ -1045,239 +1045,6 @@ button:disabled {
   box-shadow: 0 0 0 1px rgba(241, 190, 55, 0.24) inset;
 }
 
-.ticket-picker-panel {
-  display: grid;
-  grid-template-rows: auto 1fr auto auto;
-  gap: 8px;
-  width: 100%;
-  max-width: 100%;
-  margin: 0;
-  min-height: clamp(270px, 56dvh, 585px);
-  height: clamp(270px, 56dvh, 585px);
-  max-height: calc(100dvh - env(safe-area-inset-bottom, 0px) - 8px);
-  padding: 8px 6px calc(10px + env(safe-area-inset-bottom, 0px));
-  border-radius: 18px 18px 0 0;
-  box-sizing: border-box;
-  overflow: hidden;
-}
-
-.ticket-picker-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 2px;
-  min-height: 0;
-  align-items: stretch;
-  justify-items: stretch;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.03);
-  padding: 2px;
-}
-
-.picker-slot {
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  padding: 0;
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: 8px;
-  justify-items: stretch;
-  min-height: 0;
-  width: 100%;
-}
-
-.picker-arrow {
-  width: 100%;
-  min-height: clamp(24px, 4dvh, 34px);
-  padding: 4px 0;
-  border-radius: 10px;
-  font-size: 1.05rem;
-  font-weight: 700;
-  text-transform: none;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.picker-value {
-  --wheel-item-height: clamp(32px, 7.4dvh, 56px);
-  --wheel-row-gap: 6px;
-  --wheel-visible-height: calc(var(--wheel-item-height) * 5);
-  width: 100%;
-  min-height: 0;
-  height: 100%;
-  max-height: none;
-  border-radius: 12px;
-  display: block;
-  position: relative;
-  overflow: hidden;
-  border: 1px solid rgba(33, 144, 255, 0.28);
-  background: linear-gradient(180deg, rgba(27, 38, 57, 0.92), rgba(15, 24, 38, 0.94));
-  font-size: clamp(1.04rem, 2.24dvh, 1.44rem);
-  font-weight: 900;
-  user-select: none;
-  touch-action: none;
-}
-
-.picker-wheel-viewport {
-  height: 100%;
-  perspective: 640px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  scroll-snap-type: y proximity;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
-  touch-action: pan-y;
-  box-sizing: border-box;
-  padding-block: 0;
-}
-
-.picker-wheel-viewport::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-}
-
-.picker-wheel-track {
-  display: flex;
-  flex-direction: column;
-  gap: var(--wheel-row-gap);
-  transform-style: preserve-3d;
-}
-
-.picker-wheel-item {
-  min-height: var(--wheel-item-height);
-  height: var(--wheel-item-height);
-  line-height: var(--wheel-item-height);
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-  font-size: calc(var(--wheel-item-height) * 0.67);
-  color: rgba(220, 234, 255, 0.48);
-  transition: transform 90ms linear, opacity 90ms linear, filter 90ms linear, color 120ms linear;
-  scroll-snap-align: center;
-  transform-origin: center center;
-}
-
-.picker-wheel-selected {
-  color: #ffffff;
-  text-shadow: 0 0 24px rgba(33, 144, 255, 0.5);
-}
-
-.picker-wheel-focus {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  height: calc(var(--wheel-item-height) * 1.45);
-  transform: translateY(-50%);
-  border-radius: 10px;
-  border: 1px solid rgba(33, 144, 255, 0.4);
-  box-shadow: 0 0 0 1px rgba(33, 144, 255, 0.16) inset;
-  background: linear-gradient(180deg, rgba(33, 144, 255, 0.16), rgba(33, 144, 255, 0.08));
-  pointer-events: none;
-  z-index: 3;
-}
-
-.picker-value::before,
-.picker-value::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 34%;
-  pointer-events: none;
-  z-index: 4;
-}
-
-.picker-value::before {
-  top: 0;
-  background: linear-gradient(180deg, rgba(15, 24, 38, 0.95), rgba(15, 24, 38, 0));
-}
-
-.picker-value::after {
-  bottom: 0;
-  background: linear-gradient(0deg, rgba(15, 24, 38, 0.95), rgba(15, 24, 38, 0));
-}
-
-.picker-wheel::selection,
-.picker-wheel-item::selection {
-  background: transparent;
-}
-
-@media (max-height: 720px) {
-  .picker-value {
-    min-height: 180px;
-    --wheel-item-height: clamp(30px, 6.8dvh, 44px);
-    --wheel-row-gap: 5px;
-  }
-}
-
-#ticketPickerStatus {
-  min-height: 1.2em;
-  line-height: 1.2;
-  margin-top: 2px;
-  color: #ff6b6b;
-}
-
-#ticketPickerSheet {
-  display: none;
-  pointer-events: none;
-}
-
-#ticketPickerSheet.ticket-picker-open,
-#ticketPickerSheet.ticket-picker-closing {
-  display: block;
-  pointer-events: auto;
-}
-
-#ticketPickerSheet .sheet-backdrop {
-  opacity: 0;
-  transition: opacity 169ms ease;
-}
-
-#ticketPickerSheet.ticket-picker-open .sheet-backdrop,
-#ticketPickerSheet.ticket-picker-closing .sheet-backdrop {
-  opacity: 1;
-}
-
-#ticketPickerSheet .ticket-picker-panel {
-  transform: translateY(100%);
-  opacity: 0;
-  transition: transform 169ms cubic-bezier(.2, .75, .17, 1), opacity 143ms ease;
-  will-change: transform, opacity;
-}
-
-#ticketPickerSheet.ticket-picker-open .ticket-picker-panel {
-  transform: translateY(0);
-  opacity: 1;
-}
-
-#ticketPickerSheet.ticket-picker-closing .ticket-picker-panel {
-  transform: translateY(100%);
-  opacity: 0;
-}
-
-@media (max-height: 720px) {
-  .ticket-picker-panel {
-    min-height: 56dvh;
-    height: 56dvh;
-  }
-
-  .ticket-picker-grid {
-    gap: 2px;
-    padding: 2px;
-  }
-
-  .picker-slot {
-    gap: 8px;
-  }
-
-  .picker-arrow {
-    min-height: 22px;
-    font-size: 0.98rem;
-  }
-}
-
 .tickets-header .section-title {
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -1384,6 +1151,244 @@ button:disabled {
   padding: 8px 12px;
   font-size: 1.3rem;
   line-height: 1;
+}
+
+.purchase-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  background: rgba(4, 8, 14, 0.72);
+  backdrop-filter: blur(8px);
+}
+
+.purchase-screen-panel {
+  box-sizing: border-box;
+  max-width: var(--app-max-width);
+  height: 100dvh;
+  margin: 0 auto;
+  padding: calc(14px + env(safe-area-inset-top, 0px)) 12px calc(92px + env(safe-area-inset-bottom, 0px));
+  display: grid;
+  grid-template-rows: auto auto auto 1fr auto;
+  gap: 12px;
+  background: linear-gradient(180deg, #0f1725, #0a111d);
+}
+
+.purchase-screen-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.purchase-screen-header-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.purchase-screen-close-btn {
+  width: auto;
+  min-width: 42px;
+  min-height: 42px;
+  padding: 0 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.purchase-screen-draw-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.purchase-screen-draw-meta-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  color: #d7e3f5;
+  font-size: 0.9rem;
+}
+
+.purchase-screen-status {
+  min-height: 1.2em;
+}
+
+.purchase-ticket-list {
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  gap: 14px;
+  padding-right: 2px;
+}
+
+.purchase-ticket-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+}
+
+.purchase-ticket-card-complete {
+  border-color: rgba(241, 190, 55, 0.76);
+  box-shadow: 0 0 0 1px rgba(241, 190, 55, 0.18) inset;
+}
+
+.purchase-ticket-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.purchase-ticket-card-title-wrap {
+  display: grid;
+  gap: 3px;
+}
+
+.purchase-ticket-card-title {
+  font-size: 1.1rem;
+  font-weight: 900;
+}
+
+.purchase-ticket-card-subtitle {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.purchase-ticket-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.purchase-ticket-card-action {
+  width: auto;
+  min-height: 38px;
+  padding: 8px 12px;
+  font-size: 0.78rem;
+  border-radius: 12px;
+}
+
+.purchase-ticket-card-clear {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #eef3ff;
+}
+
+.purchase-ticket-card-random {
+  background: linear-gradient(180deg, #ffe26a, #f1be37);
+  color: #3d2b00;
+}
+
+.purchase-ticket-selected-label {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #d9e6fa;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.purchase-ticket-selected-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.purchase-ticket-selected-empty {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.purchase-ticket-selected-chip {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  background: linear-gradient(180deg, #ffe86c, #f1be37);
+  color: #402e00;
+  font-weight: 900;
+}
+
+.purchase-ticket-number-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.purchase-ticket-number-btn {
+  min-height: 40px;
+  padding: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #edf4ff;
+  font-size: 0.95rem;
+  font-weight: 800;
+  text-transform: none;
+}
+
+.purchase-ticket-number-btn-selected {
+  background: linear-gradient(180deg, #ffe86c, #f1be37);
+  color: #3d2b00;
+  border-color: rgba(241, 190, 55, 0.95);
+}
+
+.purchase-screen-footer {
+  position: sticky;
+  bottom: 0;
+  padding-top: 4px;
+}
+
+.purchase-screen-submit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: linear-gradient(180deg, #ffe26a, #f1be37);
+  color: #2b1b00;
+  box-shadow: 0 14px 24px rgba(0, 0, 0, 0.34);
+}
+
+@media (max-width: 560px) {
+  .purchase-screen-panel {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .purchase-ticket-card {
+    padding: 12px;
+  }
+
+  .purchase-ticket-card-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .purchase-ticket-card-actions {
+    justify-content: stretch;
+  }
+
+  .purchase-ticket-card-action {
+    flex: 1 1 0;
+    width: 100%;
+  }
+
+  .purchase-ticket-number-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 7px;
+  }
 }
 
 .center-popup {
@@ -1677,19 +1682,6 @@ button:disabled {
     flex-direction: row;
   }
 
-  .ticket-picker-grid {
-    gap: 2px;
-    padding: 2px;
-  }
-
-  .picker-slot {
-    padding: 0;
-  }
-
-  .picker-value {
-    min-height: 48px;
-    font-size: 1.25rem;
-  }
 }
 
 @media (max-height: 760px) {
@@ -1719,9 +1711,5 @@ button:disabled {
     line-height: 1.25;
   }
 
-  .ticket-picker-panel {
-    min-height: 62dvh;
-    height: 62dvh;
-  }
 }
 

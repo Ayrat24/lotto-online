@@ -8,6 +8,28 @@
 
 <div class="card" style="margin-top:0;">
     <div class="card-body">
+        <h5 class="card-title">@Model.T("admin.draws.purchaseSettings.title", "Ticket purchase screen")</h5>
+        <p class="text-muted mb-3">@Model.T("admin.draws.purchaseSettings.subtitle", "Control how many ticket cards the Mini App shows on the new purchase screen.")</p>
+
+        <form method="post" asp-page-handler="SavePurchaseSettings" class="row g-2 align-items-end">
+            @Html.AntiForgeryToken()
+            <div class="col-sm-6 col-md-4">
+                <label asp-for="TicketSlotsCount" class="form-label">@Model.T("admin.draws.purchaseSettings.ticketSlotsCount", "Ticket cards shown")</label>
+                <input asp-for="TicketSlotsCount" class="form-control" type="number" min="1" max="50" step="1" />
+            </div>
+            <div class="col-sm-6 col-md-4">
+                <button type="submit" class="btn btn-outline-primary w-100">@Model.T("admin.draws.purchaseSettings.save", "Save purchase screen")</button>
+            </div>
+        </form>
+
+        <div class="text-muted small mt-3">
+            @Model.T("admin.draws.purchaseSettings.lastUpdated", "Last updated"): @Model.PurchaseSettings.UpdatedAtUtc.ToString("u") @Model.T("admin.draws.purchaseSettings.by", "by") @(string.IsNullOrWhiteSpace(Model.PurchaseSettings.UpdatedByAdmin) ? "-" : Model.PurchaseSettings.UpdatedByAdmin)
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-top:0;">
+    <div class="card-body">
         <h5 class="card-title">@Model.T("admin.draws.create.title", "Create draw instance")</h5>
         <p class="text-muted mb-3">@Model.T("admin.draws.create.subtitle", "A new draw is created as active. Multiple active draws can run at the same time.")</p>
 

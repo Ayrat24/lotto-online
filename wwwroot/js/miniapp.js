@@ -79,12 +79,17 @@
   var myTicketsListEl = document.getElementById('myTicketsList');
   var debugModeBadgeEl = document.getElementById('debugModeBadge');
 
-  var ticketPickerSheetEl = document.getElementById('ticketPickerSheet');
-  var ticketPickerBackdropEl = document.getElementById('ticketPickerBackdrop');
-  var closeTicketPickerBtn = document.getElementById('closeTicketPickerBtn');
-  var ticketPickerGridEl = document.getElementById('ticketPickerGrid');
-  var ticketPickerStatusEl = document.getElementById('ticketPickerStatus');
-  var confirmTicketNumbersBtn = document.getElementById('confirmTicketNumbersBtn');
+  var ticketPurchaseScreenEl = document.getElementById('ticketPurchaseScreen');
+  var closeTicketPurchaseScreenBtn = document.getElementById('closeTicketPurchaseScreenBtn');
+  var ticketPurchaseSubtitleEl = document.getElementById('ticketPurchaseSubtitle');
+  var ticketPurchaseDrawIdEl = document.getElementById('ticketPurchaseDrawId');
+  var ticketPurchaseDrawCostEl = document.getElementById('ticketPurchaseDrawCost');
+  var ticketPurchaseScreenStatusEl = document.getElementById('ticketPurchaseScreenStatus');
+  var ticketPurchaseTicketsListEl = document.getElementById('ticketPurchaseTicketsList');
+  var ticketPurchaseFooterEl = document.getElementById('ticketPurchaseFooter');
+  var submitTicketPurchaseBtn = document.getElementById('submitTicketPurchaseBtn');
+  var submitTicketPurchaseLabelEl = document.getElementById('submitTicketPurchaseLabel');
+  var submitTicketPurchaseCostEl = document.getElementById('submitTicketPurchaseCost');
   var centerPopupEl = document.getElementById('centerPopup');
   var centerPopupBackdropEl = document.getElementById('centerPopupBackdrop');
   var centerPopupMessageEl = document.getElementById('centerPopupMessage');
@@ -92,7 +97,7 @@
 
   var highlightTicketId = null;
   var lastStateSig = null;
-  var latestState = { balance: 0, currentDraw: null, activeDraws: [], activeTicketGroups: [], currentTickets: [], history: [] };
+  var latestState = { balance: 0, currentDraw: null, activeDraws: [], activeTicketGroups: [], currentTickets: [], history: [], ticketPurchase: null };
   var selectedActiveDrawId = null;
   var appHasLoadedState = false;
   var initData = null;
@@ -118,29 +123,14 @@
   var referralInviteLink = '';
   var referralCodeFromQuery = '';
   var referralIsBound = false;
-  var pickerNumbers = [1, 2, 3, 4, 5];
 
   var LOTTO_NUMBERS_COUNT = 5;
   var LOTTO_MIN = 1;
   var LOTTO_MAX = 36;
-  var PICKER_VALUE_RANGE = LOTTO_MAX - LOTTO_MIN + 1;
-  var PICKER_SEED_OFFSET_MIN = 2;
-  var PICKER_SEED_OFFSET_MAX = 5;
-  var WHEEL_REPEAT_CYCLES = 7;
-
-  var pickerWheels = [];
-  var pickerWheelSnapTimers = [];
-  var pickerWheelResizeBound = false;
-  var pickerArrowHoldState = [];
-  var wheelOrderDescending = true;
-  var ticketPickerBuilt = false;
-  var ticketPickerReady = false;
-  var ticketPickerPendingOpen = false;
-  var ticketPickerCloseTimer = null;
-  var pickerApplyingSeed = false;
-  var pickerHasAnimatedOpen = false;
-  var pickerWheelSyncLockedUntil = 0;
-  var pickerOpenAnimationTimer = null;
+  var ticketSlotsPerPurchaseScreen = 10;
+  var purchaseScreenDrawId = null;
+  var purchaseScreenTicketStates = [];
+  var purchaseScreenSubmitting = false;
   var pollingIntervalId = null;
   var debugModeBadgeReason = '';
   var localDebugWatchdog = null;
@@ -164,6 +154,9 @@
     renderActiveDrawBanners(getActiveDraws(latestState), getActiveTicketGroups(latestState));
     renderMyTickets(latestState);
     renderHistory();
+    if (ticketPurchaseScreenEl && !ticketPurchaseScreenEl.hidden) {
+      renderTicketPurchaseScreen();
+    }
 
     if (clientIsLocalDebug && debugModeBadgeReason) {
       setDebugModeBadge(getDebugModeBadgeText(debugModeBadgeReason));
@@ -176,6 +169,10 @@
 
   function getActiveTicketGroups(state) {
     return (state && Array.isArray(state.activeTicketGroups)) ? state.activeTicketGroups : [];
+  }
+
+  function getTicketPurchaseConfig(state) {
+    return state && state.ticketPurchase ? state.ticketPurchase : null;
   }
 
   function resolveSelectedDrawSnapshot(state) {
@@ -737,8 +734,8 @@
       .filter(function (n) { return Number.isFinite(n); });
   }
 
-  function setTicketPickerStatus(text) {
-    if (ticketPickerStatusEl) ticketPickerStatusEl.textContent = text || '';
+  function setTicketPurchaseScreenStatus(text) {
+    if (ticketPurchaseScreenStatusEl) ticketPurchaseScreenStatusEl.textContent = text || '';
   }
 
   function showCenterPopup(message) {
@@ -756,528 +753,302 @@
   function shouldShowInvalidTicketPopup(message) {
     var value = String(message || '').toLowerCase();
     return value.indexOf('already purchased this ticket') >= 0
+      || value.indexOf('selected tickets was already purchased') >= 0
+      || value.indexOf('different number combinations') >= 0
       || value.indexOf('numbers must be unique') >= 0
-      || value.indexOf('choose 5 unique numbers') >= 0;
+      || value.indexOf('choose 5 unique numbers') >= 0
+      || value.indexOf('complete at least one ticket') >= 0;
   }
 
-  function formatPickerNumber(n) {
-    return String(n).padStart(2, '0');
+  function createEmptyPurchaseTicketState(slotNumber) {
+    return {
+      slotNumber: slotNumber,
+      numbers: []
+    };
   }
 
-  function wrapPickerNumber(n) {
-    if (n < LOTTO_MIN) return LOTTO_MAX;
-    if (n > LOTTO_MAX) return LOTTO_MIN;
-    return n;
+  function normalizeTicketNumbers(numbers) {
+    return (numbers || [])
+      .map(function (value) { return parseInt(value, 10); })
+      .filter(function (value) {
+        return Number.isFinite(value) && value >= LOTTO_MIN && value <= LOTTO_MAX;
+      })
+      .filter(function (value, index, arr) { return arr.indexOf(value) === index; })
+      .sort(function (a, b) { return a - b; })
+      .slice(0, LOTTO_NUMBERS_COUNT);
   }
 
-  function normalizePickerNumbers() {
-    if (!Array.isArray(pickerNumbers)) pickerNumbers = [];
+  function ensurePurchaseScreenTicketStates() {
+    var targetCount = Math.max(1, parseInt(ticketSlotsPerPurchaseScreen, 10) || 10);
+    var next = [];
 
-    while (pickerNumbers.length < LOTTO_NUMBERS_COUNT) {
-      pickerNumbers.push(LOTTO_MIN + pickerNumbers.length);
+    for (var i = 0; i < targetCount; i++) {
+      var existing = purchaseScreenTicketStates[i];
+      next.push({
+        slotNumber: i + 1,
+        numbers: normalizeTicketNumbers(existing && existing.numbers)
+      });
     }
 
-    if (pickerNumbers.length > LOTTO_NUMBERS_COUNT) {
-      pickerNumbers = pickerNumbers.slice(0, LOTTO_NUMBERS_COUNT);
-    }
-
-    pickerNumbers = pickerNumbers.map(function (n) {
-      n = parseInt(n, 10);
-      if (!Number.isFinite(n)) return LOTTO_MIN;
-      return Math.min(LOTTO_MAX, Math.max(LOTTO_MIN, n));
-    });
+    purchaseScreenTicketStates = next;
   }
 
-  function randomizePickerNumbers() {
+  function getPurchaseScreenDraw() {
+    var activeDraws = getActiveDraws(latestState);
+    if (purchaseScreenDrawId != null) {
+      for (var i = 0; i < activeDraws.length; i++) {
+        if (activeDraws[i] && activeDraws[i].id === purchaseScreenDrawId) {
+          return activeDraws[i];
+        }
+      }
+    }
+
+    var snapshot = resolveSelectedDrawSnapshot(latestState);
+    return snapshot.draw && snapshot.draw.state === 'active' ? snapshot.draw : null;
+  }
+
+  function isPurchaseTicketComplete(ticketState) {
+    return !!ticketState && Array.isArray(ticketState.numbers) && ticketState.numbers.length === LOTTO_NUMBERS_COUNT;
+  }
+
+  function getCompletedPurchaseTickets() {
+    return purchaseScreenTicketStates.filter(isPurchaseTicketComplete);
+  }
+
+  function getPurchaseTicketSignature(ticketState) {
+    return normalizeTicketNumbers(ticketState && ticketState.numbers).join(',');
+  }
+
+  function getDuplicateCompletedTicketSignature() {
+    var signatures = {};
+    var completed = getCompletedPurchaseTickets();
+
+    for (var i = 0; i < completed.length; i++) {
+      var signature = getPurchaseTicketSignature(completed[i]);
+      if (!signature) continue;
+      if (signatures[signature]) return signature;
+      signatures[signature] = true;
+    }
+
+    return null;
+  }
+
+  function getPurchaseScreenValidation() {
+    var completed = getCompletedPurchaseTickets();
+    if (completed.length === 0) {
+      return {
+        ok: false,
+        message: t('client.purchaseScreen.selectAtLeastOne', 'Complete at least one ticket to continue.'),
+        completedCount: 0
+      };
+    }
+
+    if (getDuplicateCompletedTicketSignature()) {
+      return {
+        ok: false,
+        message: t('client.purchaseScreen.duplicateTickets', 'Completed tickets must use different number combinations.'),
+        completedCount: completed.length
+      };
+    }
+
+    return { ok: true, message: '', completedCount: completed.length };
+  }
+
+  function getRandomTicketNumbers() {
     var set = new Set();
     while (set.size < LOTTO_NUMBERS_COUNT) {
-      set.add(LOTTO_MIN + Math.floor(Math.random() * PICKER_VALUE_RANGE));
+      set.add(LOTTO_MIN + Math.floor(Math.random() * (LOTTO_MAX - LOTTO_MIN + 1)));
     }
 
-    pickerNumbers = Array.from(set).sort(function (a, b) { return a - b; });
+    return Array.from(set).sort(function (a, b) { return a - b; });
   }
 
-  function resetTicketPickerGrid() {
-    if (ticketPickerGridEl) {
-      ticketPickerGridEl.innerHTML = '';
-    }
-
-    pickerWheels = [];
-    pickerWheelSnapTimers = [];
-    ticketPickerBuilt = false;
-    ticketPickerReady = false;
+  function setPurchaseScreenTicketNumbers(index, numbers) {
+    if (index < 0 || index >= purchaseScreenTicketStates.length) return;
+    purchaseScreenTicketStates[index].numbers = normalizeTicketNumbers(numbers);
+    renderTicketPurchaseScreen();
   }
 
-  function preloadTicketPicker() {
-    if (!ticketPickerBuilt) {
-      buildTicketPickerSlots();
-    }
+  function clearPurchaseScreenTicket(index) {
+    setPurchaseScreenTicketNumbers(index, []);
   }
 
-  function setWheelStartNearSeed(index) {
-    var wheelState = pickerWheels[index];
-    if (!wheelState || !wheelState.items || wheelState.items.length === 0) return;
-
-    var seedValue = Math.min(LOTTO_MAX, Math.max(LOTTO_MIN, parseInt(pickerNumbers[index], 10) || LOTTO_MIN));
-    var offset = PICKER_SEED_OFFSET_MIN + Math.floor(Math.random() * (PICKER_SEED_OFFSET_MAX - PICKER_SEED_OFFSET_MIN + 1));
-    var direction = Math.random() < 0.5 ? -1 : 1;
-    var startValue = seedValue + (offset * direction);
-
-    if (startValue < LOTTO_MIN || startValue > LOTTO_MAX) {
-      direction *= -1;
-      startValue = seedValue + (offset * direction);
-    }
-
-    startValue = Math.min(LOTTO_MAX, Math.max(LOTTO_MIN, startValue));
-
-    var itemIndex = wheelState.middleCycleStart + (wheelOrderDescending ? (LOTTO_MAX - startValue) : (startValue - LOTTO_MIN));
-    itemIndex = Math.max(0, Math.min(wheelState.items.length - 1, itemIndex));
-
-    centerWheelOnItem(wheelState, wheelState.items[itemIndex], 'auto');
+  function randomizePurchaseScreenTicket(index) {
+    setPurchaseScreenTicketNumbers(index, getRandomTicketNumbers());
   }
 
-  function startPickerOpenAnimation() {
-    if (!pickerApplyingSeed) return;
+  function togglePurchaseScreenNumber(index, number) {
+    if (index < 0 || index >= purchaseScreenTicketStates.length) return;
 
-    if (pickerOpenAnimationTimer) {
-      clearTimeout(pickerOpenAnimationTimer);
-      pickerOpenAnimationTimer = null;
+    var ticketState = purchaseScreenTicketStates[index];
+    var next = normalizeTicketNumbers(ticketState.numbers);
+    var existingIndex = next.indexOf(number);
+
+    if (existingIndex >= 0) {
+      next.splice(existingIndex, 1);
+    } else {
+      if (next.length >= LOTTO_NUMBERS_COUNT) return;
+      next.push(number);
     }
 
-    lockPickerWheelSync(650);
-
-    for (var i = 0; i < pickerWheels.length; i++) {
-      var wheelState = pickerWheels[i];
-      if (wheelState) wheelState.isOpening = true;
-      normalizeWheelToMiddleCycle(i, 'smooth');
-    }
-
-    pickerOpenAnimationTimer = setTimeout(function () {
-      pickerOpenAnimationTimer = null;
-      lockPickerWheelSync(180);
-      for (var i = 0; i < pickerWheels.length; i++) {
-        if (pickerWheels[i]) pickerWheels[i].isOpening = false;
-      }
-      pickerApplyingSeed = false;
-      updatePickerUi();
-    }, 403 + pickerWheels.length * 26);
+    setPurchaseScreenTicketNumbers(index, next);
   }
 
-  function restorePickerWheelPositions() {
-    for (var i = 0; i < pickerWheels.length; i++) {
-      normalizeWheelToMiddleCycle(i, 'auto');
-    }
+  function formatPurchaseScreenChooseText(missingCount) {
+    return t('client.purchaseScreen.choosePrefix', 'Choose ')
+      + missingCount
+      + t('client.purchaseScreen.chooseSuffix', ' more number(s)');
   }
 
-  function lockPickerWheelSync(ms) {
-    pickerWheelSyncLockedUntil = Math.max(pickerWheelSyncLockedUntil, Date.now() + Math.max(0, ms || 0));
+  function formatPurchaseTicketsButtonLabel(count) {
+    return t('client.purchaseScreen.purchasePrefix', 'Purchase ')
+      + count
+      + t(count === 1
+          ? 'client.purchaseScreen.purchaseSingularSuffix'
+          : 'client.purchaseScreen.purchasePluralSuffix',
+        count === 1 ? ' ticket' : ' tickets');
+  }
+
+  function formatPurchasedTicketsMessage(count) {
+    return t('client.purchaseScreen.purchasedPrefix', 'Purchased ')
+      + count
+      + t('client.purchaseScreen.purchasedSuffix', ' ticket(s).');
   }
 
   function setSheetOpenClass() {
     var hasOpenSheet = !!(
-      (ticketPickerSheetEl && !ticketPickerSheetEl.hidden)
+      (ticketPurchaseScreenEl && !ticketPurchaseScreenEl.hidden)
     );
 
     document.body.classList.toggle('sheet-open', hasOpenSheet);
   }
 
-  function validatePickerSelection() {
-    var seen = {};
-    var duplicates = false;
-
-    for (var i = 0; i < pickerNumbers.length; i++) {
-      var n = pickerNumbers[i];
-      if (seen[n]) {
-        duplicates = true;
-        break;
-      }
-      seen[n] = true;
-    }
-
-    if (duplicates) return { ok: false, message: t('client.picker.chooseUnique', 'Please choose 5 unique numbers.') };
-    return { ok: true, message: '' };
-  }
-
-  function updatePickerUi() {
-    for (var i = 0; i < pickerWheels.length; i++) {
-      renderWheelVisual(i);
-    }
-
-    var validation = validatePickerSelection();
-    setTicketPickerStatus(validation.message);
-    if (confirmTicketNumbersBtn) confirmTicketNumbersBtn.disabled = !validation.ok;
-  }
-
-  function getWheelNearestItemInfo(wheelState) {
-    if (!wheelState || !wheelState.items || wheelState.items.length === 0) return null;
-
-    var viewport = wheelState.viewport;
-    var center = viewport.scrollTop + viewport.clientHeight / 2;
-    var nearestIndex = 0;
-    var nearestDistance = Number.POSITIVE_INFINITY;
-
-    for (var i = 0; i < wheelState.items.length; i++) {
-      var item = wheelState.items[i];
-      var itemCenter = item.offsetTop + item.offsetHeight / 2;
-      var distance = Math.abs(itemCenter - center);
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearestIndex = i;
-      }
-    }
-
-    return {
-      index: nearestIndex,
-      item: wheelState.items[nearestIndex]
-    };
-  }
-
-  function centerWheelOnItem(wheelState, item, behavior) {
-    if (!wheelState || !item) return;
-    var viewport = wheelState.viewport;
-    var targetTop = item.offsetTop - (viewport.clientHeight - item.offsetHeight) / 2;
-
-    if ((behavior || 'auto') === 'smooth') {
-      viewport.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
-      return;
-    }
-
-    viewport.scrollTop = Math.max(0, targetTop);
-  }
-
-  function normalizeWheelToMiddleCycle(index, behavior) {
-    var wheelState = pickerWheels[index];
-    if (!wheelState || !wheelState.items || wheelState.items.length === 0) return;
-
-    var selected = pickerNumbers[index];
-    var inRange = Math.min(LOTTO_MAX, Math.max(LOTTO_MIN, parseInt(selected, 10) || LOTTO_MIN));
-    var preferredItemIndex = wheelState.middleCycleStart + (wheelOrderDescending ? (LOTTO_MAX - inRange) : (inRange - LOTTO_MIN));
-    preferredItemIndex = Math.max(0, Math.min(wheelState.items.length - 1, preferredItemIndex));
-    centerWheelOnItem(wheelState, wheelState.items[preferredItemIndex], behavior || 'auto');
-  }
-
-  function commitPickerNumberFromWheel(index) {
-    var wheelState = pickerWheels[index];
-    if (!wheelState || !wheelState.items || wheelState.items.length === 0) return;
-
-    var nearestInfo = getWheelNearestItemInfo(wheelState);
-    if (!nearestInfo || !nearestInfo.item) return;
-
-    var nextValue = parseInt(nearestInfo.item.getAttribute('data-value'), 10);
-    if (Number.isFinite(nextValue)) pickerNumbers[index] = nextValue;
-  }
-
-  function computeWheelItemHeight(wheelState) {
-    if (!wheelState || !wheelState.root) return 40;
-
-    // Keep wheel inside the slot's middle row so status/confirm rows never get overlapped.
-    var visibleHeight = wheelState.root.clientHeight || 0;
-    var rowGap = wheelState.rowGap || 0;
-    var target = visibleHeight > 0 ? Math.floor((visibleHeight - rowGap * 4) / 5) : 40;
-    return Math.max(26, Math.min(56, target));
-  }
-
-  function applyWheelLayout(wheelState) {
-    if (!wheelState || !wheelState.viewport || !wheelState.root) return;
-
-    var visibleHeight = wheelState.root.clientHeight || 0;
-    var rowGap = wheelState.rowGap || 0;
-    var itemHeight = computeWheelItemHeight(wheelState);
-    wheelState.itemHeight = itemHeight;
-    wheelState.root.style.setProperty('--wheel-row-gap', rowGap.toFixed(2) + 'px');
-    wheelState.root.style.setProperty('--wheel-item-height', itemHeight.toFixed(2) + 'px');
-    wheelState.root.style.setProperty('--wheel-visible-height', (visibleHeight > 0 ? visibleHeight : itemHeight * 5).toFixed(2) + 'px');
-  }
-
-  function syncAllWheelLayouts() {
-    for (var i = 0; i < pickerWheels.length; i++) {
-      var wheelState = pickerWheels[i];
-      if (!wheelState) continue;
-      applyWheelLayout(wheelState);
-      normalizeWheelToMiddleCycle(i, 'auto');
-      renderWheelVisual(i);
-    }
-  }
-
-  function renderWheelVisual(index) {
-    var wheelState = pickerWheels[index];
-    if (!wheelState || !wheelState.items || wheelState.items.length === 0) return;
-
-    var viewport = wheelState.viewport;
-    var center = viewport.scrollTop + viewport.clientHeight / 2;
-    var nearestInfo = getWheelNearestItemInfo(wheelState);
-
-    for (var i = 0; i < wheelState.items.length; i++) {
-      var item = wheelState.items[i];
-      var itemCenter = item.offsetTop + item.offsetHeight / 2;
-      var distance = Math.abs(itemCenter - center);
-      var normalized = Math.min(3.3, distance / wheelState.itemHeight);
-      var direction = itemCenter < center ? -1 : 1;
-
-      // Selected row is much larger/brighter than neighbors.
-      var scale = Math.max(0.66, 1.62 - normalized * 0.28);
-      var opacity = Math.max(0.08, 1 - normalized * 0.28);
-      var blur = Math.max(0, (normalized - 0.55) * 0.9);
-      var rotate = direction * Math.min(54, normalized * 20);
-
-      item.style.transform = 'translateZ(0) rotateX(' + rotate.toFixed(2) + 'deg) scale(' + scale.toFixed(3) + ')';
-      item.style.opacity = opacity.toFixed(3);
-      item.style.filter = 'blur(' + blur.toFixed(2) + 'px)';
-      item.classList.toggle('picker-wheel-selected', !!nearestInfo && i === nearestInfo.index);
-    }
-
-  }
-
-  function scheduleWheelSnap(index) {
-    if (pickerWheelSnapTimers[index]) {
-      clearTimeout(pickerWheelSnapTimers[index]);
-    }
-
-    pickerWheelSnapTimers[index] = setTimeout(function () {
-      var wheelState = pickerWheels[index];
-      if (!wheelState) return;
-
-      if (wheelState.isOpening || Date.now() < pickerWheelSyncLockedUntil) return;
-
-      var nearestInfo = getWheelNearestItemInfo(wheelState);
-      if (!nearestInfo || !nearestInfo.item) return;
-
-      wheelState.isAutoScrolling = true;
-      centerWheelOnItem(wheelState, nearestInfo.item, 'smooth');
-
-      setTimeout(function () {
-        wheelState.isAutoScrolling = false;
-
-        var viewport = wheelState.viewport;
-        var maxScrollTop = Math.max(0, (viewport.scrollHeight || 0) - (viewport.clientHeight || 0));
-        var edgePadding = (wheelState.itemHeight || 40) * 4;
-        if (viewport.scrollTop < edgePadding || viewport.scrollTop > maxScrollTop - edgePadding) {
-          normalizeWheelToMiddleCycle(index, 'auto');
-        }
-
-        commitPickerNumberFromWheel(index);
-        renderWheelVisual(index);
-        updatePickerUi();
-      }, 180);
-    }, 90);
-  }
-
-  function stepPickerIndex(index, delta) {
-    var wheelState = pickerWheels[index];
-    if (!wheelState) {
-      if (!Number.isFinite(index) || index < 0 || index >= pickerNumbers.length) return;
-      pickerNumbers[index] = wrapPickerNumber(pickerNumbers[index] + delta);
-      updatePickerUi();
-      return;
-    }
-
-    var nearestInfo = getWheelNearestItemInfo(wheelState);
-    if (!nearestInfo) return;
-
-      var targetIndex = nearestInfo.index + (wheelOrderDescending ? -delta : delta);
-    if (targetIndex < 0 || targetIndex >= wheelState.items.length) {
-      normalizeWheelToMiddleCycle(index, 'auto');
-      nearestInfo = getWheelNearestItemInfo(wheelState);
-      if (!nearestInfo) return;
-        targetIndex = nearestInfo.index + (wheelOrderDescending ? -delta : delta);
-      targetIndex = Math.max(0, Math.min(wheelState.items.length - 1, targetIndex));
-    }
-
-    centerWheelOnItem(wheelState, wheelState.items[targetIndex], 'smooth');
-    commitPickerNumberFromWheel(index);
-    scheduleWheelSnap(index);
-  }
-
-  function stopArrowHold(button) {
-    var state = button && button._pickerHoldState;
-    if (!state) return;
-
-    if (state.repeatTimer) clearInterval(state.repeatTimer);
-    if (state.startTimer) clearTimeout(state.startTimer);
-    state.repeatTimer = null;
-    state.startTimer = null;
-    state.active = false;
-  }
-
-  function bindArrowHold(button, stepFn) {
-    if (!button) return;
-
-    var state = { active: false, startTimer: null, repeatTimer: null };
-    button._pickerHoldState = state;
-
-    function beginHold(ev) {
-      ev.preventDefault();
-      if (state.active) return;
-
-      state.active = true;
-      stepFn();
-
-      state.startTimer = setTimeout(function () {
-        if (!state.active) return;
-        state.repeatTimer = setInterval(function () {
-          if (!state.active) return;
-          stepFn();
-        }, 100);
-      }, 500);
-    }
-
-    function endHold() {
-      stopArrowHold(button);
-    }
-
-    button.addEventListener('pointerdown', beginHold);
-    button.addEventListener('pointerup', endHold);
-    button.addEventListener('pointercancel', endHold);
-    button.addEventListener('pointerleave', endHold);
-    button.addEventListener('lostpointercapture', endHold);
-    button.addEventListener('contextmenu', function (ev) { ev.preventDefault(); });
-  }
-
-  function buildTicketPickerSlots() {
-    if (!ticketPickerGridEl) return;
-
-    if (ticketPickerBuilt && ticketPickerGridEl.children.length > 0) {
-      return;
-    }
-
-    ticketPickerReady = false;
-    normalizePickerNumbers();
-    ticketPickerGridEl.innerHTML = '';
-    pickerWheels = [];
-    pickerWheelSnapTimers = [];
-
-    for (var i = 0; i < LOTTO_NUMBERS_COUNT; i++) {
-      var slot = document.createElement('div');
-      slot.className = 'picker-slot';
-
-      var upBtn = document.createElement('button');
-      upBtn.type = 'button';
-      upBtn.className = 'picker-arrow';
-      upBtn.textContent = '^';
-
-      var value = document.createElement('div');
-      value.className = 'picker-value picker-wheel';
-
-      var focusBand = document.createElement('div');
-      focusBand.className = 'picker-wheel-focus';
-
-      var viewport = document.createElement('div');
-      viewport.className = 'picker-wheel-viewport';
-      viewport.setAttribute('data-picker-viewport', String(i));
-
-      var track = document.createElement('div');
-      track.className = 'picker-wheel-track';
-      track.setAttribute('data-picker-track', String(i));
-
-      for (var c = 0; c < WHEEL_REPEAT_CYCLES; c++) {
-        if (wheelOrderDescending) {
-          for (var vd = LOTTO_MAX; vd >= LOTTO_MIN; vd--) {
-            var wheelItemD = document.createElement('div');
-            wheelItemD.className = 'picker-wheel-item';
-            wheelItemD.setAttribute('data-value', String(vd));
-            wheelItemD.textContent = formatPickerNumber(vd);
-            track.appendChild(wheelItemD);
-          }
-        } else {
-          for (var va = LOTTO_MIN; va <= LOTTO_MAX; va++) {
-            var wheelItemA = document.createElement('div');
-            wheelItemA.className = 'picker-wheel-item';
-            wheelItemA.setAttribute('data-value', String(va));
-            wheelItemA.textContent = formatPickerNumber(va);
-            track.appendChild(wheelItemA);
-          }
-        }
-      }
-
-      viewport.appendChild(track);
-      value.appendChild(viewport);
-      value.appendChild(focusBand);
-
-      var downBtn = document.createElement('button');
-      downBtn.type = 'button';
-      downBtn.className = 'picker-arrow';
-      downBtn.textContent = 'v';
-
-      bindArrowHold(upBtn, (function (idx) {
-        return function () { stepPickerIndex(idx, 1); };
-      })(i));
-
-      bindArrowHold(downBtn, (function (idx) {
-        return function () { stepPickerIndex(idx, -1); };
-      })(i));
-
-      slot.appendChild(upBtn);
-      slot.appendChild(value);
-      slot.appendChild(downBtn);
-      ticketPickerGridEl.appendChild(slot);
-
-      // Delay wheel metrics until after layout is committed.
-      (function (idx, rootEl, vp, tr) {
-        requestAnimationFrame(function () {
-          var items = tr.querySelectorAll('.picker-wheel-item');
-          if (!items || items.length === 0) return;
-
-          var wheelState = {
-            root: rootEl,
-            viewport: vp,
-            track: tr,
-            items: items,
-            rowGap: 6,
-            itemHeight: 40,
-            middleCycleStart: Math.floor(WHEEL_REPEAT_CYCLES / 2) * PICKER_VALUE_RANGE
-          };
-
-          pickerWheels[idx] = wheelState;
-
-          applyWheelLayout(wheelState);
-
-          vp.addEventListener('scroll', function () {
-            renderWheelVisual(idx);
-            if (!wheelState.isAutoScrolling) {
-              scheduleWheelSnap(idx);
-            }
-          }, { passive: true });
-
-          // Ensure desktop mouse wheel changes the picker even when nested in sheets.
-          rootEl.addEventListener('wheel', function (e) {
-            e.preventDefault();
-            vp.scrollTop += e.deltaY;
-            if (wheelState.isOpening) return;
-            renderWheelVisual(idx);
-            scheduleWheelSnap(idx);
-          }, { passive: false });
-
-          if (pickerApplyingSeed) {
-            setWheelStartNearSeed(idx);
-          } else {
-            normalizeWheelToMiddleCycle(idx, 'auto');
-            renderWheelVisual(idx);
-          }
-
-          if (!ticketPickerReady && pickerWheels.filter(Boolean).length === LOTTO_NUMBERS_COUNT) {
-            ticketPickerReady = true;
-            if (ticketPickerPendingOpen) {
-              ticketPickerPendingOpen = false;
-              requestAnimationFrame(function () {
-                beginPickerOpenSequence();
-              });
-            }
-          }
-        });
-      })(i, value, viewport, track);
-    }
-
-    if (!pickerWheelResizeBound) {
-      pickerWheelResizeBound = true;
-      window.addEventListener('resize', function () {
-        syncAllWheelLayouts();
+  function createPurchaseTicketCard(ticketState, index) {
+    var card = document.createElement('section');
+    card.className = 'purchase-ticket-card';
+
+    var completed = isPurchaseTicketComplete(ticketState);
+    if (completed) card.classList.add('purchase-ticket-card-complete');
+
+    var header = document.createElement('div');
+    header.className = 'purchase-ticket-card-header';
+
+    var titleWrap = document.createElement('div');
+    titleWrap.className = 'purchase-ticket-card-title-wrap';
+
+    var title = document.createElement('div');
+    title.className = 'purchase-ticket-card-title';
+    title.textContent = t('client.purchaseScreen.ticketPrefix', 'Ticket') + ' ' + ticketState.slotNumber;
+
+    var subtitle = document.createElement('div');
+    subtitle.className = 'purchase-ticket-card-subtitle';
+    subtitle.textContent = completed
+      ? t('client.purchaseScreen.ready', 'Ready to purchase')
+      : formatPurchaseScreenChooseText(Math.max(0, LOTTO_NUMBERS_COUNT - ticketState.numbers.length));
+
+    titleWrap.appendChild(title);
+    titleWrap.appendChild(subtitle);
+
+    var actions = document.createElement('div');
+    actions.className = 'purchase-ticket-card-actions';
+
+    var randomBtn = document.createElement('button');
+    randomBtn.type = 'button';
+    randomBtn.className = 'purchase-ticket-card-action purchase-ticket-card-random';
+    randomBtn.textContent = t('client.purchaseScreen.random', 'Random numbers');
+    randomBtn.addEventListener('click', function () {
+      randomizePurchaseScreenTicket(index);
+    });
+
+    var clearBtn = document.createElement('button');
+    clearBtn.type = 'button';
+    clearBtn.className = 'purchase-ticket-card-action purchase-ticket-card-clear';
+    clearBtn.textContent = t('client.purchaseScreen.clear', 'Clear');
+    clearBtn.disabled = ticketState.numbers.length === 0;
+    clearBtn.addEventListener('click', function () {
+      clearPurchaseScreenTicket(index);
+    });
+
+    actions.appendChild(randomBtn);
+    actions.appendChild(clearBtn);
+
+    header.appendChild(titleWrap);
+    header.appendChild(actions);
+    card.appendChild(header);
+
+    var selectedLabel = document.createElement('div');
+    selectedLabel.className = 'purchase-ticket-selected-label';
+    selectedLabel.textContent = t('client.purchaseScreen.selectedNumbers', 'Selected numbers');
+    card.appendChild(selectedLabel);
+
+    var selectedRow = document.createElement('div');
+    selectedRow.className = 'purchase-ticket-selected-row';
+    if (ticketState.numbers.length === 0) {
+      var empty = document.createElement('div');
+      empty.className = 'purchase-ticket-selected-empty';
+      empty.textContent = t('client.purchaseScreen.noNumbersSelected', 'No numbers selected yet.');
+      selectedRow.appendChild(empty);
+    } else {
+      ticketState.numbers.forEach(function (number) {
+        var chip = document.createElement('span');
+        chip.className = 'purchase-ticket-selected-chip';
+        chip.textContent = String(number);
+        selectedRow.appendChild(chip);
       });
     }
+    card.appendChild(selectedRow);
 
-    ticketPickerBuilt = true;
+    var grid = document.createElement('div');
+    grid.className = 'purchase-ticket-number-grid';
+    for (var number = LOTTO_MIN; number <= LOTTO_MAX; number++) {
+      var numberBtn = document.createElement('button');
+      numberBtn.type = 'button';
+      numberBtn.className = 'purchase-ticket-number-btn';
+      if (ticketState.numbers.indexOf(number) >= 0) {
+        numberBtn.classList.add('purchase-ticket-number-btn-selected');
+      }
+      numberBtn.textContent = String(number);
+      (function (ticketIndex, value) {
+        numberBtn.addEventListener('click', function () {
+          togglePurchaseScreenNumber(ticketIndex, value);
+        });
+      })(index, number);
+      grid.appendChild(numberBtn);
+    }
+    card.appendChild(grid);
 
-    if (!pickerApplyingSeed) {
-      updatePickerUi();
+    return card;
+  }
+
+  function renderTicketPurchaseScreen() {
+    if (!ticketPurchaseScreenEl || !ticketPurchaseTicketsListEl) return;
+
+    ensurePurchaseScreenTicketStates();
+
+    var draw = getPurchaseScreenDraw();
+    if (ticketPurchaseDrawIdEl) ticketPurchaseDrawIdEl.textContent = draw ? String(draw.id) : '-';
+    if (ticketPurchaseDrawCostEl) ticketPurchaseDrawCostEl.textContent = draw ? formatCurrency(draw.ticketCost) : formatCurrency(0);
+    if (ticketPurchaseSubtitleEl) {
+      ticketPurchaseSubtitleEl.textContent = t('client.purchaseScreen.subtitle', 'Complete one or more tickets to buy them together.');
+    }
+
+    ticketPurchaseTicketsListEl.innerHTML = '';
+    purchaseScreenTicketStates.forEach(function (ticketState, index) {
+      ticketPurchaseTicketsListEl.appendChild(createPurchaseTicketCard(ticketState, index));
+    });
+
+    var validation = getPurchaseScreenValidation();
+    if (!purchaseScreenSubmitting) {
+      setTicketPurchaseScreenStatus(validation.ok ? '' : validation.message);
+    }
+
+    var completedCount = validation.completedCount || 0;
+    var totalCost = draw ? Number(draw.ticketCost || 0) * completedCount : 0;
+    if (ticketPurchaseFooterEl) ticketPurchaseFooterEl.hidden = completedCount <= 0;
+    if (submitTicketPurchaseLabelEl) submitTicketPurchaseLabelEl.textContent = formatPurchaseTicketsButtonLabel(completedCount);
+    if (submitTicketPurchaseCostEl) submitTicketPurchaseCostEl.textContent = formatCurrency(totalCost);
+    if (submitTicketPurchaseBtn) {
+      submitTicketPurchaseBtn.disabled = purchaseScreenSubmitting || !validation.ok || !draw || draw.state !== 'active';
     }
   }
 
@@ -1484,10 +1255,7 @@
 
     draws.forEach(function (draw) {
       var card = document.createElement('article');
-      card.className = 'card jackpot-card duplicate-jackpot-card';
-      if (selectedActiveDrawId === draw.id) {
-        card.className += ' duplicate-jackpot-card-selected';
-      }
+      card.className = 'card jackpot-card duplicate-jackpot-card purchase-entry-card';
 
       var top = document.createElement('div');
       top.className = 'jackpot-main';
@@ -1588,8 +1356,7 @@
         selectedActiveDrawId = draw.id;
         currentDisplayedDrawId = draw.id;
         setPurchaseStatus('');
-        openTicketPicker();
-        renderActiveDrawBanners(getActiveDraws(latestState), getActiveTicketGroups(latestState));
+        openTicketPurchaseScreen(draw.id);
       });
 
       buyRight.appendChild(countText);
@@ -1603,16 +1370,16 @@
 
       card.addEventListener('click', function () {
         selectedActiveDrawId = draw.id;
-        var selected = resolveSelectedDrawSnapshot(latestState);
-        renderCurrentDraw(selected.draw, selected.tickets, selected.hasMultipleActiveDraws);
-        renderActiveDrawBanners(getActiveDraws(latestState), getActiveTicketGroups(latestState));
+        currentDisplayedDrawId = draw.id;
+        setPurchaseStatus('');
+        openTicketPurchaseScreen(draw.id);
       });
 
       jackpotCardsContainerEl.appendChild(card);
     });
   }
 
-  function renderCurrentDraw(draw, currentTickets, hasMultipleActiveDraws) {
+  function renderCurrentDraw(draw, currentTickets) {
     // Re-bind key nodes if DOM was not ready at initial script evaluation.
     if (!currentDrawStateBadgeEl) currentDrawStateBadgeEl = document.getElementById('currentDrawStateBadge') || document.getElementById('jackpotGameStateBadge');
     if (!currentDrawPrizeTiersEl) currentDrawPrizeTiersEl = document.getElementById('currentDrawPrizeTiers');
@@ -1881,132 +1648,82 @@
     setProfileScreen('home');
   }
 
-  function openTicketPicker() {
-    if (!ticketPickerSheetEl) return;
+  function openTicketPurchaseScreen(drawId) {
+    if (!ticketPurchaseScreenEl) return;
 
-    if (!ticketPickerReady) {
-      ticketPickerPendingOpen = true;
-      setTicketPickerStatus(t('client.picker.preparing', 'Preparing numbers...'));
-      preloadTicketPicker();
+    purchaseScreenDrawId = drawId != null ? drawId : currentDisplayedDrawId;
+    purchaseScreenSubmitting = false;
+    ensurePurchaseScreenTicketStates();
+    setTicketPurchaseScreenStatus('');
+    ticketPurchaseScreenEl.hidden = false;
+    setSheetOpenClass();
+    renderTicketPurchaseScreen();
+  }
+
+  function closeTicketPurchaseScreen() {
+    if (!ticketPurchaseScreenEl) return;
+
+    ticketPurchaseScreenEl.hidden = true;
+    purchaseScreenSubmitting = false;
+    setTicketPurchaseScreenStatus('');
+    setSheetOpenClass();
+  }
+
+  function submitTicketPurchase() {
+    if (!initData) return;
+
+    var draw = getPurchaseScreenDraw();
+    if (!draw || draw.state !== 'active') {
+      setTicketPurchaseScreenStatus(t('client.status.noActiveDraw', 'There is no active draw right now.'));
       return;
     }
 
-    beginPickerOpenSequence();
-  }
-
-  function beginPickerOpenSequence() {
-    if (!ticketPickerSheetEl || !ticketPickerReady) return;
-
-    if (ticketPickerCloseTimer) {
-      clearTimeout(ticketPickerCloseTimer);
-      ticketPickerCloseTimer = null;
-    }
-
-    ticketPickerSheetEl.hidden = false;
-    ticketPickerSheetEl.classList.remove('ticket-picker-closing');
-    ticketPickerSheetEl.offsetHeight;
-    ticketPickerSheetEl.classList.add('ticket-picker-open');
-    setSheetOpenClass();
-
-    requestAnimationFrame(function () {
-      if (pickerOpenAnimationTimer) {
-        clearTimeout(pickerOpenAnimationTimer);
-        pickerOpenAnimationTimer = null;
-      }
-
-      if (!pickerHasAnimatedOpen) {
-        pickerApplyingSeed = true;
-        lockPickerWheelSync(900);
-
-        for (var i = 0; i < pickerWheels.length; i++) {
-          setWheelStartNearSeed(i);
-        }
-
-        pickerHasAnimatedOpen = true;
-
-        pickerOpenAnimationTimer = setTimeout(function () {
-          pickerOpenAnimationTimer = null;
-          startPickerOpenAnimation();
-        }, 72);
-
-        return;
-      }
-
-      pickerApplyingSeed = false;
-      lockPickerWheelSync(200);
-      restorePickerWheelPositions();
-      updatePickerUi();
-    });
-  }
-
-  function closeTicketPicker() {
-    if (!ticketPickerSheetEl) return;
-
-    if (pickerOpenAnimationTimer) {
-      clearTimeout(pickerOpenAnimationTimer);
-      pickerOpenAnimationTimer = null;
-    }
-
-    pickerApplyingSeed = false;
-
-    ticketPickerSheetEl.classList.remove('ticket-picker-open');
-    ticketPickerSheetEl.classList.add('ticket-picker-closing');
-    setSheetOpenClass();
-
-    if (ticketPickerCloseTimer) clearTimeout(ticketPickerCloseTimer);
-    ticketPickerCloseTimer = setTimeout(function () {
-      ticketPickerSheetEl.hidden = true;
-      ticketPickerSheetEl.classList.remove('ticket-picker-closing');
-      ticketPickerCloseTimer = null;
-      setSheetOpenClass();
-    }, 260);
-  }
-
-  function confirmSelectedTicketNumbers() {
-    if (!initData) return;
-
-    var selected = resolveSelectedDrawSnapshot(latestState);
-    var selectedDrawId = selected.draw && selected.draw.state === 'active'
-      ? selected.draw.id
-      : null;
-
-    var validation = validatePickerSelection();
+    var validation = getPurchaseScreenValidation();
     if (!validation.ok) {
-      setTicketPickerStatus(validation.message);
+      setTicketPurchaseScreenStatus(validation.message);
       showCenterPopup(validation.message);
       return;
     }
 
-    if (confirmTicketNumbersBtn) confirmTicketNumbersBtn.disabled = true;
+    var completedTickets = getCompletedPurchaseTickets().map(function (ticketState) {
+      return normalizeTicketNumbers(ticketState.numbers);
+    });
+
+    purchaseScreenSubmitting = true;
+    setTicketPurchaseScreenStatus(t('client.purchaseScreen.purchasing', 'Purchasing tickets...'));
+    renderTicketPurchaseScreen();
     if (purchaseBtn) purchaseBtn.disabled = true;
-    setTicketPickerStatus(t('client.picker.submitting', 'Submitting ticket...'));
 
     postJson('/api/tickets/purchase', {
       initData: initData || '',
-      numbers: pickerNumbers.slice(0, LOTTO_NUMBERS_COUNT),
-      drawId: selectedDrawId
+      drawId: draw.id,
+      tickets: completedTickets
     }, null)
       .then(function (res) {
-        if (res && res.ok && res.ticket) {
-          highlightTicketId = res.ticket.id;
-          setPurchaseStatus(t('client.status.ticketPurchased', 'Ticket purchased.'));
-          closeTicketPicker();
-          randomizePickerNumbers();
-          pickerHasAnimatedOpen = false;
-          if (ticketPickerReady) updatePickerUi();
-          return refreshState();
+        if (!(res && res.ok && Array.isArray(res.tickets))) {
+          setTicketPurchaseScreenStatus(t('client.status.purchaseFailed', 'Purchase failed.'));
+          return;
         }
 
-        setTicketPickerStatus(t('client.status.purchaseFailed', 'Purchase failed.'));
+        if (res.tickets.length > 0) {
+          highlightTicketId = res.tickets[0].id;
+        }
+        setPurchaseStatus(formatPurchasedTicketsMessage(Number(res.purchasedCount || res.tickets.length || 0)));
+        purchaseScreenTicketStates = [];
+        ensurePurchaseScreenTicketStates();
+        closeTicketPurchaseScreen();
+        return refreshState();
       })
       .catch(function (err) {
-        setTicketPickerStatus(err.message);
-        if (shouldShowInvalidTicketPopup(err && err.message)) {
-          showCenterPopup(err.message);
+        var message = err && err.message ? err.message : t('client.status.purchaseFailed', 'Purchase failed.');
+        setTicketPurchaseScreenStatus(message);
+        if (shouldShowInvalidTicketPopup(message)) {
+          showCenterPopup(message);
         }
       })
       .finally(function () {
-        updatePickerUi();
+        purchaseScreenSubmitting = false;
+        renderTicketPurchaseScreen();
         if (purchaseBtn) {
           var snapshot = resolveSelectedDrawSnapshot(latestState);
           purchaseBtn.disabled = !(snapshot.draw && snapshot.draw.state === 'active');
@@ -2163,8 +1880,13 @@
               };
             })
           };
-        })
-        ,
+        }),
+        ticketPurchase: state && state.ticketPurchase ? {
+          ticketSlotsCount: Number(state.ticketPurchase.ticketSlotsCount || 0),
+          numbersPerTicket: Number(state.ticketPurchase.numbersPerTicket || 0),
+          minNumber: Number(state.ticketPurchase.minNumber || 0),
+          maxNumber: Number(state.ticketPurchase.maxNumber || 0)
+        } : null,
         balance: state && Number.isFinite(Number(state.balance)) ? Number(state.balance) : 0
       });
     } catch (e) {
@@ -2173,7 +1895,16 @@
   }
 
   function applyState(state) {
-    latestState = state || { balance: 0, currentDraw: null, activeDraws: [], activeTicketGroups: [], currentTickets: [], history: [] };
+    latestState = state || { balance: 0, currentDraw: null, activeDraws: [], activeTicketGroups: [], currentTickets: [], history: [], ticketPurchase: null };
+
+    var purchaseConfig = getTicketPurchaseConfig(latestState);
+    if (purchaseConfig) {
+      LOTTO_NUMBERS_COUNT = Math.max(1, parseInt(purchaseConfig.numbersPerTicket, 10) || LOTTO_NUMBERS_COUNT);
+      LOTTO_MIN = Math.max(1, parseInt(purchaseConfig.minNumber, 10) || LOTTO_MIN);
+      LOTTO_MAX = Math.max(LOTTO_MIN, parseInt(purchaseConfig.maxNumber, 10) || LOTTO_MAX);
+      ticketSlotsPerPurchaseScreen = Math.max(1, parseInt(purchaseConfig.ticketSlotsCount, 10) || ticketSlotsPerPurchaseScreen);
+      ensurePurchaseScreenTicketStates();
+    }
 
     var activeDraws = getActiveDraws(latestState);
     if (activeDraws.length === 0) {
@@ -2192,6 +1923,9 @@
     renderCurrentDraw(selected.draw, selected.tickets, selected.hasMultipleActiveDraws);
     renderActiveDrawBanners(activeDraws, getActiveTicketGroups(latestState));
     renderMyTickets(latestState);
+    if (ticketPurchaseScreenEl && !ticketPurchaseScreenEl.hidden) {
+      renderTicketPurchaseScreen();
+    }
 
     if (clientIsLocalDebug && !autoOpenedTicketsTab) {
       var ticketGroups = buildMyTicketGroups(latestState);
@@ -2701,16 +2435,24 @@
     setPurchaseStatus('');
     // Ensure purchases from jackpot card target the featured/current draw
     if (currentDisplayedDrawId != null) selectedActiveDrawId = currentDisplayedDrawId;
-    openTicketPicker();
+    openTicketPurchaseScreen(currentDisplayedDrawId);
   }
 
   if (purchaseBtn) purchaseBtn.addEventListener('click', purchaseTicket);
+  if (featuredJackpotCardEl) {
+    featuredJackpotCardEl.addEventListener('click', function (event) {
+      if (purchaseBtn && (event.target === purchaseBtn || purchaseBtn.contains(event.target))) {
+        return;
+      }
+
+      purchaseTicket();
+    });
+  }
   if (lotteryTabBtn) lotteryTabBtn.addEventListener('click', function () { setActiveTab('lottery'); });
   if (ticketsTabBtn) ticketsTabBtn.addEventListener('click', function () { setActiveTab('tickets'); });
   if (profileTabBtn) profileTabBtn.addEventListener('click', function () { setActiveTab('profile'); });
-  if (closeTicketPickerBtn) closeTicketPickerBtn.addEventListener('click', closeTicketPicker);
-  if (ticketPickerBackdropEl) ticketPickerBackdropEl.addEventListener('click', closeTicketPicker);
-  if (confirmTicketNumbersBtn) confirmTicketNumbersBtn.addEventListener('click', confirmSelectedTicketNumbers);
+  if (closeTicketPurchaseScreenBtn) closeTicketPurchaseScreenBtn.addEventListener('click', closeTicketPurchaseScreen);
+  if (submitTicketPurchaseBtn) submitTicketPurchaseBtn.addEventListener('click', submitTicketPurchase);
   if (centerPopupConfirmBtn) centerPopupConfirmBtn.addEventListener('click', hideCenterPopup);
   if (centerPopupBackdropEl) centerPopupBackdropEl.addEventListener('click', hideCenterPopup);
   // active draw selection handled via per-banner buy buttons
@@ -2757,12 +2499,11 @@
 
   loadLocaleFromCache();
 
-  randomizePickerNumbers();
-  preloadTicketPicker();
+  ensurePurchaseScreenTicketStates();
   setActiveTab('lottery');
   setProfileScreen('home');
   renderCurrentDraw(null, [], false);
-  renderMyTickets({ balance: 0, currentDraw: null, activeDraws: [], activeTicketGroups: [], currentTickets: [], history: [] });
+  renderMyTickets({ balance: 0, currentDraw: null, activeDraws: [], activeTicketGroups: [], currentTickets: [], history: [], ticketPurchase: null });
   renderHistory();
   renderBalance(0);
   if (topUpAmountInputEl && !String(topUpAmountInputEl.value || '').trim()) {

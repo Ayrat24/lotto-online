@@ -10,5 +10,12 @@ public sealed record MiniAppStateDto(
     IReadOnlyList<DrawDto> ActiveDraws,
     IReadOnlyList<DrawGroupDto> ActiveTicketGroups,
     IReadOnlyList<TicketForDrawDto> CurrentTickets,
-    IReadOnlyList<DrawGroupDto> History);
+    IReadOnlyList<DrawGroupDto> History,
+    TicketPurchaseConfigDto TicketPurchase);
+
+public sealed record TicketPurchaseConfigDto(
+    int TicketSlotsCount,
+    int NumbersPerTicket,
+    int MinNumber,
+    int MaxNumber);
 

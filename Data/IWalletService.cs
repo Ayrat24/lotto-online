@@ -6,7 +6,7 @@ public interface IWalletService
 
     Task<decimal> TopUpUserAsync(long userId, CancellationToken ct);
 
-    Task<WalletPurchaseResult> TryPurchaseTicketAsync(long userId, long drawId, string numbers, CancellationToken ct);
+    Task<WalletBatchPurchaseResult> TryPurchaseTicketsAsync(long userId, long drawId, IReadOnlyList<string> numbersByTicket, CancellationToken ct);
 
     Task<WalletClaimResult> ClaimTicketWinningsAsync(long userId, long ticketId, CancellationToken ct);
 
@@ -26,6 +26,7 @@ public interface IWalletService
 }
 
 public sealed record WalletPurchaseResult(bool Success, decimal UserBalance, string? Error, Ticket? Ticket = null);
+public sealed record WalletBatchPurchaseResult(bool Success, decimal UserBalance, decimal TotalCost, string? Error, IReadOnlyList<Ticket>? Tickets = null);
 public sealed record WalletClaimResult(bool Success, decimal UserBalance, decimal Amount, string? Error);
 
 public sealed record WalletWithdrawRequestResult(bool Success, decimal UserBalance, string? Error, WithdrawalRequest? Request = null);

@@ -52,6 +52,7 @@ public static class DatabaseModule
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IWalletService, WalletService>();
         services.AddScoped<IReferralService, ReferralService>();
+        services.AddScoped<ITicketPurchaseSettingsService, TicketPurchaseSettingsService>();
 
         return services;
     }

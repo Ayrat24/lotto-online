@@ -17,6 +17,7 @@ public static class TimelineEndpoints
             IConfiguration config,
             IWebHostEnvironment env,
             AppDbContext db,
+            ITicketPurchaseSettingsService ticketPurchaseSettings,
             CancellationToken ct) =>
         {
             long telegramUserId;
@@ -161,7 +162,14 @@ public static class TimelineEndpoints
                 })
                 .ToArray();
 
-            var state = new MiniAppStateDto(user?.Balance ?? 0m, currentDraw, activeDraws, activeTicketGroups, currentTickets, history);
+            var purchaseSettings = await ticketPurchaseSettings.GetSettingsAsync(ct);
+            var ticketPurchase = new TicketPurchaseConfigDto(
+                purchaseSettings.TicketSlotsCount,
+                DrawManagement.NumbersPerDraw,
+                DrawManagement.MinNumber,
+                DrawManagement.MaxNumber);
+
+            var state = new MiniAppStateDto(user?.Balance ?? 0m, currentDraw, activeDraws, activeTicketGroups, currentTickets, history, ticketPurchase);
             return Results.Ok(new { ok = true, state });
         });
 

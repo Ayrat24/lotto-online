@@ -26,21 +26,32 @@ public sealed class DrawsModel : LocalizedAdminPageModel
         public decimal TotalPrizePool => PrizePoolMatch3 + PrizePoolMatch4 + PrizePoolMatch5;
     }
 
+    public sealed record TicketPurchaseSettingsView(
+        int TicketSlotsCount,
+        DateTimeOffset UpdatedAtUtc,
+        string? UpdatedByAdmin);
+
     private readonly AppDbContext _db;
     private readonly IConfiguration _config;
     private readonly IWebHostEnvironment _env;
+    private readonly ITicketPurchaseSettingsService _ticketPurchaseSettings;
 
-    public DrawsModel(AppDbContext db, IConfiguration config, IWebHostEnvironment env, ILocalizationService localization)
+    public DrawsModel(AppDbContext db, IConfiguration config, IWebHostEnvironment env, ITicketPurchaseSettingsService ticketPurchaseSettings, ILocalizationService localization)
         : base(localization)
     {
         _db = db;
         _config = config;
         _env = env;
+        _ticketPurchaseSettings = ticketPurchaseSettings;
     }
 
     public IReadOnlyList<AdminDrawRow> Draws { get; private set; } = Array.Empty<AdminDrawRow>();
+    public TicketPurchaseSettingsView PurchaseSettings { get; private set; } = new(10, DateTimeOffset.MinValue, null);
     public string? StatusMessage { get; private set; }
     public bool StatusIsError { get; private set; }
+
+    [BindProperty]
+    public int TicketSlotsCount { get; set; } = 10;
 
     [TempData]
     public string? FlashMessage { get; set; }
@@ -81,9 +92,36 @@ public sealed class DrawsModel : LocalizedAdminPageModel
         return Page();
     }
 
+    public async Task<IActionResult> OnPostSavePurchaseSettingsAsync(CancellationToken ct)
+    {
+        await LoadUiTextAsync(ct);
+        await EnsureDebugSeedAsync(ct);
+
+        if (TicketSlotsCount < 1 || TicketSlotsCount > 50)
+        {
+            StatusMessage = await GetTextAsync("admin.draws.purchaseSettings.flash.invalidRange", "Ticket screen slot count must be between 1 and 50.", ct);
+            StatusIsError = true;
+            await LoadAsync(ct);
+            return Page();
+        }
+
+        await _ticketPurchaseSettings.SaveSettingsAsync(TicketSlotsCount, User.Identity?.Name ?? "admin", ct);
+        StatusMessage = await GetTextAsync("admin.draws.purchaseSettings.flash.saved", "Ticket purchase screen settings were saved.", ct);
+        StatusIsError = false;
+        await LoadAsync(ct);
+        return Page();
+    }
+
 
     private async Task LoadAsync(CancellationToken ct)
     {
+        var purchaseSettings = await _ticketPurchaseSettings.GetSettingsAsync(ct);
+        PurchaseSettings = new TicketPurchaseSettingsView(
+            purchaseSettings.TicketSlotsCount,
+            purchaseSettings.UpdatedAtUtc,
+            purchaseSettings.UpdatedByAdmin);
+        TicketSlotsCount = purchaseSettings.TicketSlotsCount;
+
         var ticketCounts = await _db.Tickets
             .AsNoTracking()
             .GroupBy(x => x.DrawId)

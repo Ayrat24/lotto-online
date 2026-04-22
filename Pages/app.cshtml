@@ -138,6 +138,8 @@
 
       <div id="jackpotCardsContainer" class="stack" hidden></div>
 
+      <div id="purchaseStatus" class="section-subtitle"></div>
+
       <!-- current draw card removed — its small helpers were migrated into the jackpot card above -->
 
     </section>
@@ -218,21 +220,36 @@
     </section>
   </main>
 
-  <div id="ticketPickerSheet" class="sheet" hidden>
-    <div id="ticketPickerBackdrop" class="sheet-backdrop"></div>
-    <div class="sheet-panel ticket-picker-panel">
-      <div class="sheet-header">
-        <div>
-          <div class="section-title" data-loc="client.picker.title">Pick your numbers</div>
-          <div class="section-subtitle" data-loc="client.picker.subtitle">Choose 5 unique numbers from 1 to 36.</div>
+  <div id="ticketPurchaseScreen" class="purchase-screen" hidden>
+    <div class="purchase-screen-panel" role="dialog" aria-modal="true" aria-labelledby="ticketPurchaseTitle">
+      <div class="purchase-screen-header">
+        <div class="purchase-screen-header-copy">
+          <div id="ticketPurchaseTitle" class="section-title" data-loc="client.purchaseScreen.title">Pick your tickets</div>
+          <div id="ticketPurchaseSubtitle" class="section-subtitle" data-loc="client.purchaseScreen.subtitle">Complete one or more tickets to buy them together.</div>
         </div>
-        <button id="closeTicketPickerBtn" type="button" class="sheet-close-btn" aria-label="Close picker" data-loc-aria-label="client.picker.closeAria">x</button>
+        <button id="closeTicketPurchaseScreenBtn" type="button" class="purchase-screen-close-btn" aria-label="Close purchase screen" data-loc-aria-label="client.purchaseScreen.closeAria">×</button>
       </div>
 
-      <div id="ticketPickerGrid" class="ticket-picker-grid" aria-label="Number picker" data-loc-aria-label="client.picker.gridAria"></div>
+      <div class="purchase-screen-draw-meta">
+        <div class="purchase-screen-draw-meta-line">
+          <span data-loc="client.purchaseScreen.drawPrefix">Draw #</span>
+          <strong id="ticketPurchaseDrawId">-</strong>
+        </div>
+        <div class="purchase-screen-draw-meta-line">
+          <span data-loc="client.currentDraw.ticketCostPrefix">Ticket cost:</span>
+          <strong id="ticketPurchaseDrawCost">$0.00</strong>
+        </div>
+      </div>
 
-      <div id="ticketPickerStatus" class="muted"></div>
-      <button id="confirmTicketNumbersBtn" type="button" data-loc="client.picker.confirm">Confirm numbers</button>
+      <div id="ticketPurchaseScreenStatus" class="muted purchase-screen-status"></div>
+      <div id="ticketPurchaseTicketsList" class="purchase-ticket-list"></div>
+
+      <div id="ticketPurchaseFooter" class="purchase-screen-footer" hidden>
+        <button id="submitTicketPurchaseBtn" type="button" class="purchase-screen-submit-btn">
+          <span id="submitTicketPurchaseLabel">Purchase tickets</span>
+          <span id="submitTicketPurchaseCost">$0.00</span>
+        </button>
+      </div>
     </div>
   </div>
 

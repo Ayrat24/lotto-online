@@ -77,9 +77,9 @@ public static class TicketsEndpoints
             return Results.Ok(new { ok = true, tickets });
         });
 
-        // Purchase a ticket for a selected active draw.
+        // Purchase multiple tickets for a selected active draw in one batch.
         endpoints.MapPost("/api/tickets/purchase", async (
-            PurchaseTicketRequest req,
+            PurchaseTicketsRequest req,
             HttpContext http,
             IConfiguration config,
             IWebHostEnvironment env,
@@ -125,19 +125,24 @@ public static class TicketsEndpoints
             if (req.DrawId <= 0 || !activeDraws.Any(x => x.Id == req.DrawId))
                 return Results.BadRequest(new { ok = false, error = "Selected draw is not active." });
 
-            if (!TryNormalizeSelectedNumbers(req.Numbers, out var numbers, out var validationError))
+            if (!TryNormalizeSelectedTickets(req.Tickets, out var normalizedTickets, out var validationError))
                 return Results.BadRequest(new { ok = false, error = validationError });
 
-            var purchaseResult = await wallet.TryPurchaseTicketAsync(u.Id, req.DrawId, numbers, ct);
-            if (!purchaseResult.Success || purchaseResult.Ticket is null)
-                return Results.BadRequest(new { ok = false, error = purchaseResult.Error ?? "Purchase failed.", balance = purchaseResult.UserBalance });
+            var purchaseResult = await wallet.TryPurchaseTicketsAsync(u.Id, req.DrawId, normalizedTickets, ct);
+            if (!purchaseResult.Success || purchaseResult.Tickets is null)
+                return Results.BadRequest(new { ok = false, error = purchaseResult.Error ?? "Purchase failed.", balance = purchaseResult.UserBalance, totalCost = purchaseResult.TotalCost });
 
-            var ticket = purchaseResult.Ticket;
+            var tickets = purchaseResult.Tickets
+                .Select(ticket => new TicketDto(ticket.Id, ticket.DrawId, ticket.Numbers, DrawManagement.ToTicketStatusValue(ticket.Status), ticket.PurchasedAtUtc, 0m))
+                .ToArray();
+
             return Results.Ok(new
             {
                 ok = true,
                 balance = purchaseResult.UserBalance,
-                ticket = new TicketDto(ticket.Id, ticket.DrawId, ticket.Numbers, DrawManagement.ToTicketStatusValue(ticket.Status), ticket.PurchasedAtUtc, 0m)
+                totalCost = purchaseResult.TotalCost,
+                purchasedCount = tickets.Length,
+                tickets
             });
         });
 
@@ -185,41 +190,46 @@ public static class TicketsEndpoints
         return endpoints;
     }
 
-    private static bool TryNormalizeSelectedNumbers(IReadOnlyList<int>? selectedNumbers, out string normalizedNumbers, out string error)
+    private static bool TryNormalizeSelectedTickets(IReadOnlyList<IReadOnlyList<int>>? selectedTickets, out IReadOnlyList<string> normalizedTickets, out string error)
     {
-        normalizedNumbers = string.Empty;
+        normalizedTickets = Array.Empty<string>();
         error = string.Empty;
 
-        if (selectedNumbers is null)
+        if (selectedTickets is null || selectedTickets.Count == 0)
         {
-            error = "Please select numbers first.";
+            error = "Select at least one completed ticket first.";
             return false;
         }
 
-        if (selectedNumbers.Count != DrawManagement.NumbersPerDraw)
+        var normalized = new List<string>(selectedTickets.Count);
+        foreach (var selectedNumbers in selectedTickets)
         {
-            error = $"Exactly {DrawManagement.NumbersPerDraw} numbers are required.";
-            return false;
-        }
-
-        var set = new HashSet<int>();
-        foreach (var n in selectedNumbers)
-        {
-            if (n < DrawManagement.MinNumber || n > DrawManagement.MaxNumber)
+            if (selectedNumbers.Count != DrawManagement.NumbersPerDraw)
             {
-                error = $"Each number must be between {DrawManagement.MinNumber} and {DrawManagement.MaxNumber}.";
+                error = $"Exactly {DrawManagement.NumbersPerDraw} numbers are required per ticket.";
                 return false;
             }
 
-            if (!set.Add(n))
+            var set = new HashSet<int>();
+            foreach (var n in selectedNumbers)
             {
-                error = "Numbers must be unique.";
-                return false;
+                if (n < DrawManagement.MinNumber || n > DrawManagement.MaxNumber)
+                {
+                    error = $"Each number must be between {DrawManagement.MinNumber} and {DrawManagement.MaxNumber}.";
+                    return false;
+                }
+
+                if (!set.Add(n))
+                {
+                    error = "Numbers must be unique.";
+                    return false;
+                }
             }
+
+            normalized.Add(string.Join(',', selectedNumbers));
         }
 
-        // Keep the original user-selected order for player-facing views.
-        normalizedNumbers = string.Join(',', selectedNumbers);
+        normalizedTickets = normalized;
         return true;
     }
 }

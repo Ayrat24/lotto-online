@@ -66,65 +66,100 @@ public sealed class WalletService : IWalletService
         return user.Balance;
     }
 
-    public async Task<WalletPurchaseResult> TryPurchaseTicketAsync(long userId, long drawId, string numbers, CancellationToken ct)
+    public async Task<WalletBatchPurchaseResult> TryPurchaseTicketsAsync(long userId, long drawId, IReadOnlyList<string> numbersByTicket, CancellationToken ct)
     {
+        if (numbersByTicket.Count == 0)
+            return new WalletBatchPurchaseResult(false, 0m, 0m, "Select at least one ticket first.");
+
         var draw = await _db.Draws.SingleOrDefaultAsync(x => x.Id == drawId, ct);
         if (draw is null)
-            return new WalletPurchaseResult(false, 0m, "Draw was not found.");
+            return new WalletBatchPurchaseResult(false, 0m, 0m, "Draw was not found.");
 
         if (draw.State != DrawState.Active)
-            return new WalletPurchaseResult(false, 0m, "Only active draws accept purchases.");
+            return new WalletBatchPurchaseResult(false, 0m, 0m, "Only active draws accept purchases.");
 
         if (draw.TicketCost <= 0)
-            return new WalletPurchaseResult(false, 0m, "Ticket cost is not configured for this draw.");
+            return new WalletBatchPurchaseResult(false, 0m, 0m, "Ticket cost is not configured for this draw.");
 
         var user = await _db.Users.SingleOrDefaultAsync(x => x.Id == userId, ct);
         if (user is null)
-            return new WalletPurchaseResult(false, 0m, "User was not found.");
+            return new WalletBatchPurchaseResult(false, 0m, 0m, "User was not found.");
 
-        var candidateSignature = BuildTicketSignature(numbers);
+        var requestedNumbers = numbersByTicket
+            .Select(x => string.Join(',', x
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(int.Parse)))
+            .ToArray();
+        var requestedSignatures = requestedNumbers
+            .Select(BuildTicketSignature)
+            .ToArray();
+        var uniqueRequestedSignatures = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var signature in requestedSignatures)
+        {
+            if (!uniqueRequestedSignatures.Add(signature))
+                return new WalletBatchPurchaseResult(false, user.Balance, 0m, "Completed tickets must use different number combinations.");
+        }
+
         var existingNumbers = await _db.Tickets
             .Where(x => x.UserId == userId && x.DrawId == drawId)
             .Select(x => x.Numbers)
             .AsNoTracking()
             .ToListAsync(ct);
 
-        if (existingNumbers.Any(x => BuildTicketSignature(x) == candidateSignature))
-            return new WalletPurchaseResult(false, user.Balance, "You already purchased this ticket for the selected draw.");
+        var existingSignatures = existingNumbers
+            .Select(BuildTicketSignature)
+            .ToHashSet(StringComparer.Ordinal);
 
-        var cost = RoundAmount(draw.TicketCost);
-        if (user.Balance < cost)
-            return new WalletPurchaseResult(false, user.Balance, "Insufficient balance.");
+        if (requestedSignatures.Any(existingSignatures.Contains))
+            return new WalletBatchPurchaseResult(false, user.Balance, 0m, "One of the selected tickets was already purchased for the selected draw.");
+
+        var costPerTicket = RoundAmount(draw.TicketCost);
+        var totalCost = RoundAmount(costPerTicket * requestedNumbers.Length);
+        if (user.Balance < totalCost)
+            return new WalletBatchPurchaseResult(false, user.Balance, totalCost, "Insufficient balance.");
 
         var serverWallet = await EnsureServerWalletAsync(ct);
         var now = DateTimeOffset.UtcNow;
+        var balanceBeforePurchase = user.Balance;
+        var serverBalanceBeforePurchase = serverWallet.Balance;
 
-        user.Balance = RoundAmount(user.Balance - cost);
-        serverWallet.Balance = RoundAmount(serverWallet.Balance + cost);
+        var createdTickets = new List<Ticket>(requestedNumbers.Length);
+        var userBalance = user.Balance;
+        var serverBalance = serverWallet.Balance;
+
+        foreach (var (numbers, signature) in requestedNumbers.Zip(requestedSignatures))
+        {
+            userBalance = RoundAmount(userBalance - costPerTicket);
+            serverBalance = RoundAmount(serverBalance + costPerTicket);
+
+            var ticket = new Ticket
+            {
+                UserId = user.Id,
+                DrawId = draw.Id,
+                Numbers = numbers,
+                NumbersSignature = signature,
+                Status = TicketStatus.AwaitingDraw,
+                PurchasedAtUtc = now
+            };
+
+            createdTickets.Add(ticket);
+            _db.Tickets.Add(ticket);
+            _db.WalletTransactions.Add(new WalletTransaction
+            {
+                UserId = user.Id,
+                Type = WalletTransactionType.TicketPurchase,
+                UserDelta = -costPerTicket,
+                UserBalanceAfter = userBalance,
+                ServerDelta = costPerTicket,
+                ServerBalanceAfter = serverBalance,
+                Reference = $"draw:{draw.Id}",
+                CreatedAtUtc = now
+            });
+        }
+
+        user.Balance = userBalance;
+        serverWallet.Balance = serverBalance;
         serverWallet.UpdatedAtUtc = now;
-
-        var ticket = new Ticket
-        {
-            UserId = user.Id,
-            DrawId = draw.Id,
-            Numbers = numbers,
-            NumbersSignature = candidateSignature,
-            Status = TicketStatus.AwaitingDraw,
-            PurchasedAtUtc = now
-        };
-
-        _db.Tickets.Add(ticket);
-        _db.WalletTransactions.Add(new WalletTransaction
-        {
-            UserId = user.Id,
-            Type = WalletTransactionType.TicketPurchase,
-            UserDelta = -cost,
-            UserBalanceAfter = user.Balance,
-            ServerDelta = cost,
-            ServerBalanceAfter = serverWallet.Balance,
-            Reference = $"draw:{draw.Id}",
-            CreatedAtUtc = now
-        });
 
         try
         {
@@ -133,9 +168,11 @@ public sealed class WalletService : IWalletService
         catch (DbUpdateException ex) when (ex.InnerException?.Message?.Contains("IX_tickets_UserId_DrawId_NumbersSignature", StringComparison.OrdinalIgnoreCase) == true
                                         || ex.Message.Contains("IX_tickets_UserId_DrawId_NumbersSignature", StringComparison.OrdinalIgnoreCase))
         {
-            return new WalletPurchaseResult(false, user.Balance, "You already purchased this ticket for the selected draw.");
+            user.Balance = balanceBeforePurchase;
+            serverWallet.Balance = serverBalanceBeforePurchase;
+            return new WalletBatchPurchaseResult(false, balanceBeforePurchase, totalCost, "One of the selected tickets was already purchased for the selected draw.");
         }
-        return new WalletPurchaseResult(true, user.Balance, null, ticket);
+        return new WalletBatchPurchaseResult(true, user.Balance, totalCost, null, createdTickets);
     }
 
     public async Task<WalletClaimResult> ClaimTicketWinningsAsync(long userId, long ticketId, CancellationToken ct)
@@ -419,7 +456,6 @@ public sealed class WalletService : IWalletService
             WithdrawalRequestStatus.Confirmed when isRejected => "rejected",
             WithdrawalRequestStatus.Pending => "waiting_for_admin_approval",
             WithdrawalRequestStatus.Denied => "rejected",
-            WithdrawalRequestStatus.Confirmed => "waiting_for_admin_approval",
             _ => "waiting_for_admin_approval"
         };
     }

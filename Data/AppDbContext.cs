@@ -20,6 +20,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<ReferralProgramSettings> ReferralProgramSettings => Set<ReferralProgramSettings>();
     public DbSet<ReferralReward> ReferralRewards => Set<ReferralReward>();
     public DbSet<NewsBanner> NewsBanners => Set<NewsBanner>();
+    public DbSet<TicketPurchaseSettings> TicketPurchaseSettings => Set<TicketPurchaseSettings>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -65,6 +66,17 @@ public sealed class AppDbContext : DbContext
             b.Property(x => x.MinQualifyingDepositAmount).HasPrecision(18, 2).IsRequired();
             b.Property(x => x.EligibilityWindowDays).IsRequired();
             b.Property(x => x.MonthlyInviterBonusCap).HasPrecision(18, 2).IsRequired();
+            b.Property(x => x.UpdatedByAdmin).HasMaxLength(128);
+            b.Property(x => x.UpdatedAtUtc).IsRequired();
+        });
+
+        modelBuilder.Entity<TicketPurchaseSettings>(b =>
+        {
+            b.ToTable("ticket_purchase_settings");
+            b.HasKey(x => x.Id);
+
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.TicketSlotsCount).IsRequired();
             b.Property(x => x.UpdatedByAdmin).HasMaxLength(128);
             b.Property(x => x.UpdatedAtUtc).IsRequired();
         });
