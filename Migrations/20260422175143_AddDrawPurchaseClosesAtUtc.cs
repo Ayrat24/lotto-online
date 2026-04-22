@@ -17,7 +17,7 @@ namespace MiniApp.Migrations
 
             migrationBuilder.Sql("""
                 UPDATE draws
-                SET \"PurchaseClosesAtUtc\" = COALESCE(\"PurchaseClosesAtUtc\", \"CreatedAtUtc\" + INTERVAL '1 hour')
+                SET "PurchaseClosesAtUtc" = COALESCE("PurchaseClosesAtUtc", "CreatedAtUtc" + INTERVAL '1 hour')
                 """);
 
             migrationBuilder.AlterColumn<DateTimeOffset>(
