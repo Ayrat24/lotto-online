@@ -61,6 +61,7 @@
   var currentDrawPrizePool4El = document.getElementById('currentDrawPrizePool4');
   var currentDrawPrizePool5El = document.getElementById('currentDrawPrizePool5');
   var newsBannerSectionEl = document.getElementById('newsBannerSection');
+  var newsBannerCarouselEl = document.getElementById('newsBannerCarousel');
   var newsBannerTrackEl = document.getElementById('newsBannerTrack');
   var newsBannerDotsEl = document.getElementById('newsBannerDots');
   var currentDrawNumbersWrapEl = document.getElementById('currentDrawNumbersWrap');
@@ -106,6 +107,13 @@
   var newsBanners = [];
   var newsBannerIndex = 0;
   var newsBannerAutoplayTimerId = null;
+  var newsBannerGestureBound = false;
+  var newsBannerDragPointerId = null;
+  var newsBannerDragStartX = 0;
+  var newsBannerDragDeltaX = 0;
+  var newsBannerDragActive = false;
+  var newsBannerDragMoved = false;
+  var newsBannerSuppressClickUntil = 0;
   var referralInviteCode = '';
   var referralInviteLink = '';
   var referralCodeFromQuery = '';
@@ -412,9 +420,14 @@
     newsBannerAutoplayTimerId = null;
   }
 
-  function updateNewsBannerPosition() {
+  function updateNewsBannerPosition(offsetPx) {
     if (newsBannerTrackEl) {
-      newsBannerTrackEl.style.transform = 'translateX(-' + (newsBannerIndex * 100) + '%)';
+      var pixelOffset = Number(offsetPx || 0);
+      if (pixelOffset === 0) {
+        newsBannerTrackEl.style.transform = 'translateX(-' + (newsBannerIndex * 100) + '%)';
+      } else {
+        newsBannerTrackEl.style.transform = 'translateX(calc(-' + (newsBannerIndex * 100) + '% + ' + pixelOffset + 'px))';
+      }
     }
 
     if (!newsBannerDotsEl) return;
@@ -425,6 +438,113 @@
       dots[i].classList.toggle('news-banner-dot-active', isActive);
       dots[i].setAttribute('aria-current', isActive ? 'true' : 'false');
     }
+  }
+
+  function getNewsBannerSwipeThreshold() {
+    var width = newsBannerCarouselEl ? Number(newsBannerCarouselEl.clientWidth || 0) : 0;
+    return Math.max(30, Math.round(width * 0.12));
+  }
+
+  function getNewsBannerAdjustedDragOffset(deltaX) {
+    var value = Number(deltaX || 0);
+    if (newsBanners.length <= 1) return 0;
+
+    if ((newsBannerIndex <= 0 && value > 0) || (newsBannerIndex >= newsBanners.length - 1 && value < 0)) {
+      value *= 0.35;
+    }
+
+    return value;
+  }
+
+  function endNewsBannerDrag(pointerId) {
+    if (!newsBannerDragActive || (pointerId != null && newsBannerDragPointerId !== pointerId)) return;
+
+    var swipeThreshold = getNewsBannerSwipeThreshold();
+    var finalDelta = newsBannerDragDeltaX;
+    var shouldAdvance = Math.abs(finalDelta) >= swipeThreshold;
+    var shouldSuppressClick = newsBannerDragMoved;
+
+    if (shouldAdvance && newsBanners.length > 1) {
+      if (finalDelta < 0 && newsBannerIndex < newsBanners.length - 1) {
+        newsBannerIndex++;
+      } else if (finalDelta > 0 && newsBannerIndex > 0) {
+        newsBannerIndex--;
+      }
+    }
+
+    newsBannerDragPointerId = null;
+    newsBannerDragActive = false;
+    newsBannerDragStartX = 0;
+    newsBannerDragDeltaX = 0;
+    newsBannerDragMoved = false;
+
+    if (newsBannerCarouselEl) {
+      newsBannerCarouselEl.classList.remove('news-banner-carousel-dragging');
+    }
+
+    if (shouldSuppressClick) {
+      newsBannerSuppressClickUntil = Date.now() + 250;
+    }
+
+    updateNewsBannerPosition();
+    startNewsBannerAutoplay();
+  }
+
+  function bindNewsBannerGestures() {
+    if (!newsBannerCarouselEl || newsBannerGestureBound) return;
+
+    newsBannerGestureBound = true;
+
+    newsBannerCarouselEl.addEventListener('pointerdown', function (event) {
+      if (!event) return;
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      if (newsBanners.length <= 1) return;
+
+      newsBannerDragPointerId = event.pointerId;
+      newsBannerDragActive = true;
+      newsBannerDragMoved = false;
+      newsBannerDragStartX = Number(event.clientX || 0);
+      newsBannerDragDeltaX = 0;
+      stopNewsBannerAutoplay();
+
+      if (newsBannerCarouselEl) {
+        newsBannerCarouselEl.classList.add('news-banner-carousel-dragging');
+      }
+
+      try {
+        if (typeof newsBannerCarouselEl.setPointerCapture === 'function') {
+          newsBannerCarouselEl.setPointerCapture(event.pointerId);
+        }
+      } catch (e) {
+      }
+    });
+
+    newsBannerCarouselEl.addEventListener('pointermove', function (event) {
+      if (!newsBannerDragActive || !event || newsBannerDragPointerId !== event.pointerId) return;
+
+      newsBannerDragDeltaX = Number(event.clientX || 0) - newsBannerDragStartX;
+      if (Math.abs(newsBannerDragDeltaX) > 8) {
+        newsBannerDragMoved = true;
+      }
+
+      if (newsBannerDragMoved && event.cancelable) {
+        event.preventDefault();
+      }
+
+      updateNewsBannerPosition(getNewsBannerAdjustedDragOffset(newsBannerDragDeltaX));
+    });
+
+    newsBannerCarouselEl.addEventListener('pointerup', function (event) {
+      endNewsBannerDrag(event && event.pointerId);
+    });
+
+    newsBannerCarouselEl.addEventListener('pointercancel', function (event) {
+      endNewsBannerDrag(event && event.pointerId);
+    });
+
+    newsBannerCarouselEl.addEventListener('lostpointercapture', function (event) {
+      endNewsBannerDrag(event && event.pointerId);
+    });
   }
 
   function startNewsBannerAutoplay() {
@@ -497,12 +617,15 @@
       : [];
 
     if (!newsBannerSectionEl) newsBannerSectionEl = document.getElementById('newsBannerSection');
+    if (!newsBannerCarouselEl) newsBannerCarouselEl = document.getElementById('newsBannerCarousel');
     if (!newsBannerTrackEl) newsBannerTrackEl = document.getElementById('newsBannerTrack');
     if (!newsBannerDotsEl) newsBannerDotsEl = document.getElementById('newsBannerDots');
 
-    if (!newsBannerSectionEl || !newsBannerTrackEl || !newsBannerDotsEl) {
+    if (!newsBannerSectionEl || !newsBannerCarouselEl || !newsBannerTrackEl || !newsBannerDotsEl) {
       return;
     }
+
+    bindNewsBannerGestures();
 
     stopNewsBannerAutoplay();
     newsBannerTrackEl.innerHTML = '';
@@ -528,7 +651,15 @@
         slide.type = 'button';
         slide.classList.add('news-banner-slide-actionable');
         slide.setAttribute('aria-label', t('client.news.bannerAltPrefix', 'News banner') + ' ' + (index + 1));
-        slide.addEventListener('click', function () {
+        slide.addEventListener('click', function (event) {
+          if (Date.now() < newsBannerSuppressClickUntil) {
+            if (event) {
+              event.preventDefault();
+              event.stopPropagation();
+            }
+            return;
+          }
+
           openNewsBannerAction(banner);
         });
       }

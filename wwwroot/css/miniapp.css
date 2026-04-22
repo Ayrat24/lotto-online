@@ -289,12 +289,23 @@ body.app-loading .loading-shell {
 
 .news-banner-carousel {
   overflow: hidden;
+  touch-action: pan-y;
+  user-select: none;
+  cursor: grab;
+}
+
+.news-banner-carousel.news-banner-carousel-dragging {
+  cursor: grabbing;
 }
 
 .news-banner-track {
   display: flex;
   transition: transform 260ms ease;
   will-change: transform;
+}
+
+.news-banner-carousel.news-banner-carousel-dragging .news-banner-track {
+  transition: none;
 }
 
 .news-banner-slide {
