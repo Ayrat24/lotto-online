@@ -80,6 +80,7 @@
   var debugModeBadgeEl = document.getElementById('debugModeBadge');
 
   var ticketPurchaseScreenEl = document.getElementById('ticketPurchaseScreen');
+  var ticketPurchasePanelEl = document.getElementById('ticketPurchasePanel');
   var closeTicketPurchaseScreenBtn = document.getElementById('closeTicketPurchaseScreenBtn');
   var ticketPurchaseSubtitleEl = document.getElementById('ticketPurchaseSubtitle');
   var ticketPurchaseDrawIdEl = document.getElementById('ticketPurchaseDrawId');
@@ -97,7 +98,7 @@
 
   var highlightTicketId = null;
   var lastStateSig = null;
-  var latestState = { balance: 0, currentDraw: null, activeDraws: [], activeTicketGroups: [], currentTickets: [], history: [], ticketPurchase: null };
+  var latestState = { balance: 0, serverNowUtc: null, currentDraw: null, activeDraws: [], activeTicketGroups: [], currentTickets: [], history: [], ticketPurchase: null };
   var selectedActiveDrawId = null;
   var appHasLoadedState = false;
   var initData = null;
@@ -132,6 +133,8 @@
   var purchaseScreenTicketStates = [];
   var purchaseScreenSubmitting = false;
   var pollingIntervalId = null;
+  var countdownIntervalId = null;
+  var serverClockOffsetMs = 0;
   var debugModeBadgeReason = '';
   var localDebugWatchdog = null;
 
@@ -398,6 +401,105 @@
     var amount = Number(value || 0);
     if (!Number.isFinite(amount)) amount = 0;
     return '$' + Math.round(amount).toLocaleString(getIntlLocale(), { maximumFractionDigits: 0 });
+  }
+
+  function syncServerClock(serverNowUtc) {
+    var serverNowMs = serverNowUtc ? Date.parse(serverNowUtc) : NaN;
+    if (!Number.isFinite(serverNowMs)) return;
+
+    serverClockOffsetMs = serverNowMs - Date.now();
+  }
+
+  function getServerNowMs() {
+    return Date.now() + serverClockOffsetMs;
+  }
+
+  function getDrawPurchaseCloseMs(draw) {
+    var closeMs = draw && draw.purchaseClosesAtUtc ? Date.parse(draw.purchaseClosesAtUtc) : NaN;
+    return Number.isFinite(closeMs) ? closeMs : null;
+  }
+
+  function formatCountdown(totalSeconds) {
+    var safeSeconds = Math.max(0, Math.floor(Number(totalSeconds || 0)));
+    var hours = Math.floor(safeSeconds / 3600);
+    var minutes = Math.floor((safeSeconds % 3600) / 60);
+    var seconds = safeSeconds % 60;
+
+    if (hours > 0) {
+      return String(hours).padStart(2, '0')
+        + ':' + String(minutes).padStart(2, '0')
+        + ':' + String(seconds).padStart(2, '0');
+    }
+
+    return String(minutes).padStart(2, '0')
+      + ':' + String(seconds).padStart(2, '0');
+  }
+
+  function isDrawPurchasable(draw) {
+    if (!draw || draw.state !== 'active' || draw.canPurchase === false) {
+      return false;
+    }
+
+    var closeMs = getDrawPurchaseCloseMs(draw);
+    return closeMs != null && closeMs > getServerNowMs();
+  }
+
+  function getDrawCountdownText(draw) {
+    if (!draw) {
+      return t('client.jackpot.endsIn', 'Ends in --:--:--');
+    }
+
+    if (draw.state !== 'active') {
+      return formatDrawStateLabel(draw.state);
+    }
+
+    var closeMs = getDrawPurchaseCloseMs(draw);
+    if (closeMs == null) {
+      return t('client.drawCard.noSchedule', 'Schedule pending');
+    }
+
+    var remainingSeconds = Math.floor((closeMs - getServerNowMs()) / 1000);
+    if (draw.canPurchase === false || remainingSeconds <= 0) {
+      return t('client.drawCard.salesClosed', 'Sales closed');
+    }
+
+    return formatCountdown(remainingSeconds);
+  }
+
+  function getDrawStatusText(draw) {
+    if (!draw) return '';
+    if (draw.state !== 'active') return formatDrawStateLabel(draw.state);
+    if (!isDrawPurchasable(draw)) return t('client.drawCard.salesClosed', 'Sales closed');
+    return '';
+  }
+
+  function getDrawUnavailableMessage(draw) {
+    if (draw && draw.state === 'active' && !isDrawPurchasable(draw)) {
+      return t('client.status.drawClosed', 'Ticket sales for this draw are closed.');
+    }
+
+    return t('client.status.noActiveDraw', 'There is no active draw right now.');
+  }
+
+  function refreshCountdownVisuals() {
+    var selected = resolveSelectedDrawSnapshot(latestState);
+    renderCurrentDraw(selected.draw, selected.tickets, selected.hasMultipleActiveDraws);
+    renderActiveDrawBanners(getActiveDraws(latestState), getActiveTicketGroups(latestState));
+    if (ticketPurchaseScreenEl && !ticketPurchaseScreenEl.hidden) {
+      renderTicketPurchaseScreen();
+    }
+  }
+
+  function startCountdownTimer() {
+    if (countdownIntervalId) return;
+
+    try {
+      countdownIntervalId = setInterval(function () {
+        refreshCountdownVisuals();
+      }, 1000);
+    } catch (e) {
+      countdownIntervalId = null;
+    }
   }
 
   function renderBalance(balanceValue) {
@@ -923,6 +1025,22 @@
     document.body.classList.toggle('sheet-open', hasOpenSheet);
   }
 
+  function syncTicketPurchaseFooterVisibility(showFooter) {
+    var shouldShow = !!showFooter;
+
+    if (!ticketPurchasePanelEl) {
+      ticketPurchasePanelEl = document.getElementById('ticketPurchasePanel');
+    }
+
+    if (ticketPurchaseFooterEl) {
+      ticketPurchaseFooterEl.hidden = !shouldShow;
+    }
+
+    if (ticketPurchasePanelEl) {
+      ticketPurchasePanelEl.classList.toggle('purchase-screen-panel-footer-visible', shouldShow);
+    }
+  }
+
   function createPurchaseTicketCard(ticketState, index) {
     var card = document.createElement('section');
     card.className = 'purchase-ticket-card';
@@ -1038,17 +1156,22 @@
     });
 
     var validation = getPurchaseScreenValidation();
+    var purchasable = isDrawPurchasable(draw);
     if (!purchaseScreenSubmitting) {
-      setTicketPurchaseScreenStatus(validation.ok ? '' : validation.message);
+      if (!draw || !purchasable) {
+        setTicketPurchaseScreenStatus(getDrawUnavailableMessage(draw));
+      } else {
+        setTicketPurchaseScreenStatus(validation.ok ? '' : validation.message);
+      }
     }
 
     var completedCount = validation.completedCount || 0;
     var totalCost = draw ? Number(draw.ticketCost || 0) * completedCount : 0;
-    if (ticketPurchaseFooterEl) ticketPurchaseFooterEl.hidden = completedCount <= 0;
+    syncTicketPurchaseFooterVisibility(completedCount > 0);
     if (submitTicketPurchaseLabelEl) submitTicketPurchaseLabelEl.textContent = formatPurchaseTicketsButtonLabel(completedCount);
     if (submitTicketPurchaseCostEl) submitTicketPurchaseCostEl.textContent = formatCurrency(totalCost);
     if (submitTicketPurchaseBtn) {
-      submitTicketPurchaseBtn.disabled = purchaseScreenSubmitting || !validation.ok || !draw || draw.state !== 'active';
+      submitTicketPurchaseBtn.disabled = purchaseScreenSubmitting || !validation.ok || !draw || !purchasable;
     }
   }
 
@@ -1243,134 +1366,80 @@
       return;
     }
 
-    var ticketCountByDrawId = {};
-    (activeTicketGroups || []).forEach(function (group) {
-      if (!group || group.drawId == null) return;
-      var count = Array.isArray(group.tickets) ? group.tickets.length : 0;
-      ticketCountByDrawId[group.drawId] = count;
-    });
-
     jackpotCardsContainerEl.innerHTML = '';
     jackpotCardsContainerEl.hidden = false;
+    jackpotCardsContainerEl.classList.add('draw-card-list');
 
     draws.forEach(function (draw) {
       var card = document.createElement('article');
-      card.className = 'card jackpot-card duplicate-jackpot-card purchase-entry-card';
-
-      var top = document.createElement('div');
-      top.className = 'jackpot-main';
-
-      var rowTop = document.createElement('div');
-      rowTop.className = 'jackpot-top';
-
-      var badge = document.createElement('span');
-      badge.className = 'state-badge ' + (draw.state === 'active' ? 'state-badge-active' : draw.state === 'finished' ? 'state-badge-finished' : 'state-badge-upcoming');
-      badge.textContent = formatDrawStateLabel(draw.state);
-
-      var stamp = document.createElement('span');
-      stamp.className = 'jackpot-time';
-      stamp.textContent = (draw.state === 'finished' ? t('client.currentDraw.concludedPrefix', 'Concluded ') : t('client.currentDraw.openedPrefix', 'Opened ')) + formatUtc(draw.createdAtUtc);
-
-      rowTop.appendChild(badge);
-      rowTop.appendChild(stamp);
-
-      var headline = document.createElement('div');
-      headline.className = 'jackpot-headline';
-
-      var title = document.createElement('span');
-      title.className = 'jackpot-title';
-      title.textContent = t('client.history.drawPrefix', 'Draw #') + draw.id;
-
-      var amount = document.createElement('span');
-      amount.className = 'jackpot-amount';
-      amount.textContent = formatJackpot(draw.prizePool);
-
-      headline.appendChild(title);
-      headline.appendChild(amount);
-
-      var tiers = document.createElement('div');
-      tiers.className = 'prize-tier-row';
-
-      function appendTier(label, value) {
-        var pill = document.createElement('div');
-        pill.className = 'prize-tier-pill';
-        var tierLabel = document.createElement('span');
-        tierLabel.className = 'prize-tier-label';
-        tierLabel.textContent = label;
-        var tierValue = document.createElement('span');
-        tierValue.className = 'prize-tier-value';
-        tierValue.textContent = '$' + formatPrizeTierPool(value);
-        pill.appendChild(tierLabel);
-        pill.appendChild(tierValue);
-        tiers.appendChild(pill);
+      card.className = 'card draw-card draw-card-compact duplicate-jackpot-card';
+      if (selectedActiveDrawId != null && draw.id === selectedActiveDrawId) {
+        card.classList.add('draw-card-selected');
+      }
+      if (!isDrawPurchasable(draw)) {
+        card.classList.add('draw-card-unavailable');
       }
 
-      appendTier('3/5', draw.prizePoolMatch3);
-      appendTier('4/5', draw.prizePoolMatch4);
-      appendTier('5/5', draw.prizePoolMatch5);
+      var header = document.createElement('div');
+      header.className = 'draw-card-header';
 
-      top.appendChild(rowTop);
-      top.appendChild(headline);
-      top.appendChild(tiers);
+      var title = document.createElement('div');
+      title.className = 'draw-card-title';
+      title.textContent = t('client.drawCard.titlePrefix', 'Draw #') + draw.id;
 
-      var buyRow = document.createElement('div');
-      buyRow.className = 'jackpot-buy-row';
+      var timer = document.createElement('div');
+      timer.className = 'draw-card-timer';
+      timer.textContent = getDrawCountdownText(draw);
+      if (!isDrawPurchasable(draw)) timer.classList.add('draw-card-timer-closed');
 
-      var buyLeft = document.createElement('div');
-      buyLeft.className = 'jackpot-buy-left';
+      header.appendChild(title);
+      header.appendChild(timer);
+
+      var status = document.createElement('div');
+      status.className = 'draw-card-status';
+      status.textContent = getDrawStatusText(draw);
+      status.hidden = !status.textContent;
+
+      var jackpotLabel = document.createElement('div');
+      jackpotLabel.className = 'draw-card-jackpot-label';
+      jackpotLabel.textContent = t('client.drawCard.jackpotLabel', 'JACKPOT');
+
+      var amount = document.createElement('div');
+      amount.className = 'draw-card-jackpot-value';
+      amount.textContent = formatJackpot(draw.prizePoolMatch5);
+
+      var footer = document.createElement('div');
+      footer.className = 'draw-card-footer';
+
+      var costBlock = document.createElement('div');
+      costBlock.className = 'draw-card-cost-block';
 
       var costLabel = document.createElement('div');
-      costLabel.className = 'jackpot-buy-price-label';
-      costLabel.textContent = t('client.currentDraw.ticketCostPrefix', 'Ticket cost:');
+      costLabel.className = 'draw-card-cost-label';
+      costLabel.textContent = t('client.drawCard.ticketCostLabel', 'Ticket cost');
 
       var costValue = document.createElement('div');
-      costValue.className = 'jackpot-buy-price';
+      costValue.className = 'draw-card-cost-value';
       costValue.textContent = formatCurrency(draw.ticketCost);
 
-      buyLeft.appendChild(costLabel);
-      buyLeft.appendChild(costValue);
+      costBlock.appendChild(costLabel);
+      costBlock.appendChild(costValue);
+      footer.appendChild(costBlock);
 
-      var buyRight = document.createElement('div');
-      buyRight.className = 'jackpot-buy-right';
-
-      var countText = document.createElement('div');
-      countText.className = 'jackpot-buy-ticket-count';
-      countText.textContent = t('client.tickets.title', 'My tickets') + ': ' + (ticketCountByDrawId[draw.id] || 0);
-
-      var buyBtn = document.createElement('button');
-      buyBtn.type = 'button';
-      buyBtn.className = 'jackpot-buy-btn';
-      buyBtn.textContent = t('client.button.purchase', 'Purchase ticket');
-      buyBtn.disabled = draw.state !== 'active';
-      buyBtn.title = draw.state === 'active' ? '' : t('client.currentDraw.activeOnlyTitle', 'Only the active draw accepts purchases.');
-
-      buyBtn.addEventListener('click', function (event) {
-        event.preventDefault();
-        event.stopPropagation();
-
-        if (draw.state !== 'active') {
-          setPurchaseStatus(t('client.status.noActiveDraw', 'There is no active draw right now.'));
-          return;
-        }
-
-        selectedActiveDrawId = draw.id;
-        currentDisplayedDrawId = draw.id;
-        setPurchaseStatus('');
-        openTicketPurchaseScreen(draw.id);
-      });
-
-      buyRight.appendChild(countText);
-      buyRight.appendChild(buyBtn);
-
-      buyRow.appendChild(buyLeft);
-      buyRow.appendChild(buyRight);
-
-      card.appendChild(top);
-      card.appendChild(buyRow);
+      card.appendChild(header);
+      card.appendChild(status);
+      card.appendChild(jackpotLabel);
+      card.appendChild(amount);
+      card.appendChild(footer);
 
       card.addEventListener('click', function () {
         selectedActiveDrawId = draw.id;
         currentDisplayedDrawId = draw.id;
+        if (!isDrawPurchasable(draw)) {
+          setPurchaseStatus(getDrawUnavailableMessage(draw));
+          return;
+        }
+
         setPurchaseStatus('');
         openTicketPurchaseScreen(draw.id);
       });
@@ -1390,27 +1459,22 @@
     // legacy picker removed; banners will be rendered instead
 
     if (!draw) {
-      if (jackpotChipEl) jackpotChipEl.textContent = t('client.currentDraw.waiting', 'waiting');
-        if (currentDrawStateBadgeEl) {
-          currentDrawStateBadgeEl.textContent = t('client.currentDraw.waiting', 'waiting');
-          currentDrawStateBadgeEl.className = 'state-badge state-badge-muted';
-        }
+      if (currentDrawStateBadgeEl) {
+        currentDrawStateBadgeEl.textContent = '';
+        currentDrawStateBadgeEl.hidden = true;
+      }
         if (currentDrawEmptyEl) currentDrawEmptyEl.hidden = false;
         if (currentDrawContentEl) currentDrawContentEl.hidden = true;
-      if (currentDrawIdEl) currentDrawIdEl.textContent = t('client.jackpot.prizePoolTitle', 'Prize pool :');
+      if (featuredJackpotCardEl) featuredJackpotCardEl.classList.remove('draw-card-unavailable');
+      if (currentDrawIdEl) currentDrawIdEl.textContent = t('client.drawCard.titlePrefix', 'Draw #') + '—';
       if (currentDrawPrizePoolEl) currentDrawPrizePoolEl.textContent = '$0.00';
       if (currentDrawCreatedAtEl) currentDrawCreatedAtEl.textContent = t('client.jackpot.endsIn', 'Ends in --:--:--');
       if (jackpotAmountEl) jackpotAmountEl.textContent = '$0';
-      if (jackpotSubtitleEl) jackpotSubtitleEl.textContent = t('client.jackpot.subtitle', 'The next draw is coming soon. Get your tickets now.');
+      if (jackpotSubtitleEl) jackpotSubtitleEl.textContent = t('client.drawCard.jackpotLabel', 'JACKPOT');
       if (currentDrawPrizeTiersEl) currentDrawPrizeTiersEl.setAttribute('hidden', 'hidden');
       if (currentDrawPrizePool3El) currentDrawPrizePool3El.textContent = '$0.00';
       if (currentDrawPrizePool4El) currentDrawPrizePool4El.textContent = '$0.00';
       if (currentDrawPrizePool5El) currentDrawPrizePool5El.textContent = '$0.00';
-      if (purchaseBtn) {
-        purchaseBtn.disabled = true;
-        purchaseBtn.hidden = false;
-        purchaseBtn.title = t('client.currentDraw.noActiveTitle', 'No active draw available.');
-      }
       if (currentDrawSubtitleEl) currentDrawSubtitleEl.hidden = false;
       if (currentDrawTicketPriceRowEl) currentDrawTicketPriceRowEl.hidden = false;
       if (currentDrawTicketCostEl) currentDrawTicketCostEl.textContent = '$2.00';
@@ -1419,21 +1483,30 @@
       return;
     }
 
+    var purchasable = isDrawPurchasable(draw);
     var isFinishedDraw = draw.state === 'finished';
 
     if (currentDrawStateBadgeEl) {
-      currentDrawStateBadgeEl.textContent = formatDrawStateLabel(draw.state);
-      currentDrawStateBadgeEl.className = 'state-badge ' + (draw.state === 'active' ? 'state-badge-active' : draw.state === 'finished' ? 'state-badge-finished' : 'state-badge-upcoming');
+      currentDrawStateBadgeEl.textContent = getDrawStatusText(draw);
+      currentDrawStateBadgeEl.hidden = !currentDrawStateBadgeEl.textContent;
     }
     if (jackpotChipEl) jackpotChipEl.textContent = formatDrawStateLabel(draw.state);
     if (currentDrawEmptyEl) currentDrawEmptyEl.hidden = true;
     if (currentDrawContentEl) currentDrawContentEl.hidden = false;
+    if (featuredJackpotCardEl) {
+      featuredJackpotCardEl.classList.toggle('draw-card-unavailable', !purchasable);
+      featuredJackpotCardEl.classList.toggle('draw-card-selected', !!purchasable);
+    }
 
-    if (currentDrawIdEl) currentDrawIdEl.textContent = t('client.jackpot.prizePoolTitle', 'Prize pool :');
+    if (currentDrawIdEl) currentDrawIdEl.textContent = t('client.drawCard.titlePrefix', 'Draw #') + draw.id;
     if (currentDrawPrizePoolEl) currentDrawPrizePoolEl.textContent = '$' + formatPrizePool(draw.prizePool);
-    if (currentDrawCreatedAtEl) currentDrawCreatedAtEl.textContent = (draw.state === 'finished' ? t('client.currentDraw.concludedPrefix', 'Concluded ') : t('client.currentDraw.openedPrefix', 'Opened ')) + formatUtc(draw.createdAtUtc);
-    if (jackpotAmountEl) jackpotAmountEl.textContent = formatJackpot(draw.prizePool);
-    if (currentDrawPrizeTiersEl) currentDrawPrizeTiersEl.removeAttribute('hidden');
+    if (currentDrawCreatedAtEl) {
+      currentDrawCreatedAtEl.textContent = getDrawCountdownText(draw);
+      currentDrawCreatedAtEl.classList.toggle('draw-card-timer-closed', !purchasable);
+    }
+    if (jackpotAmountEl) jackpotAmountEl.textContent = formatJackpot(draw.prizePoolMatch5 || 0);
+    if (jackpotSubtitleEl) jackpotSubtitleEl.textContent = t('client.drawCard.jackpotLabel', 'JACKPOT');
+    if (currentDrawPrizeTiersEl) currentDrawPrizeTiersEl.setAttribute('hidden', 'hidden');
     if (currentDrawPrizePool3El) currentDrawPrizePool3El.textContent = '$' + formatPrizeTierPool(draw.prizePoolMatch3 || 0);
     if (currentDrawPrizePool4El) currentDrawPrizePool4El.textContent = '$' + formatPrizeTierPool(draw.prizePoolMatch4 || 0);
     if (currentDrawPrizePool5El) currentDrawPrizePool5El.textContent = '$' + formatPrizeTierPool(draw.prizePoolMatch5 || 0);
@@ -1444,32 +1517,8 @@
       currentDisplayedDrawId = draw ? draw.id : null;
       var jackpotPriceEl = document.getElementById('jackpotBuyPrice');
       if (jackpotPriceEl) jackpotPriceEl.textContent = formatCurrency(draw ? draw.ticketCost : 0);
-
-      if (purchaseBtn) {
-        // Ensure purchase button is visible and enabled only for active draws
-        purchaseBtn.hidden = false;
-        purchaseBtn.disabled = draw ? draw.state !== 'active' : true;
-        purchaseBtn.title = draw && draw.state === 'active' ? '' : t('client.currentDraw.activeOnlyTitle', 'Only the active draw accepts purchases.');
-      }
     } catch (e) {
       try { console.warn('renderCurrentDraw jackpot update error', e); } catch (e) { }
-    }
-
-    var hasWinningsAvailable = false;
-    (currentTickets || []).forEach(function (ticket) {
-      if (ticket && ticket.status === 'winnings_available') hasWinningsAvailable = true;
-    });
-
-    if (jackpotSubtitleEl) {
-      if (draw.state === 'active') {
-        jackpotSubtitleEl.textContent = t('client.currentDraw.liveSubtitle', 'The draw is live. Don\'t miss your chance to become a multi-millionaire!');
-      } else if (draw.state === 'finished' && hasWinningsAvailable) {
-        jackpotSubtitleEl.textContent = t('client.currentDraw.finishedWithWinnings', 'This draw is finished and your winnings are ready to claim.');
-      } else if (draw.state === 'finished') {
-        jackpotSubtitleEl.textContent = t('client.currentDraw.finishedNoWinnings', 'This draw is finished. Check your tickets against the result numbers.');
-      } else {
-        jackpotSubtitleEl.textContent = t('client.jackpot.subtitle', 'The next draw is coming soon. Get your tickets now.');
-      }
     }
 
     var hasNumbers = !!(draw.numbers && String(draw.numbers).length > 0);
@@ -1477,12 +1526,6 @@
     if (currentDrawNumbersEl) {
       currentDrawNumbersEl.innerHTML = '';
       if (hasNumbers) currentDrawNumbersEl.appendChild(createNumbersRow(draw.numbers, draw.numbers));
-    }
-
-    if (purchaseBtn) {
-      purchaseBtn.disabled = draw.state !== 'active';
-      purchaseBtn.hidden = isFinishedDraw;
-      purchaseBtn.title = draw.state === 'active' ? '' : t('client.currentDraw.activeOnlyTitle', 'Only the active draw accepts purchases.');
     }
 
     if (currentDrawSubtitleEl) currentDrawSubtitleEl.hidden = isFinishedDraw;
@@ -1652,6 +1695,12 @@
     if (!ticketPurchaseScreenEl) return;
 
     purchaseScreenDrawId = drawId != null ? drawId : currentDisplayedDrawId;
+    var draw = getPurchaseScreenDraw();
+    if (!draw || !isDrawPurchasable(draw)) {
+      setPurchaseStatus(getDrawUnavailableMessage(draw));
+      return;
+    }
+
     purchaseScreenSubmitting = false;
     ensurePurchaseScreenTicketStates();
     setTicketPurchaseScreenStatus('');
@@ -1666,6 +1715,7 @@
     ticketPurchaseScreenEl.hidden = true;
     purchaseScreenSubmitting = false;
     setTicketPurchaseScreenStatus('');
+    syncTicketPurchaseFooterVisibility(false);
     setSheetOpenClass();
   }
 
@@ -1673,8 +1723,8 @@
     if (!initData) return;
 
     var draw = getPurchaseScreenDraw();
-    if (!draw || draw.state !== 'active') {
-      setTicketPurchaseScreenStatus(t('client.status.noActiveDraw', 'There is no active draw right now.'));
+    if (!draw || !isDrawPurchasable(draw)) {
+      setTicketPurchaseScreenStatus(getDrawUnavailableMessage(draw));
       return;
     }
 
@@ -1820,7 +1870,9 @@
           ticketCost: state.currentDraw.ticketCost,
           state: state.currentDraw.state,
           numbers: state.currentDraw.numbers || null,
-          createdAtUtc: state.currentDraw.createdAtUtc || null
+          createdAtUtc: state.currentDraw.createdAtUtc || null,
+          purchaseClosesAtUtc: state.currentDraw.purchaseClosesAtUtc || null,
+          canPurchase: !!state.currentDraw.canPurchase
         } : null,
         activeDraws: (state && state.activeDraws || []).map(function (draw) {
           return {
@@ -1832,7 +1884,9 @@
             ticketCost: draw.ticketCost,
             state: draw.state,
             numbers: draw.numbers || null,
-            createdAtUtc: draw.createdAtUtc || null
+            createdAtUtc: draw.createdAtUtc || null,
+            purchaseClosesAtUtc: draw.purchaseClosesAtUtc || null,
+            canPurchase: !!draw.canPurchase
           };
         }),
         activeTicketGroups: (state && state.activeTicketGroups || []).map(function (group) {
@@ -1868,7 +1922,9 @@
               prizePool: group.draw.prizePool,
               state: group.draw.state,
               numbers: group.draw.numbers || null,
-              createdAtUtc: group.draw.createdAtUtc || null
+              createdAtUtc: group.draw.createdAtUtc || null,
+              purchaseClosesAtUtc: group.draw.purchaseClosesAtUtc || null,
+              canPurchase: !!group.draw.canPurchase
             } : null,
             tickets: (group.tickets || []).map(function (ticket) {
               return {
@@ -1887,7 +1943,8 @@
           minNumber: Number(state.ticketPurchase.minNumber || 0),
           maxNumber: Number(state.ticketPurchase.maxNumber || 0)
         } : null,
-        balance: state && Number.isFinite(Number(state.balance)) ? Number(state.balance) : 0
+        balance: state && Number.isFinite(Number(state.balance)) ? Number(state.balance) : 0,
+        serverNowUtc: state && state.serverNowUtc ? String(state.serverNowUtc) : null
       });
     } catch (e) {
       return String(Math.random());
@@ -1895,7 +1952,8 @@
   }
 
   function applyState(state) {
-    latestState = state || { balance: 0, currentDraw: null, activeDraws: [], activeTicketGroups: [], currentTickets: [], history: [], ticketPurchase: null };
+    latestState = state || { balance: 0, serverNowUtc: null, currentDraw: null, activeDraws: [], activeTicketGroups: [], currentTickets: [], history: [], ticketPurchase: null };
+    syncServerClock(latestState.serverNowUtc);
 
     var purchaseConfig = getTicketPurchaseConfig(latestState);
     if (purchaseConfig) {
@@ -2021,10 +2079,14 @@
           if (!found) highlightTicketId = null;
         }
 
+        syncServerClock(res.state.serverNowUtc);
+
         var sig = computeStateSig(res.state);
         if (sig !== lastStateSig) {
           lastStateSig = sig;
           applyState(res.state);
+        } else {
+          refreshCountdownVisuals();
         }
 
         markAppReady();
@@ -2427,8 +2489,8 @@
   function purchaseTicket() {
     if (!initData) return;
     var selected = resolveSelectedDrawSnapshot(latestState);
-    if (!selected.draw || selected.draw.state !== 'active') {
-      setPurchaseStatus(t('client.status.noActiveDraw', 'There is no active draw right now.'));
+    if (!selected.draw || !isDrawPurchasable(selected.draw)) {
+      setPurchaseStatus(getDrawUnavailableMessage(selected.draw));
       return;
     }
 
@@ -2499,6 +2561,7 @@
 
   loadLocaleFromCache();
 
+  startCountdownTimer();
   ensurePurchaseScreenTicketStates();
   setActiveTab('lottery');
   setProfileScreen('home');

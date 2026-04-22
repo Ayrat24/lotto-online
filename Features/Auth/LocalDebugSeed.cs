@@ -43,7 +43,8 @@ public static class LocalDebugSeed
                 TicketCost = 2m,
                 State = DrawState.Finished,
                 Numbers = DrawManagement.GenerateDrawNumbers(),
-                CreatedAtUtc = now.AddHours(-3 + finishedDraws.Count)
+                CreatedAtUtc = now.AddHours(-3 + finishedDraws.Count),
+                PurchaseClosesAtUtc = now.AddHours(-2 + finishedDraws.Count)
             };
 
             db.Draws.Add(finished);
@@ -90,7 +91,8 @@ public static class LocalDebugSeed
                         PrizePoolMatch5 = 70m + activeDraws.Count * 30m,
                         TicketCost = 2m,
                         State = DrawState.Active,
-                        CreatedAtUtc = now.AddHours(-1).AddMinutes(-20 * activeDraws.Count)
+                        CreatedAtUtc = now.AddHours(-1).AddMinutes(-20 * activeDraws.Count),
+                        PurchaseClosesAtUtc = now.AddMinutes(45 + (activeDraws.Count * 20))
                     };
 
                     db.Draws.Add(drawToActivate);
@@ -111,16 +113,35 @@ public static class LocalDebugSeed
         {
             upcomingDraw = new Draw
             {
-                Id = nextId++,
+                Id = nextId,
                 PrizePoolMatch3 = 120m,
                 PrizePoolMatch4 = 70m,
                 PrizePoolMatch5 = 110m,
                 TicketCost = 2m,
                 State = DrawState.Upcoming,
-                CreatedAtUtc = now
+                CreatedAtUtc = now,
+                PurchaseClosesAtUtc = now.AddHours(3)
             };
+            nextId++;
             db.Draws.Add(upcomingDraw);
             draws.Add(upcomingDraw);
+        }
+
+        for (var i = 0; i < activeDraws.Count; i++)
+        {
+            activeDraws[i].PurchaseClosesAtUtc = now.AddMinutes(45 + (i * 20));
+        }
+
+        foreach (var draw in draws.Where(x => x.State == DrawState.Upcoming))
+        {
+            if (draw.PurchaseClosesAtUtc <= now)
+                draw.PurchaseClosesAtUtc = now.AddHours(3);
+        }
+
+        foreach (var draw in draws.Where(x => x.State == DrawState.Finished))
+        {
+            if (draw.PurchaseClosesAtUtc > now)
+                draw.PurchaseClosesAtUtc = draw.CreatedAtUtc.AddHours(1);
         }
 
         await db.SaveChangesAsync(ct);
@@ -207,11 +228,7 @@ public static class LocalDebugSeed
         {
             user.PreferredLanguage ??= "en";
             if (user.Balance < minBalance)
-            {
                 user.Balance = minBalance;
-                await db.SaveChangesAsync(ct);
-                return;
-            }
 
             await db.SaveChangesAsync(ct);
             return;

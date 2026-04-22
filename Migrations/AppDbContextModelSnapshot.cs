@@ -122,6 +122,9 @@ namespace MiniApp.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<DateTimeOffset>("PurchaseClosesAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("State")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -134,6 +137,8 @@ namespace MiniApp.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CreatedAtUtc");
+
+                    b.HasIndex("PurchaseClosesAtUtc");
 
                     b.HasIndex("State");
 

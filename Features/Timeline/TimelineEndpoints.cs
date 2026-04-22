@@ -20,6 +20,7 @@ public static class TimelineEndpoints
             ITicketPurchaseSettingsService ticketPurchaseSettings,
             CancellationToken ct) =>
         {
+            var nowUtc = DateTimeOffset.UtcNow;
             long telegramUserId;
 
             if (LocalDebugMode.TryGetDebugTelegramUserId(http, config, env, out var localDebugUserId))
@@ -82,10 +83,10 @@ public static class TimelineEndpoints
 
             var currentDraw = featuredDrawEntity is null
                 ? null
-                : DrawManagement.ToDto(featuredDrawEntity);
+                : DrawManagement.ToDto(featuredDrawEntity, nowUtc);
 
             var activeDraws = activeDrawEntities
-                .Select(DrawManagement.ToDto)
+                .Select(x => DrawManagement.ToDto(x, nowUtc))
                 .ToArray();
 
             var ticketRows = user is null
@@ -151,7 +152,7 @@ public static class TimelineEndpoints
                     .Where(x => historyDrawIds.Contains(x.Id))
                     .AsNoTracking()
                     .ToListAsync(ct))
-                    .Select(DrawManagement.ToDto)
+                    .Select(x => DrawManagement.ToDto(x, nowUtc))
                     .ToDictionary(x => x.Id);
 
             var history = historyTicketGroups
@@ -169,7 +170,7 @@ public static class TimelineEndpoints
                 DrawManagement.MinNumber,
                 DrawManagement.MaxNumber);
 
-            var state = new MiniAppStateDto(user?.Balance ?? 0m, currentDraw, activeDraws, activeTicketGroups, currentTickets, history, ticketPurchase);
+            var state = new MiniAppStateDto(user?.Balance ?? 0m, nowUtc, currentDraw, activeDraws, activeTicketGroups, currentTickets, history, ticketPurchase);
             return Results.Ok(new { ok = true, state });
         });
 

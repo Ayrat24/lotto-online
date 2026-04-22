@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using MiniApp.Data;
 
@@ -9,13 +10,14 @@ internal static class DrawManagement
     public const int MinNumber = 1;
     public const int MaxNumber = 36;
 
-    public static async Task<Draw> CreateDrawAsync(AppDbContext db, decimal prizePoolMatch3, decimal prizePoolMatch4, decimal prizePoolMatch5, decimal ticketCost, CancellationToken ct)
+    public static async Task<Draw> CreateDrawAsync(AppDbContext db, decimal prizePoolMatch3, decimal prizePoolMatch4, decimal prizePoolMatch5, decimal ticketCost, DateTimeOffset? purchaseClosesAtUtc, CancellationToken ct)
     {
         EnsurePrizePool(prizePoolMatch3, "3/5");
         EnsurePrizePool(prizePoolMatch4, "4/5");
         EnsurePrizePool(prizePoolMatch5, "5/5");
         EnsureTicketCost(ticketCost);
 
+        var nowUtc = DateTimeOffset.UtcNow;
         var nextId = (await db.Draws.MaxAsync(x => (long?)x.Id, ct) ?? 0) + 1;
         var draw = new Draw
         {
@@ -25,7 +27,8 @@ internal static class DrawManagement
             PrizePoolMatch5 = RoundPrizePool(prizePoolMatch5),
             TicketCost = RoundMoney(ticketCost),
             State = DrawState.Active,
-            CreatedAtUtc = DateTimeOffset.UtcNow
+            CreatedAtUtc = nowUtc,
+            PurchaseClosesAtUtc = NormalizePurchaseClosesAtUtc(purchaseClosesAtUtc, GetDefaultPurchaseClosesAtUtc(nowUtc))
         };
 
         db.Draws.Add(draw);
@@ -33,7 +36,7 @@ internal static class DrawManagement
         return draw;
     }
 
-    public static async Task UpdateDrawAsync(AppDbContext db, Draw draw, decimal prizePoolMatch3, decimal prizePoolMatch4, decimal prizePoolMatch5, decimal ticketCost, DrawState state, CancellationToken ct)
+    public static async Task UpdateDrawAsync(AppDbContext db, Draw draw, decimal prizePoolMatch3, decimal prizePoolMatch4, decimal prizePoolMatch5, decimal ticketCost, DrawState state, DateTimeOffset? purchaseClosesAtUtc, CancellationToken ct)
     {
         EnsurePrizePool(prizePoolMatch3, "3/5");
         EnsurePrizePool(prizePoolMatch4, "4/5");
@@ -52,6 +55,7 @@ internal static class DrawManagement
         draw.PrizePoolMatch5 = RoundPrizePool(prizePoolMatch5);
         draw.TicketCost = RoundMoney(ticketCost);
         draw.State = state;
+        draw.PurchaseClosesAtUtc = NormalizePurchaseClosesAtUtc(purchaseClosesAtUtc, draw.PurchaseClosesAtUtc);
         await db.SaveChangesAsync(ct);
     }
 
@@ -83,8 +87,9 @@ internal static class DrawManagement
         await db.SaveChangesAsync(ct);
     }
 
-    public static DrawDto ToDto(Draw draw)
+    public static DrawDto ToDto(Draw draw, DateTimeOffset? nowUtc = null)
     {
+        var effectiveNowUtc = nowUtc?.ToUniversalTime() ?? DateTimeOffset.UtcNow;
         var totalPrizePool = draw.PrizePoolMatch3 + draw.PrizePoolMatch4 + draw.PrizePoolMatch5;
         return new(
             draw.Id,
@@ -95,7 +100,35 @@ internal static class DrawManagement
             draw.TicketCost,
             ToStateValue(draw.State),
             draw.Numbers,
-            draw.CreatedAtUtc);
+            draw.CreatedAtUtc,
+            draw.PurchaseClosesAtUtc,
+            CanPurchase(draw, effectiveNowUtc));
+    }
+
+    public static bool CanPurchase(Draw draw, DateTimeOffset nowUtc)
+        => draw.State == DrawState.Active && draw.PurchaseClosesAtUtc > nowUtc.ToUniversalTime();
+
+    public static DateTimeOffset GetDefaultPurchaseClosesAtUtc(DateTimeOffset nowUtc)
+        => nowUtc.ToUniversalTime().AddHours(1);
+
+    public static string FormatAdminUtcInput(DateTimeOffset value)
+        => value.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture);
+
+    public static bool TryParseAdminUtcInput(string? value, out DateTimeOffset purchaseClosesAtUtc)
+    {
+        if (DateTime.TryParseExact(
+            value,
+            ["yyyy-MM-ddTHH:mm", "yyyy-MM-ddTHH:mm:ss"],
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out var parsed))
+        {
+            purchaseClosesAtUtc = new DateTimeOffset(DateTime.SpecifyKind(parsed, DateTimeKind.Utc));
+            return true;
+        }
+
+        purchaseClosesAtUtc = default;
+        return false;
     }
 
     public static bool TryParseEditableState(string? value, out DrawState state)
@@ -151,8 +184,7 @@ internal static class DrawManagement
     private static string NormalizeManualDrawNumbers(string manualNumbers)
     {
         var parts = manualNumbers
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .ToArray();
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
         if (parts.Length != NumbersPerDraw)
             throw new InvalidOperationException($"Provide exactly {NumbersPerDraw} numbers separated by commas.");
@@ -180,6 +212,9 @@ internal static class DrawManagement
 
     private static decimal RoundMoney(decimal value)
         => decimal.Round(value, 2, MidpointRounding.AwayFromZero);
+
+    private static DateTimeOffset NormalizePurchaseClosesAtUtc(DateTimeOffset? purchaseClosesAtUtc, DateTimeOffset fallbackUtc)
+        => purchaseClosesAtUtc?.ToUniversalTime() ?? fallbackUtc.ToUniversalTime();
 
 
     private static void EnsurePrizePool(decimal prizePool, string tier)

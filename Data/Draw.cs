@@ -21,6 +21,8 @@ public sealed class Draw
 
     public DrawState State { get; set; } = DrawState.Upcoming;
 
+    public DateTimeOffset PurchaseClosesAtUtc { get; set; } = DateTimeOffset.UtcNow.AddHours(1);
+
     /// <summary>
     /// 5 distinct numbers in range 1..36 (sorted), stored as "n1,n2,n3,n4,n5".
     /// </summary>

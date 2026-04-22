@@ -158,6 +158,7 @@ public sealed class AppDbContext : DbContext
             b.Property(x => x.Id).ValueGeneratedNever();
 
             b.HasIndex(x => x.CreatedAtUtc);
+            b.HasIndex(x => x.PurchaseClosesAtUtc);
             b.HasIndex(x => x.State);
 
             b.Property(x => x.PrizePoolMatch3).HasPrecision(18, 2).IsRequired();
@@ -168,6 +169,7 @@ public sealed class AppDbContext : DbContext
                 .HasConversion<string>()
                 .HasMaxLength(32)
                 .IsRequired();
+            b.Property(x => x.PurchaseClosesAtUtc).IsRequired();
             b.Property(x => x.Numbers).HasMaxLength(64);
             b.Property(x => x.CreatedAtUtc).IsRequired();
         });

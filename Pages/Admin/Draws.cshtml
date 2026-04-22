@@ -51,6 +51,11 @@
                 <input id="createTicketCost" name="ticketCost" type="number" min="0.01" step="0.01" value="2" class="form-control" />
             </div>
             <div class="col-sm-6 col-md-4">
+                <label asp-for="CreatePurchaseClosesAtUtc" class="form-label">@Model.T("admin.draws.create.purchaseClosesAtUtc", "Ticket sales close at (UTC)")</label>
+                <input asp-for="CreatePurchaseClosesAtUtc" type="datetime-local" step="60" class="form-control" />
+                <div class="form-text">@Model.T("admin.draws.create.purchaseClosesAtUtcHint", "The client countdown stops ticket purchases at this UTC time, but the draw still must be executed manually by admin.")</div>
+            </div>
+            <div class="col-sm-6 col-md-4">
                 <button type="submit" class="btn btn-danger w-100">@Model.T("admin.draws.create.submit", "Create draw")</button>
             </div>
         </form>
@@ -81,6 +86,7 @@ else
                         <th>@Model.T("admin.draws.table.ticketCost", "Ticket cost")</th>
                         <th>@Model.T("admin.draws.table.totalPool", "Total pool")</th>
                         <th>@Model.T("admin.draws.table.pools", "Pools (3/5, 4/5, 5/5)")</th>
+                        <th>@Model.T("admin.draws.table.purchaseClosesAtUtc", "Sales close (UTC)")</th>
                         <th>@Model.T("admin.draws.table.createdUtc", "Created (UTC)")</th>
                         <th>@Model.T("admin.draws.table.numbers", "Numbers")</th>
                         <th>@Model.T("admin.draws.table.actions", "Actions")</th>
@@ -104,6 +110,7 @@ else
                                 @d.TotalPrizePool.ToString("0.00")
                             </td>
                             <td><code>@d.PrizePoolMatch3.ToString("0.00")</code>, <code>@d.PrizePoolMatch4.ToString("0.00")</code>, <code>@d.PrizePoolMatch5.ToString("0.00")</code></td>
+                            <td>@d.PurchaseClosesAtUtc.ToString("u")</td>
                             <td>@d.CreatedAtUtc.ToString("u")</td>
                             <td>
                                 @if (string.IsNullOrWhiteSpace(d.Numbers))

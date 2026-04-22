@@ -10,7 +10,7 @@ using MiniApp.Features.Localization;
 namespace MiniApp.Pages.Admin.Draws;
 
 [Authorize(Policy = AdminAuth.PolicyName)]
-public sealed class EditModel : MiniApp.Pages.Admin.LocalizedAdminPageModel
+public sealed class EditModel : LocalizedAdminPageModel
 {
     public sealed record DrawTicketRow(string Numbers, long SelectionCount);
     public sealed record DrawTicketUserRow(long UserId, long TelegramUserId, string? Number, long TicketCount, DateTimeOffset LastPurchasedAtUtc);
@@ -53,6 +53,9 @@ public sealed class EditModel : MiniApp.Pages.Admin.LocalizedAdminPageModel
     public decimal TicketCost { get; set; }
 
     [BindProperty]
+    public string PurchaseClosesAtUtc { get; set; } = string.Empty;
+
+    [BindProperty]
     public string State { get; set; } = "upcoming";
 
     [BindProperty]
@@ -83,6 +86,7 @@ public sealed class EditModel : MiniApp.Pages.Admin.LocalizedAdminPageModel
         PrizePoolMatch4 = SelectedDraw.PrizePoolMatch4;
         PrizePoolMatch5 = SelectedDraw.PrizePoolMatch5;
         TicketCost = SelectedDraw.TicketCost;
+        PurchaseClosesAtUtc = DrawManagement.FormatAdminUtcInput(SelectedDraw.PurchaseClosesAtUtc);
         State = DrawManagement.ToStateValue(SelectedDraw.State);
 
         if (SelectedDraw.State == DrawState.Finished)
@@ -103,6 +107,15 @@ public sealed class EditModel : MiniApp.Pages.Admin.LocalizedAdminPageModel
         if (draw is null)
             return NotFound();
 
+        if (!DrawManagement.TryParseAdminUtcInput(PurchaseClosesAtUtc, out var purchaseClosesAtUtc))
+        {
+            StatusMessage = await GetTextAsync("admin.draws.flash.invalidPurchaseClosesAtUtc", "Enter a valid UTC purchase close date and time.", ct);
+            StatusIsError = true;
+            SelectedDraw = draw;
+            await SafeLoadTicketsAsync(id, ticketPage, ticketNumbers, ct);
+            return Page();
+        }
+
         if (!DrawManagement.TryParseEditableState(State, out var parsedState))
         {
             StatusMessage = await GetTextAsync("admin.draws.edit.flash.invalidState", "State must be active or upcoming.", ct);
@@ -114,7 +127,7 @@ public sealed class EditModel : MiniApp.Pages.Admin.LocalizedAdminPageModel
 
         try
         {
-            await DrawManagement.UpdateDrawAsync(_db, draw, PrizePoolMatch3, PrizePoolMatch4, PrizePoolMatch5, TicketCost, parsedState, ct);
+            await DrawManagement.UpdateDrawAsync(_db, draw, PrizePoolMatch3, PrizePoolMatch4, PrizePoolMatch5, TicketCost, parsedState, purchaseClosesAtUtc, ct);
             var updatedTemplate = await GetTextAsync("admin.draws.edit.flash.updated", "Updated draw #{0}.", ct);
             FlashMessage = string.Format(updatedTemplate, draw.Id);
             FlashIsError = false;
@@ -157,6 +170,7 @@ public sealed class EditModel : MiniApp.Pages.Admin.LocalizedAdminPageModel
             PrizePoolMatch4 = draw.PrizePoolMatch4;
             PrizePoolMatch5 = draw.PrizePoolMatch5;
             TicketCost = draw.TicketCost;
+            PurchaseClosesAtUtc = DrawManagement.FormatAdminUtcInput(draw.PurchaseClosesAtUtc);
             State = DrawManagement.ToStateValue(draw.State);
             await SafeLoadTicketsAsync(id, ticketPage, ticketNumbers, ct);
             return Page();

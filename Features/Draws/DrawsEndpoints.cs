@@ -24,6 +24,7 @@ public static class DrawsEndpoints
                     request.PrizePoolMatch4,
                     request.PrizePoolMatch5,
                     request.TicketCost,
+                    request.PurchaseClosesAtUtc,
                     ct);
                 var dto = DrawManagement.ToDto(draw);
                 return Results.Ok(new { ok = true, draw = dto });
@@ -58,6 +59,7 @@ public static class DrawsEndpoints
                     req.PrizePoolMatch5,
                     req.TicketCost,
                     state,
+                    req.PurchaseClosesAtUtc,
                     ct);
                 return Results.Ok(new { ok = true, draw = DrawManagement.ToDto(draw) });
             }
@@ -97,7 +99,7 @@ public static class DrawsEndpoints
                 .ToListAsync(ct);
 
             var drawDtos = draws
-                .Select(DrawManagement.ToDto)
+                .Select(x => DrawManagement.ToDto(x))
                 .ToArray();
 
             return Results.Ok(new { ok = true, draws = drawDtos });

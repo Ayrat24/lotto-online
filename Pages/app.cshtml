@@ -93,46 +93,27 @@
         </div>
       </section>
 
-      <section id="featuredJackpotCard" class="card jackpot-card">
-        <div class="jackpot-main">
-          <div class="jackpot-top">
-            <!-- Replaced top red "jackpot-chip" with the green state badge. JS will update its text/class at runtime. -->
-            <span id="currentDrawStateBadge" class="state-badge state-badge-active" data-loc="client.draw.state.active">Active</span>
-            <span class="jackpot-time" id="currentDrawCreatedAt" data-loc="client.jackpot.endsIn">Ends in --:--:--</span>
-          </div>
+      <section id="featuredJackpotCard" class="card draw-card featured-draw-card">
+        <div class="draw-card-header">
+          <div id="jackpotGameTitle" class="draw-card-title" data-loc="client.drawCard.titlePrefix">Draw #</div>
+          <div id="currentDrawCreatedAt" class="draw-card-timer" data-loc="client.jackpot.endsIn">Ends in --:--:--</div>
+        </div>
 
-          <div class="jackpot-headline">
-            <span class="jackpot-title" id="jackpotGameTitle" data-loc="client.jackpot.prizePoolTitle">Prize pool :</span>
-            <span class="jackpot-amount" id="jackpotAmount">$0.00</span>
-            <span class="jackpot-amount-bang" aria-hidden="true">!</span>
-          </div>
+        <div id="currentDrawStateBadge" class="draw-card-status" hidden></div>
+        <div id="jackpotSubtitle" class="draw-card-jackpot-label" data-loc="client.drawCard.jackpotLabel">JACKPOT</div>
+        <div id="jackpotAmount" class="draw-card-jackpot-value">$0.00</div>
 
-          <p class="jackpot-copy" id="jackpotSubtitle" data-loc="client.jackpot.subtitle">The next draw is coming soon. Get your tickets now.</p>
-
-          <div id="currentDrawPrizeTiers" class="prize-tier-row" hidden>
-            <div class="prize-tier-pill">
-              <span class="prize-tier-label">3/5</span>
-              <span class="prize-tier-value" id="currentDrawPrizePool3">$0.00</span>
-            </div>
-            <div class="prize-tier-pill">
-              <span class="prize-tier-label">4/5</span>
-              <span class="prize-tier-value" id="currentDrawPrizePool4">$0.00</span>
-            </div>
-            <div class="prize-tier-pill">
-              <span class="prize-tier-label">5/5</span>
-              <span class="prize-tier-value" id="currentDrawPrizePool5">$0.00</span>
-            </div>
+        <div class="draw-card-footer">
+          <div class="draw-card-cost-block">
+            <div class="draw-card-cost-label" data-loc="client.drawCard.ticketCostLabel">Ticket cost</div>
+            <div id="jackpotBuyPrice" class="draw-card-cost-value">$2.00</div>
           </div>
         </div>
-        <!-- Purchase row: dark subcontainer inside the red jackpot card -->
-        <div class="jackpot-buy-row">
-          <div class="jackpot-buy-left">
-            <div class="jackpot-buy-price-label" data-loc="client.currentDraw.ticketCostPrefix">Ticket cost:</div>
-            <div id="jackpotBuyPrice" class="jackpot-buy-price">$2.00</div>
-          </div>
-          <div class="jackpot-buy-right">
-            <button id="purchaseTicketBtn" type="button" class="jackpot-buy-btn" data-loc="client.button.purchase">Purchase ticket</button>
-          </div>
+
+        <div id="currentDrawPrizeTiers" hidden>
+          <span id="currentDrawPrizePool3">$0.00</span>
+          <span id="currentDrawPrizePool4">$0.00</span>
+          <span id="currentDrawPrizePool5">$0.00</span>
         </div>
       </section>
 
@@ -221,7 +202,7 @@
   </main>
 
   <div id="ticketPurchaseScreen" class="purchase-screen" hidden>
-    <div class="purchase-screen-panel" role="dialog" aria-modal="true" aria-labelledby="ticketPurchaseTitle">
+    <div id="ticketPurchasePanel" class="purchase-screen-panel" role="dialog" aria-modal="true" aria-labelledby="ticketPurchaseTitle">
       <div class="purchase-screen-header">
         <div class="purchase-screen-header-copy">
           <div id="ticketPurchaseTitle" class="section-title" data-loc="client.purchaseScreen.title">Pick your tickets</div>

@@ -1,5 +1,3 @@
-using MiniApp.Data;
-
 namespace MiniApp.Features.Draws;
 
 public sealed record DrawDto(
@@ -11,11 +9,13 @@ public sealed record DrawDto(
 	decimal TicketCost,
 	string State,
 	string? Numbers,
-	DateTimeOffset CreatedAtUtc);
+	DateTimeOffset CreatedAtUtc,
+	DateTimeOffset PurchaseClosesAtUtc,
+	bool CanPurchase);
 
-public sealed record CreateDrawRequest(decimal PrizePoolMatch3, decimal PrizePoolMatch4, decimal PrizePoolMatch5, decimal TicketCost);
+public sealed record CreateDrawRequest(decimal PrizePoolMatch3, decimal PrizePoolMatch4, decimal PrizePoolMatch5, decimal TicketCost, DateTimeOffset? PurchaseClosesAtUtc = null);
 
-public sealed record UpdateDrawRequest(decimal PrizePoolMatch3, decimal PrizePoolMatch4, decimal PrizePoolMatch5, decimal TicketCost, string State);
+public sealed record UpdateDrawRequest(decimal PrizePoolMatch3, decimal PrizePoolMatch4, decimal PrizePoolMatch5, decimal TicketCost, string State, DateTimeOffset? PurchaseClosesAtUtc = null);
 
 public sealed record TicketForDrawDto(long Id, long DrawId, string Numbers, string Status, DateTimeOffset PurchasedAtUtc, decimal WinningAmount);
 

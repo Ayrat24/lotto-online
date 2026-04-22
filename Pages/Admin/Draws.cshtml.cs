@@ -21,6 +21,7 @@ public sealed class DrawsModel : LocalizedAdminPageModel
         string State,
         string? Numbers,
         DateTimeOffset CreatedAtUtc,
+        DateTimeOffset PurchaseClosesAtUtc,
         long TicketCount)
     {
         public decimal TotalPrizePool => PrizePoolMatch3 + PrizePoolMatch4 + PrizePoolMatch5;
@@ -53,6 +54,9 @@ public sealed class DrawsModel : LocalizedAdminPageModel
     [BindProperty]
     public int TicketSlotsCount { get; set; } = 10;
 
+    [BindProperty]
+    public string CreatePurchaseClosesAtUtc { get; set; } = string.Empty;
+
     [TempData]
     public string? FlashMessage { get; set; }
 
@@ -75,9 +79,18 @@ public sealed class DrawsModel : LocalizedAdminPageModel
     {
         await LoadUiTextAsync(ct);
         await EnsureDebugSeedAsync(ct);
+
+        if (!DrawManagement.TryParseAdminUtcInput(CreatePurchaseClosesAtUtc, out var purchaseClosesAtUtc))
+        {
+            StatusMessage = await GetTextAsync("admin.draws.flash.invalidPurchaseClosesAtUtc", "Enter a valid UTC purchase close date and time.", ct);
+            StatusIsError = true;
+            await LoadAsync(ct);
+            return Page();
+        }
+
         try
         {
-            var draw = await DrawManagement.CreateDrawAsync(_db, prizePoolMatch3, prizePoolMatch4, prizePoolMatch5, ticketCost, ct);
+            var draw = await DrawManagement.CreateDrawAsync(_db, prizePoolMatch3, prizePoolMatch4, prizePoolMatch5, ticketCost, purchaseClosesAtUtc, ct);
             var template = await GetTextAsync("admin.draws.flash.created", "Created draw #{0} in {1} state.", ct);
             StatusMessage = string.Format(template, draw.Id, DrawManagement.ToStateValue(draw.State));
             StatusIsError = false;
@@ -121,6 +134,8 @@ public sealed class DrawsModel : LocalizedAdminPageModel
             purchaseSettings.UpdatedAtUtc,
             purchaseSettings.UpdatedByAdmin);
         TicketSlotsCount = purchaseSettings.TicketSlotsCount;
+        if (string.IsNullOrWhiteSpace(CreatePurchaseClosesAtUtc))
+            CreatePurchaseClosesAtUtc = DrawManagement.FormatAdminUtcInput(DrawManagement.GetDefaultPurchaseClosesAtUtc(DateTimeOffset.UtcNow));
 
         var ticketCounts = await _db.Tickets
             .AsNoTracking()
@@ -148,6 +163,7 @@ public sealed class DrawsModel : LocalizedAdminPageModel
                 DrawManagement.ToStateValue(draw.State),
                 draw.Numbers,
                 draw.CreatedAtUtc,
+                draw.PurchaseClosesAtUtc,
                 ticketCounts.GetValueOrDefault(draw.Id)))
             .ToArray();
     }

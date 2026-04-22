@@ -112,18 +112,26 @@ public static class TicketsEndpoints
             }
 
             var u = await users.TouchUserAsync(telegramUserId, ct);
+            var nowUtc = DateTimeOffset.UtcNow;
 
             var activeDraws = await db.Draws
                 .Where(x => x.State == DrawState.Active)
                 .OrderByDescending(x => x.Id)
-                .Select(x => new { x.Id })
+                .Select(x => new { x.Id, x.PurchaseClosesAtUtc })
                 .ToListAsync(ct);
 
             if (activeDraws.Count == 0)
                 return Results.BadRequest(new { ok = false, error = "There is no active draw right now." });
 
-            if (req.DrawId <= 0 || !activeDraws.Any(x => x.Id == req.DrawId))
+            var selectedDraw = req.DrawId <= 0
+                ? null
+                : activeDraws.FirstOrDefault(x => x.Id == req.DrawId);
+
+            if (selectedDraw is null)
                 return Results.BadRequest(new { ok = false, error = "Selected draw is not active." });
+
+            if (selectedDraw.PurchaseClosesAtUtc <= nowUtc)
+                return Results.BadRequest(new { ok = false, error = "Ticket sales for this draw are closed." });
 
             if (!TryNormalizeSelectedTickets(req.Tickets, out var normalizedTickets, out var validationError))
                 return Results.BadRequest(new { ok = false, error = validationError });
