@@ -9,19 +9,24 @@ internal static class DrawManagement
     public const int NumbersPerDraw = 5;
     public const int MinNumber = 1;
     public const int MaxNumber = 36;
+    public const string DefaultCardColor = "gold";
 
-    public static async Task<Draw> CreateDrawAsync(AppDbContext db, decimal prizePoolMatch3, decimal prizePoolMatch4, decimal prizePoolMatch5, decimal ticketCost, DateTimeOffset? purchaseClosesAtUtc, CancellationToken ct)
+    private static readonly string[] SupportedCardColors = ["gold", "teal", "pink", "blue", "orange"];
+
+    public static async Task<Draw> CreateDrawAsync(AppDbContext db, decimal prizePoolMatch3, decimal prizePoolMatch4, decimal prizePoolMatch5, decimal ticketCost, string? cardColor, DateTimeOffset? purchaseClosesAtUtc, CancellationToken ct)
     {
         EnsurePrizePool(prizePoolMatch3, "3/5");
         EnsurePrizePool(prizePoolMatch4, "4/5");
         EnsurePrizePool(prizePoolMatch5, "5/5");
         EnsureTicketCost(ticketCost);
+        var normalizedCardColor = NormalizeCardColor(cardColor);
 
         var nowUtc = DateTimeOffset.UtcNow;
         var nextId = (await db.Draws.MaxAsync(x => (long?)x.Id, ct) ?? 0) + 1;
         var draw = new Draw
         {
             Id = nextId,
+            CardColor = normalizedCardColor,
             PrizePoolMatch3 = RoundPrizePool(prizePoolMatch3),
             PrizePoolMatch4 = RoundPrizePool(prizePoolMatch4),
             PrizePoolMatch5 = RoundPrizePool(prizePoolMatch5),
@@ -36,12 +41,13 @@ internal static class DrawManagement
         return draw;
     }
 
-    public static async Task UpdateDrawAsync(AppDbContext db, Draw draw, decimal prizePoolMatch3, decimal prizePoolMatch4, decimal prizePoolMatch5, decimal ticketCost, DrawState state, DateTimeOffset? purchaseClosesAtUtc, CancellationToken ct)
+    public static async Task UpdateDrawAsync(AppDbContext db, Draw draw, decimal prizePoolMatch3, decimal prizePoolMatch4, decimal prizePoolMatch5, decimal ticketCost, DrawState state, string? cardColor, DateTimeOffset? purchaseClosesAtUtc, CancellationToken ct)
     {
         EnsurePrizePool(prizePoolMatch3, "3/5");
         EnsurePrizePool(prizePoolMatch4, "4/5");
         EnsurePrizePool(prizePoolMatch5, "5/5");
         EnsureTicketCost(ticketCost);
+        var normalizedCardColor = NormalizeCardColor(cardColor);
 
         if (draw.State == DrawState.Finished)
             throw new InvalidOperationException("Finished draws cannot be edited.");
@@ -50,6 +56,7 @@ internal static class DrawManagement
             throw new InvalidOperationException("Use Execute Draw to finish a draw.");
 
 
+        draw.CardColor = normalizedCardColor;
         draw.PrizePoolMatch3 = RoundPrizePool(prizePoolMatch3);
         draw.PrizePoolMatch4 = RoundPrizePool(prizePoolMatch4);
         draw.PrizePoolMatch5 = RoundPrizePool(prizePoolMatch5);
@@ -93,6 +100,7 @@ internal static class DrawManagement
         var totalPrizePool = draw.PrizePoolMatch3 + draw.PrizePoolMatch4 + draw.PrizePoolMatch5;
         return new(
             draw.Id,
+            NormalizeCardColor(draw.CardColor),
             totalPrizePool,
             draw.PrizePoolMatch3,
             draw.PrizePoolMatch4,
@@ -170,6 +178,11 @@ internal static class DrawManagement
             _ => status.ToString().ToLowerInvariant()
         };
 
+    public static IReadOnlyList<string> GetSupportedCardColors() => SupportedCardColors;
+
+    public static string GetColorDisplayKey(string cardColor)
+        => $"admin.draws.cardColor.option.{NormalizeCardColor(cardColor)}";
+
     public static string GenerateDrawNumbers()
     {
         var set = new HashSet<int>();
@@ -215,6 +228,18 @@ internal static class DrawManagement
 
     private static DateTimeOffset NormalizePurchaseClosesAtUtc(DateTimeOffset? purchaseClosesAtUtc, DateTimeOffset fallbackUtc)
         => purchaseClosesAtUtc?.ToUniversalTime() ?? fallbackUtc.ToUniversalTime();
+
+    public static string NormalizeCardColor(string? cardColor)
+    {
+        var normalized = string.IsNullOrWhiteSpace(cardColor)
+            ? DefaultCardColor
+            : cardColor.Trim().ToLowerInvariant();
+
+        if (SupportedCardColors.Contains(normalized, StringComparer.Ordinal))
+            return normalized;
+
+        throw new InvalidOperationException($"Draw card color '{cardColor}' is not supported.");
+    }
 
 
     private static void EnsurePrizePool(decimal prizePool, string tier)

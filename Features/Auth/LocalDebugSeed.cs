@@ -27,6 +27,9 @@ public static class LocalDebugSeed
         {
             if (draw.TicketCost <= 0)
                 draw.TicketCost = 2m;
+
+            if (string.IsNullOrWhiteSpace(draw.CardColor))
+                draw.CardColor = GetSeedCardColor((int)(draw.Id % 5));
         }
 
         long nextId = draws.Count == 0 ? 1 : draws[^1].Id + 1;
@@ -37,6 +40,7 @@ public static class LocalDebugSeed
             var finished = new Draw
             {
                 Id = nextId++,
+                CardColor = GetSeedCardColor(finishedDraws.Count + 2),
                 PrizePoolMatch3 = 40m + finishedDraws.Count * 10m,
                 PrizePoolMatch4 = 25m + finishedDraws.Count * 10m,
                 PrizePoolMatch5 = 35m + finishedDraws.Count * 30m,
@@ -86,6 +90,7 @@ public static class LocalDebugSeed
                     drawToActivate = new Draw
                     {
                         Id = nextId++,
+                        CardColor = GetSeedCardColor(activeDraws.Count),
                         PrizePoolMatch3 = 80m + activeDraws.Count * 20m,
                         PrizePoolMatch4 = 50m + activeDraws.Count * 20m,
                         PrizePoolMatch5 = 70m + activeDraws.Count * 30m,
@@ -100,6 +105,7 @@ public static class LocalDebugSeed
                 }
 
                 drawToActivate.State = DrawState.Active;
+                drawToActivate.CardColor = GetSeedCardColor(activeDraws.Count);
                 activeDraws.Add(drawToActivate);
             }
         }
@@ -114,6 +120,7 @@ public static class LocalDebugSeed
             upcomingDraw = new Draw
             {
                 Id = nextId,
+                CardColor = GetSeedCardColor(4),
                 PrizePoolMatch3 = 120m,
                 PrizePoolMatch4 = 70m,
                 PrizePoolMatch5 = 110m,
@@ -197,6 +204,16 @@ public static class LocalDebugSeed
     {
         // Keep debug UX deterministic: always have at least two active draws to exercise multi-draw UI.
         return 2;
+    }
+
+    private static string GetSeedCardColor(int index)
+    {
+        var colors = DrawManagement.GetSupportedCardColors();
+        if (colors.Count == 0)
+            return DrawManagement.DefaultCardColor;
+
+        var normalizedIndex = Math.Abs(index) % colors.Count;
+        return colors[normalizedIndex];
     }
 
     private static int CountMatches(string ticketNumbers, string drawNumbers)

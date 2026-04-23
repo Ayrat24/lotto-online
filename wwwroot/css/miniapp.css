@@ -414,11 +414,51 @@ body.app-loading .loading-shell {
 
 .draw-card-list {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   overflow-x: auto;
   padding-bottom: 4px;
   scroll-snap-type: x proximity;
   -webkit-overflow-scrolling: touch;
+}
+
+.draw-sort-tabs-section {
+  display: grid;
+  gap: 8px;
+}
+
+.draw-sort-tabs {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.draw-sort-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.draw-sort-tab {
+  width: auto;
+  min-width: max-content;
+  min-height: 0;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #f1f5ff;
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  box-shadow: none;
+}
+
+.draw-sort-tab-active {
+  background: linear-gradient(180deg, #ffd455, #f1be37);
+  border-color: rgba(255, 212, 85, 0.7);
+  color: #302102;
 }
 
 .draw-card-list::-webkit-scrollbar {
@@ -431,14 +471,24 @@ body.app-loading .loading-shell {
 }
 
 .draw-card {
+  --draw-card-bg-start: #f1be37;
+  --draw-card-bg-end: #c88a00;
+  --draw-card-fg: #ffffff;
+  --draw-card-muted: rgba(255, 255, 255, 0.92);
+  --draw-card-chip-bg: rgba(255, 255, 255, 0.18);
+  --draw-card-chip-color: #ffffff;
+  --draw-card-status-bg: rgba(255, 255, 255, 0.14);
+  --draw-card-status-color: rgba(255, 255, 255, 0.96);
+  --draw-card-cost-bg: rgba(255, 255, 255, 0.98);
+  --draw-card-cost-color: #12161d;
   display: grid;
-  gap: 10px;
-  min-height: 160px;
-  padding: 14px;
-  border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, #161a22 0%, #0f1218 100%);
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.24);
+  gap: 7px;
+  min-height: 126px;
+  padding: 11px 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(135deg, var(--draw-card-bg-start) 0%, var(--draw-card-bg-end) 100%);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.2);
   cursor: pointer;
   transition: transform 0.12s ease, border-color 0.16s ease, box-shadow 0.16s ease;
 }
@@ -449,21 +499,22 @@ body.app-loading .loading-shell {
 }
 
 .draw-card-compact {
-  flex: 0 0 220px;
+  flex: 0 0 174px;
   scroll-snap-align: start;
 }
 
 .featured-draw-card {
   width: 100%;
+  min-height: 146px;
 }
 
 .draw-card-selected {
-  border-color: rgba(255, 214, 84, 0.6);
-  box-shadow: 0 0 0 1px rgba(255, 214, 84, 0.24), 0 14px 30px rgba(0, 0, 0, 0.24);
+  border-color: rgba(255, 255, 255, 0.48);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18), 0 12px 24px rgba(0, 0, 0, 0.24);
 }
 
 .draw-card-unavailable {
-  opacity: 0.78;
+  opacity: 0.74;
 }
 
 .draw-card-header {
@@ -474,19 +525,19 @@ body.app-loading .loading-shell {
 }
 
 .draw-card-title {
-  font-size: 1.02rem;
+  font-size: 0.88rem;
   font-weight: 800;
   line-height: 1.2;
-  color: #ffffff;
+  color: var(--draw-card-fg);
 }
 
 .draw-card-timer {
   flex: 0 0 auto;
-  padding: 5px 10px;
+  padding: 4px 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
-  font-size: 0.88rem;
+  background: var(--draw-card-chip-bg);
+  color: var(--draw-card-chip-color);
+  font-size: 0.78rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
@@ -494,34 +545,33 @@ body.app-loading .loading-shell {
 
 .draw-card-timer-closed {
   background: rgba(255, 255, 255, 0.08);
-  color: #c7d0df;
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .draw-card-status {
   display: inline-flex;
   justify-self: start;
-  padding: 4px 8px;
+  padding: 3px 7px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  color: #c9d2e4;
-  font-size: 0.74rem;
+  background: var(--draw-card-status-bg);
+  color: var(--draw-card-status-color);
+  font-size: 0.63rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 .draw-card-jackpot-label {
-  color: #ffd54a;
-  font-size: 0.8rem;
+  color: var(--draw-card-muted);
+  font-size: 0.72rem;
   font-weight: 900;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .draw-card-jackpot-value {
-  color: #ffffff;
-  font-size: clamp(1.8rem, 5vw, 2.5rem);
-  line-height: 1;
+  color: var(--draw-card-fg);
+  font-size: clamp(1.7rem, 4.4vw, 2.25rem);
+  line-height: 0.96;
   font-weight: 900;
   letter-spacing: -0.02em;
 }
@@ -537,15 +587,15 @@ body.app-loading .loading-shell {
   display: inline-grid;
   gap: 2px;
   justify-items: end;
-  min-width: 92px;
-  padding: 8px 10px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.96);
-  color: #111318;
+  min-width: 72px;
+  padding: 6px 9px;
+  border-radius: 12px;
+  background: var(--draw-card-cost-bg);
+  color: var(--draw-card-cost-color);
 }
 
 .draw-card-cost-label {
-  font-size: 0.68rem;
+  font-size: 0.58rem;
   font-weight: 800;
   line-height: 1.1;
   color: #4a4f5b;
@@ -554,38 +604,69 @@ body.app-loading .loading-shell {
 }
 
 .draw-card-cost-value {
-  font-size: 1rem;
+  font-size: 0.82rem;
   line-height: 1;
   font-weight: 900;
 }
 
+.draw-card-theme-gold {
+  --draw-card-bg-start: #f5c41e;
+  --draw-card-bg-end: #d99900;
+}
+
+.draw-card-theme-teal {
+  --draw-card-bg-start: #1ecdc4;
+  --draw-card-bg-end: #0d9fa6;
+}
+
+.draw-card-theme-pink {
+  --draw-card-bg-start: #e65ac9;
+  --draw-card-bg-end: #c748b4;
+}
+
+.draw-card-theme-blue {
+  --draw-card-bg-start: #18a8ee;
+  --draw-card-bg-end: #0c78d8;
+}
+
+.draw-card-theme-orange {
+  --draw-card-bg-start: #ff951d;
+  --draw-card-bg-end: #ff6d00;
+}
+
 @media (max-width: 560px) {
   .draw-card {
-    min-height: 142px;
-    padding: 12px;
+    min-height: 116px;
+    padding: 10px 11px;
     border-radius: 18px;
   }
 
   .draw-card-compact {
-    flex-basis: 188px;
+    flex-basis: 158px;
   }
 
   .draw-card-title {
-    font-size: 0.95rem;
+    font-size: 0.8rem;
   }
 
   .draw-card-timer {
-    font-size: 0.8rem;
-    padding: 4px 8px;
+    font-size: 0.72rem;
+    padding: 3px 7px;
   }
 
   .draw-card-jackpot-value {
-    font-size: 1.65rem;
+    font-size: 1.5rem;
   }
 
   .draw-card-cost-block {
-    min-width: 80px;
+    min-width: 68px;
+    padding: 5px 8px;
   }
+
+   .draw-sort-tab {
+    padding: 9px 12px;
+    font-size: 0.69rem;
+   }
 }
 
 /* #currentDrawStateBadge was previously hidden; make it visible so the green ACTIVE badge shows in the header. */

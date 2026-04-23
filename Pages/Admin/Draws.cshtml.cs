@@ -14,6 +14,7 @@ public sealed class DrawsModel : LocalizedAdminPageModel
 {
     public sealed record AdminDrawRow(
         long Id,
+        string CardColor,
         decimal PrizePoolMatch3,
         decimal PrizePoolMatch4,
         decimal PrizePoolMatch5,
@@ -47,6 +48,7 @@ public sealed class DrawsModel : LocalizedAdminPageModel
     }
 
     public IReadOnlyList<AdminDrawRow> Draws { get; private set; } = Array.Empty<AdminDrawRow>();
+    public IReadOnlyList<string> CardColorOptions => DrawManagement.GetSupportedCardColors();
     public TicketPurchaseSettingsView PurchaseSettings { get; private set; } = new(10, DateTimeOffset.MinValue, null);
     public string? StatusMessage { get; private set; }
     public bool StatusIsError { get; private set; }
@@ -56,6 +58,9 @@ public sealed class DrawsModel : LocalizedAdminPageModel
 
     [BindProperty]
     public string CreatePurchaseClosesAtUtc { get; set; } = string.Empty;
+
+    [BindProperty]
+    public string CreateCardColor { get; set; } = DrawManagement.DefaultCardColor;
 
     [TempData]
     public string? FlashMessage { get; set; }
@@ -90,7 +95,7 @@ public sealed class DrawsModel : LocalizedAdminPageModel
 
         try
         {
-            var draw = await DrawManagement.CreateDrawAsync(_db, prizePoolMatch3, prizePoolMatch4, prizePoolMatch5, ticketCost, purchaseClosesAtUtc, ct);
+            var draw = await DrawManagement.CreateDrawAsync(_db, prizePoolMatch3, prizePoolMatch4, prizePoolMatch5, ticketCost, CreateCardColor, purchaseClosesAtUtc, ct);
             var template = await GetTextAsync("admin.draws.flash.created", "Created draw #{0} in {1} state.", ct);
             StatusMessage = string.Format(template, draw.Id, DrawManagement.ToStateValue(draw.State));
             StatusIsError = false;
@@ -136,6 +141,8 @@ public sealed class DrawsModel : LocalizedAdminPageModel
         TicketSlotsCount = purchaseSettings.TicketSlotsCount;
         if (string.IsNullOrWhiteSpace(CreatePurchaseClosesAtUtc))
             CreatePurchaseClosesAtUtc = DrawManagement.FormatAdminUtcInput(DrawManagement.GetDefaultPurchaseClosesAtUtc(DateTimeOffset.UtcNow));
+        if (string.IsNullOrWhiteSpace(CreateCardColor))
+            CreateCardColor = DrawManagement.DefaultCardColor;
 
         var ticketCounts = await _db.Tickets
             .AsNoTracking()
@@ -156,6 +163,7 @@ public sealed class DrawsModel : LocalizedAdminPageModel
         Draws = draws
             .Select(draw => new AdminDrawRow(
                 draw.Id,
+                DrawManagement.NormalizeCardColor(draw.CardColor),
                 draw.PrizePoolMatch3,
                 draw.PrizePoolMatch4,
                 draw.PrizePoolMatch5,

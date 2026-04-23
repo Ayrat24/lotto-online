@@ -17,13 +17,14 @@ public static class DrawsEndpoints
         {
             try
             {
-                var request = req ?? new CreateDrawRequest(0m, 0m, 0m, 2m);
+                var request = req ?? new CreateDrawRequest(0m, 0m, 0m, 2m, DrawManagement.DefaultCardColor);
                 var draw = await DrawManagement.CreateDrawAsync(
                     db,
                     request.PrizePoolMatch3,
                     request.PrizePoolMatch4,
                     request.PrizePoolMatch5,
                     request.TicketCost,
+                    request.CardColor,
                     request.PurchaseClosesAtUtc,
                     ct);
                 var dto = DrawManagement.ToDto(draw);
@@ -59,6 +60,7 @@ public static class DrawsEndpoints
                     req.PrizePoolMatch5,
                     req.TicketCost,
                     state,
+                    req.CardColor,
                     req.PurchaseClosesAtUtc,
                     ct);
                 return Results.Ok(new { ok = true, draw = DrawManagement.ToDto(draw) });

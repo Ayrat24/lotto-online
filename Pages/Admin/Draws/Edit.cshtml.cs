@@ -30,6 +30,7 @@ public sealed class EditModel : LocalizedAdminPageModel
     public Draw? SelectedDraw { get; private set; }
 
     public bool CanEdit => SelectedDraw is not null && SelectedDraw.State != DrawState.Finished;
+    public IReadOnlyList<string> CardColorOptions => DrawManagement.GetSupportedCardColors();
 
     public IReadOnlyList<DrawTicketRow> Tickets { get; private set; } = Array.Empty<DrawTicketRow>();
     public IReadOnlyList<DrawTicketUserRow> TicketUsers { get; private set; } = Array.Empty<DrawTicketUserRow>();
@@ -51,6 +52,9 @@ public sealed class EditModel : LocalizedAdminPageModel
 
     [BindProperty]
     public decimal TicketCost { get; set; }
+
+    [BindProperty]
+    public string CardColor { get; set; } = DrawManagement.DefaultCardColor;
 
     [BindProperty]
     public string PurchaseClosesAtUtc { get; set; } = string.Empty;
@@ -86,6 +90,7 @@ public sealed class EditModel : LocalizedAdminPageModel
         PrizePoolMatch4 = SelectedDraw.PrizePoolMatch4;
         PrizePoolMatch5 = SelectedDraw.PrizePoolMatch5;
         TicketCost = SelectedDraw.TicketCost;
+        CardColor = DrawManagement.NormalizeCardColor(SelectedDraw.CardColor);
         PurchaseClosesAtUtc = DrawManagement.FormatAdminUtcInput(SelectedDraw.PurchaseClosesAtUtc);
         State = DrawManagement.ToStateValue(SelectedDraw.State);
 
@@ -127,7 +132,7 @@ public sealed class EditModel : LocalizedAdminPageModel
 
         try
         {
-            await DrawManagement.UpdateDrawAsync(_db, draw, PrizePoolMatch3, PrizePoolMatch4, PrizePoolMatch5, TicketCost, parsedState, purchaseClosesAtUtc, ct);
+            await DrawManagement.UpdateDrawAsync(_db, draw, PrizePoolMatch3, PrizePoolMatch4, PrizePoolMatch5, TicketCost, parsedState, CardColor, purchaseClosesAtUtc, ct);
             var updatedTemplate = await GetTextAsync("admin.draws.edit.flash.updated", "Updated draw #{0}.", ct);
             FlashMessage = string.Format(updatedTemplate, draw.Id);
             FlashIsError = false;
@@ -170,6 +175,7 @@ public sealed class EditModel : LocalizedAdminPageModel
             PrizePoolMatch4 = draw.PrizePoolMatch4;
             PrizePoolMatch5 = draw.PrizePoolMatch5;
             TicketCost = draw.TicketCost;
+            CardColor = DrawManagement.NormalizeCardColor(draw.CardColor);
             PurchaseClosesAtUtc = DrawManagement.FormatAdminUtcInput(draw.PurchaseClosesAtUtc);
             State = DrawManagement.ToStateValue(draw.State);
             await SafeLoadTicketsAsync(id, ticketPage, ticketNumbers, ct);

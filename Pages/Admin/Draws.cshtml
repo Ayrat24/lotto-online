@@ -51,6 +51,16 @@
                 <input id="createTicketCost" name="ticketCost" type="number" min="0.01" step="0.01" value="2" class="form-control" />
             </div>
             <div class="col-sm-6 col-md-4">
+                <label asp-for="CreateCardColor" class="form-label">@Model.T("admin.draws.create.cardColor", "Card color")</label>
+                <select asp-for="CreateCardColor" class="form-select">
+                    @foreach (var option in Model.CardColorOptions)
+                    {
+                        <option value="@option">@Model.T(MiniApp.Features.Draws.DrawManagement.GetColorDisplayKey(option), option)</option>
+                    }
+                </select>
+                <div class="form-text">@Model.T("admin.draws.create.cardColorHint", "Used by Mini App draw cards and sorting view.")</div>
+            </div>
+            <div class="col-sm-6 col-md-4">
                 <label asp-for="CreatePurchaseClosesAtUtc" class="form-label">@Model.T("admin.draws.create.purchaseClosesAtUtc", "Ticket sales close at (UTC)")</label>
                 <input asp-for="CreatePurchaseClosesAtUtc" type="datetime-local" step="60" class="form-control" />
                 <div class="form-text">@Model.T("admin.draws.create.purchaseClosesAtUtcHint", "The client countdown stops ticket purchases at this UTC time, but the draw still must be executed manually by admin.")</div>
@@ -83,6 +93,7 @@ else
                         <th>@Model.T("admin.draws.table.id", "Id")</th>
                         <th>@Model.T("admin.draws.table.tickets", "Tickets")</th>
                         <th>@Model.T("admin.draws.table.state", "State")</th>
+                        <th>@Model.T("admin.draws.table.cardColor", "Card color")</th>
                         <th>@Model.T("admin.draws.table.ticketCost", "Ticket cost")</th>
                         <th>@Model.T("admin.draws.table.totalPool", "Total pool")</th>
                         <th>@Model.T("admin.draws.table.pools", "Pools (3/5, 4/5, 5/5)")</th>
@@ -95,6 +106,14 @@ else
                     <tbody>
                     @foreach (var d in Model.Draws)
                     {
+                        var previewColor = d.CardColor switch
+                        {
+                            "teal" => "#14b8a6",
+                            "pink" => "#d946ef",
+                            "blue" => "#0ea5e9",
+                            "orange" => "#f97316",
+                            _ => "#eab308"
+                        };
                         <tr>
                             <td><strong>@d.Id</strong></td>
                             <td>
@@ -104,6 +123,12 @@ else
                                 <span class="badge @(d.State == "active" ? "bg-success-subtle text-dark border border-success-subtle" : d.State == "finished" ? "bg-dark text-white" : "bg-secondary-subtle text-dark border border-secondary-subtle") text-uppercase">
                                     @d.State
                                 </span>
+                            </td>
+                            <td>
+                                <div class="d-inline-flex align-items-center gap-2">
+                                    <span class="rounded-circle border" style="width:14px;height:14px;display:inline-block;background:@previewColor;"></span>
+                                    <span>@Model.T(MiniApp.Features.Draws.DrawManagement.GetColorDisplayKey(d.CardColor), d.CardColor)</span>
+                                </div>
                             </td>
                             <td><code>@d.TicketCost.ToString("0.00")</code></td>
                             <td>

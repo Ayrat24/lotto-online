@@ -11,6 +11,8 @@ public sealed class Draw
 {
     public long Id { get; set; }
 
+    public string CardColor { get; set; } = "gold";
+
     public decimal PrizePoolMatch3 { get; set; }
 
     public decimal PrizePoolMatch4 { get; set; }

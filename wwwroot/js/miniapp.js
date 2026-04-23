@@ -71,6 +71,10 @@
   var currentDrawPurchaseBlockEl = document.getElementById('currentDrawPurchaseBlock');
   var featuredJackpotCardEl = document.getElementById('featuredJackpotCard');
   var jackpotCardsContainerEl = document.getElementById('jackpotCardsContainer');
+  var drawSortTabsSectionEl = document.getElementById('drawSortTabsSection');
+  var sortClosestDrawBtn = document.getElementById('sortClosestDrawBtn');
+  var sortBiggestJackpotBtn = document.getElementById('sortBiggestJackpotBtn');
+  var sortCheaperTicketsBtn = document.getElementById('sortCheaperTicketsBtn');
   var currentDisplayedDrawId = null;
   var appShellEl = document.getElementById('appShell');
   var appLoadingShellEl = document.getElementById('appLoadingShell');
@@ -109,6 +113,7 @@
   var autoOpenedTicketsTab = false;
   var activeTabName = 'lottery';
   var activeProfileScreen = 'home';
+  var currentDrawSortMode = 'closest';
   var historyEntries = [];
   var newsBanners = [];
   var newsBannerIndex = 0;
@@ -153,6 +158,7 @@
   function reapplyLocalizedRuntimeTexts() {
     var selected = resolveSelectedDrawSnapshot(latestState);
     renderNewsBanners(newsBanners);
+    syncDrawSortTabs();
     renderCurrentDraw(selected.draw, selected.tickets, selected.hasMultipleActiveDraws);
     renderActiveDrawBanners(getActiveDraws(latestState), getActiveTicketGroups(latestState));
     renderMyTickets(latestState);
@@ -167,7 +173,8 @@
   }
 
   function getActiveDraws(state) {
-    return (state && Array.isArray(state.activeDraws)) ? state.activeDraws : [];
+    var draws = (state && Array.isArray(state.activeDraws)) ? state.activeDraws.filter(function (x) { return !!x; }) : [];
+    return draws.slice().sort(compareActiveDraws);
   }
 
   function getActiveTicketGroups(state) {
@@ -176,6 +183,104 @@
 
   function getTicketPurchaseConfig(state) {
     return state && state.ticketPurchase ? state.ticketPurchase : null;
+  }
+
+  function getDrawSortCloseMs(draw) {
+    var closeMs = getDrawPurchaseCloseMs(draw);
+    if (closeMs != null) return closeMs;
+
+    var createdMs = draw && draw.createdAtUtc ? Date.parse(draw.createdAtUtc) : NaN;
+    return Number.isFinite(createdMs) ? createdMs : Number.MAX_SAFE_INTEGER;
+  }
+
+  function compareNumbersAsc(a, b) {
+    return (Number(a) || 0) - (Number(b) || 0);
+  }
+
+  function compareNumbersDesc(a, b) {
+    return (Number(b) || 0) - (Number(a) || 0);
+  }
+
+  function compareActiveDraws(a, b) {
+    if (!a && !b) return 0;
+    if (!a) return 1;
+    if (!b) return -1;
+
+    if (currentDrawSortMode === 'jackpot') {
+      return compareNumbersDesc(a.prizePoolMatch5, b.prizePoolMatch5)
+        || compareNumbersAsc(getDrawSortCloseMs(a), getDrawSortCloseMs(b))
+        || compareNumbersAsc(a.ticketCost, b.ticketCost)
+        || compareNumbersDesc(a.id, b.id);
+    }
+
+    if (currentDrawSortMode === 'cheap') {
+      return compareNumbersAsc(a.ticketCost, b.ticketCost)
+        || compareNumbersDesc(a.prizePoolMatch5, b.prizePoolMatch5)
+        || compareNumbersAsc(getDrawSortCloseMs(a), getDrawSortCloseMs(b))
+        || compareNumbersDesc(a.id, b.id);
+    }
+
+    return compareNumbersAsc(getDrawSortCloseMs(a), getDrawSortCloseMs(b))
+      || compareNumbersDesc(a.prizePoolMatch5, b.prizePoolMatch5)
+      || compareNumbersAsc(a.ticketCost, b.ticketCost)
+      || compareNumbersDesc(a.id, b.id);
+  }
+
+  function syncDrawSortTabs() {
+    var mapping = [
+      { button: sortClosestDrawBtn, mode: 'closest' },
+      { button: sortBiggestJackpotBtn, mode: 'jackpot' },
+      { button: sortCheaperTicketsBtn, mode: 'cheap' }
+    ];
+
+    mapping.forEach(function (item) {
+      if (!item.button) return;
+      var isActive = currentDrawSortMode === item.mode;
+      item.button.classList.toggle('draw-sort-tab-active', isActive);
+      item.button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      item.button.tabIndex = isActive ? 0 : -1;
+    });
+  }
+
+  function setDrawSortMode(mode) {
+    var normalized = String(mode || '').toLowerCase();
+    if (normalized !== 'closest' && normalized !== 'jackpot' && normalized !== 'cheap') {
+      normalized = 'closest';
+    }
+
+    if (currentDrawSortMode === normalized) {
+      syncDrawSortTabs();
+      return;
+    }
+
+    currentDrawSortMode = normalized;
+    syncDrawSortTabs();
+
+    var selected = resolveSelectedDrawSnapshot(latestState);
+    renderCurrentDraw(selected.draw, selected.tickets, selected.hasMultipleActiveDraws);
+    renderActiveDrawBanners(getActiveDraws(latestState), getActiveTicketGroups(latestState));
+  }
+
+  function getDrawCardThemeClass(cardColor) {
+    var value = String(cardColor || '').trim().toLowerCase();
+    if (value === 'teal' || value === 'pink' || value === 'blue' || value === 'orange') {
+      return 'draw-card-theme-' + value;
+    }
+
+    return 'draw-card-theme-gold';
+  }
+
+  function applyDrawCardTheme(cardEl, draw) {
+    if (!cardEl) return;
+
+    cardEl.classList.remove(
+      'draw-card-theme-gold',
+      'draw-card-theme-teal',
+      'draw-card-theme-pink',
+      'draw-card-theme-blue',
+      'draw-card-theme-orange');
+
+    cardEl.classList.add(getDrawCardThemeClass(draw && draw.cardColor));
   }
 
   function resolveSelectedDrawSnapshot(state) {
@@ -1356,6 +1461,11 @@
     var draws = Array.isArray(activeDraws) ? activeDraws.filter(function (x) { return !!x; }) : [];
     var showMultiDrawBanners = draws.length > 1;
 
+    if (drawSortTabsSectionEl) {
+      drawSortTabsSectionEl.hidden = !showMultiDrawBanners;
+    }
+    syncDrawSortTabs();
+
     if (featuredJackpotCardEl) {
       featuredJackpotCardEl.hidden = showMultiDrawBanners;
     }
@@ -1373,6 +1483,7 @@
     draws.forEach(function (draw) {
       var card = document.createElement('article');
       card.className = 'card draw-card draw-card-compact duplicate-jackpot-card';
+      applyDrawCardTheme(card, draw);
       if (selectedActiveDrawId != null && draw.id === selectedActiveDrawId) {
         card.classList.add('draw-card-selected');
       }
@@ -1479,6 +1590,7 @@
       if (currentDrawTicketPriceRowEl) currentDrawTicketPriceRowEl.hidden = false;
       if (currentDrawTicketCostEl) currentDrawTicketCostEl.textContent = '$2.00';
       if (currentDrawPurchaseBlockEl) currentDrawPurchaseBlockEl.hidden = false;
+      applyDrawCardTheme(featuredJackpotCardEl, null);
       // legacy picker cleanup not required
       return;
     }
@@ -1494,6 +1606,7 @@
     if (currentDrawEmptyEl) currentDrawEmptyEl.hidden = true;
     if (currentDrawContentEl) currentDrawContentEl.hidden = false;
     if (featuredJackpotCardEl) {
+      applyDrawCardTheme(featuredJackpotCardEl, draw);
       featuredJackpotCardEl.classList.toggle('draw-card-unavailable', !purchasable);
       featuredJackpotCardEl.classList.toggle('draw-card-selected', !!purchasable);
     }
@@ -1863,6 +1976,7 @@
       return JSON.stringify({
         currentDraw: state && state.currentDraw ? {
           id: state.currentDraw.id,
+            cardColor: state.currentDraw.cardColor || null,
           prizePool: state.currentDraw.prizePool,
           prizePoolMatch3: state.currentDraw.prizePoolMatch3,
           prizePoolMatch4: state.currentDraw.prizePoolMatch4,
@@ -1877,6 +1991,7 @@
         activeDraws: (state && state.activeDraws || []).map(function (draw) {
           return {
             id: draw.id,
+            cardColor: draw.cardColor || null,
             prizePool: draw.prizePool,
             prizePoolMatch3: draw.prizePoolMatch3,
             prizePoolMatch4: draw.prizePoolMatch4,
@@ -1919,6 +2034,7 @@
             drawId: group.drawId,
             draw: group.draw ? {
               id: group.draw.id,
+              cardColor: group.draw.cardColor || null,
               prizePool: group.draw.prizePool,
               state: group.draw.state,
               numbers: group.draw.numbers || null,
@@ -2501,6 +2617,9 @@
   }
 
   if (purchaseBtn) purchaseBtn.addEventListener('click', purchaseTicket);
+  if (sortClosestDrawBtn) sortClosestDrawBtn.addEventListener('click', function () { setDrawSortMode('closest'); });
+  if (sortBiggestJackpotBtn) sortBiggestJackpotBtn.addEventListener('click', function () { setDrawSortMode('jackpot'); });
+  if (sortCheaperTicketsBtn) sortCheaperTicketsBtn.addEventListener('click', function () { setDrawSortMode('cheap'); });
   if (featuredJackpotCardEl) {
     featuredJackpotCardEl.addEventListener('click', function (event) {
       if (purchaseBtn && (event.target === purchaseBtn || purchaseBtn.contains(event.target))) {
@@ -2563,6 +2682,7 @@
 
   startCountdownTimer();
   ensurePurchaseScreenTicketStates();
+  syncDrawSortTabs();
   setActiveTab('lottery');
   setProfileScreen('home');
   renderCurrentDraw(null, [], false);

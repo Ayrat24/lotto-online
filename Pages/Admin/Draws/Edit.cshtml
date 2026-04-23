@@ -52,6 +52,16 @@ else if (Model.CanEdit)
                 <input asp-for="TicketCost" type="number" min="0.01" step="0.01" class="form-control" />
             </div>
             <div class="col-md-4">
+                <label asp-for="CardColor" class="form-label">@Model.T("admin.draws.edit.cardColor", "Card color")</label>
+                <select asp-for="CardColor" class="form-select">
+                    @foreach (var option in Model.CardColorOptions)
+                    {
+                        <option value="@option">@Model.T(MiniApp.Features.Draws.DrawManagement.GetColorDisplayKey(option), option)</option>
+                    }
+                </select>
+                <div class="form-text">@Model.T("admin.draws.edit.cardColorHint", "Used by Mini App draw cards and sorting view.")</div>
+            </div>
+            <div class="col-md-4">
                 <label asp-for="PurchaseClosesAtUtc" class="form-label">@Model.T("admin.draws.edit.purchaseClosesAtUtc", "Ticket sales close at (UTC)")</label>
                 <input asp-for="PurchaseClosesAtUtc" type="datetime-local" step="60" class="form-control" />
                 <div class="form-text">@Model.T("admin.draws.edit.purchaseClosesAtUtcHint", "Ticket sales stop at this UTC time, but the draw still needs manual execution by admin.")</div>

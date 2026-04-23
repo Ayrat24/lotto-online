@@ -161,6 +161,10 @@ public sealed class AppDbContext : DbContext
             b.HasIndex(x => x.PurchaseClosesAtUtc);
             b.HasIndex(x => x.State);
 
+            b.Property(x => x.CardColor)
+                .HasMaxLength(32)
+                .IsRequired()
+                .HasDefaultValue("gold");
             b.Property(x => x.PrizePoolMatch3).HasPrecision(18, 2).IsRequired();
             b.Property(x => x.PrizePoolMatch4).HasPrecision(18, 2).IsRequired();
             b.Property(x => x.PrizePoolMatch5).HasPrecision(18, 2).IsRequired();
