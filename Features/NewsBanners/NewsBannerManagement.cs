@@ -23,6 +23,7 @@ public static class NewsBannerManagement
     {
         "lottery",
         "tickets",
+        "winners",
         "profile",
         "profile/deposit",
         "profile/invite",

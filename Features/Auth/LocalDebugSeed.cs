@@ -1,21 +1,40 @@
 using Microsoft.EntityFrameworkCore;
 using MiniApp.Data;
 using MiniApp.Features.Draws;
+using System.Globalization;
 
 namespace MiniApp.Features.Auth;
 
 public static class LocalDebugSeed
 {
-    private const long FakeUserA = 700000001;
-    private const long FakeUserB = 700000002;
+    private sealed record DebugUserSeed(
+        long TelegramUserId,
+        string Number,
+        decimal MinBalance,
+        string PreferredLanguage,
+        bool IsFake,
+        string AcquisitionDeepLink,
+        int LastSeenMinutesAgo);
 
     public static async Task EnsureSeededAsync(AppDbContext db, long debugTelegramUserId, CancellationToken ct)
     {
         var now = DateTimeOffset.UtcNow;
 
-        await EnsureUserAsync(db, debugTelegramUserId, "+10000000001", 100m, now, ct);
-        await EnsureUserAsync(db, FakeUserA, "+10000000002", 25m, now, ct);
-        await EnsureUserAsync(db, FakeUserB, "+10000000003", 25m, now, ct);
+        var seeds = new[]
+        {
+            new DebugUserSeed(debugTelegramUserId, "+10000000001", 100m, "en", false, "local-debug-primary", 1),
+            new DebugUserSeed(700000001, "+10000000002", 25m, "en", true, "local-debug-seed-a", 6),
+            new DebugUserSeed(700000002, "+10000000003", 25m, "ru", true, "local-debug-seed-b", 11),
+            new DebugUserSeed(700000003, "+10000000004", 40m, "uz", true, "local-debug-seed-c", 18),
+            new DebugUserSeed(700000004, "+10000000005", 75m, "en", true, "local-debug-seed-d", 27),
+            new DebugUserSeed(700000005, "+10000000006", 10m, "ru", true, "local-debug-seed-e", 34),
+            new DebugUserSeed(700000006, "+10000000007", 60m, "uz", true, "local-debug-seed-f", 49)
+        };
+
+        foreach (var seed in seeds)
+            await EnsureUserAsync(db, seed, now, ct);
+
+        await EnsureWinnerEntriesAsync(db, now, ct);
 
         var debugUser = await db.Users.SingleAsync(x => x.TelegramUserId == debugTelegramUserId, ct);
 
@@ -238,14 +257,21 @@ public static class LocalDebugSeed
         return matches;
     }
 
-    private static async Task EnsureUserAsync(AppDbContext db, long telegramUserId, string number, decimal minBalance, DateTimeOffset now, CancellationToken ct)
+    private static async Task EnsureUserAsync(AppDbContext db, DebugUserSeed seed, DateTimeOffset now, CancellationToken ct)
     {
-        var user = await db.Users.SingleOrDefaultAsync(x => x.TelegramUserId == telegramUserId, ct);
+        var user = await db.Users.SingleOrDefaultAsync(x => x.TelegramUserId == seed.TelegramUserId, ct);
         if (user is not null)
         {
-            user.PreferredLanguage ??= "en";
-            if (user.Balance < minBalance)
-                user.Balance = minBalance;
+            user.Number ??= seed.Number;
+            user.PreferredLanguage ??= seed.PreferredLanguage;
+            user.AcquisitionDeepLink ??= seed.AcquisitionDeepLink;
+            user.InviteCode ??= BuildDeterministicInviteCode(seed.TelegramUserId);
+            if (seed.IsFake)
+                user.IsFake = true;
+            if (user.Balance < seed.MinBalance)
+                user.Balance = seed.MinBalance;
+            if (user.LastSeenAtUtc < now.AddMinutes(-seed.LastSeenMinutesAgo))
+                user.LastSeenAtUtc = now.AddMinutes(-seed.LastSeenMinutesAgo);
 
             await db.SaveChangesAsync(ct);
             return;
@@ -253,14 +279,67 @@ public static class LocalDebugSeed
 
         db.Users.Add(new MiniAppUser
         {
-            TelegramUserId = telegramUserId,
-            Number = number,
-            PreferredLanguage = "en",
+            TelegramUserId = seed.TelegramUserId,
+            Number = seed.Number,
+            PreferredLanguage = seed.PreferredLanguage,
+            AcquisitionDeepLink = seed.AcquisitionDeepLink,
+            InviteCode = BuildDeterministicInviteCode(seed.TelegramUserId),
             ReferredByUserIdOrUnbound = MiniAppUser.UnboundReferralUserId,
-            Balance = minBalance,
+            IsFake = seed.IsFake,
+            Balance = seed.MinBalance,
             CreatedAtUtc = now,
-            LastSeenAtUtc = now
+            LastSeenAtUtc = now.AddMinutes(-seed.LastSeenMinutesAgo)
         });
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    private static string BuildDeterministicInviteCode(long telegramUserId)
+        => $"D{Math.Abs(telegramUserId).ToString(CultureInfo.InvariantCulture).PadLeft(9, '0')}";
+
+    private static async Task EnsureWinnerEntriesAsync(AppDbContext db, DateTimeOffset now, CancellationToken ct)
+    {
+        var hasPublishedWinners = await db.Set<WinnerEntry>()
+            .AsNoTracking()
+            .AnyAsync(x => x.IsPublished, ct);
+
+        if (hasPublishedWinners)
+            return;
+
+        db.Set<WinnerEntry>().AddRange(
+            new WinnerEntry
+            {
+                Name = "Ludmila Boltenkova",
+                WinningAmountText = "1 000 000 rub.",
+                QuoteText = "Winning felt like a gift for me.",
+                PhotoPath = "/img/debug-winners/ludmila.svg",
+                DisplayOrder = 0,
+                IsPublished = true,
+                CreatedAtUtc = now.AddMinutes(-12),
+                UpdatedAtUtc = now.AddMinutes(-12)
+            },
+            new WinnerEntry
+            {
+                Name = "Lidia M.",
+                WinningAmountText = "38 870 613 rub.",
+                QuoteText = "At first I thought I had won only 38,000 rubles.",
+                PhotoPath = "/img/debug-winners/lidia.svg",
+                DisplayOrder = 1,
+                IsPublished = true,
+                CreatedAtUtc = now.AddMinutes(-11),
+                UpdatedAtUtc = now.AddMinutes(-11)
+            },
+            new WinnerEntry
+            {
+                Name = "Svetlana Tolkova",
+                WinningAmountText = "2 500 000 rub.",
+                QuoteText = "The day before the win, my left palm would not stop itching.",
+                PhotoPath = "/img/debug-winners/svetlana.svg",
+                DisplayOrder = 2,
+                IsPublished = true,
+                CreatedAtUtc = now.AddMinutes(-10),
+                UpdatedAtUtc = now.AddMinutes(-10)
+            });
 
         await db.SaveChangesAsync(ct);
     }

@@ -40,10 +40,15 @@
   var lotteryTabBtn = document.getElementById('lotteryTabBtn');
   var ticketsTabBtn = document.getElementById('ticketsTabBtn');
   var ticketsWinningPinEl = document.getElementById('ticketsWinningPin');
+  var winnersTabBtn = document.getElementById('winnersTabBtn');
   var profileTabBtn = document.getElementById('profileTabBtn');
   var lotteryTabPanel = document.getElementById('lotteryTabPanel');
   var ticketsTabPanel = document.getElementById('ticketsTabPanel');
+  var winnersTabPanel = document.getElementById('winnersTabPanel');
   var profileTabPanel = document.getElementById('profileTabPanel');
+  var winnersStatusEl = document.getElementById('winnersStatus');
+  var winnersEmptyEl = document.getElementById('winnersEmpty');
+  var winnersListEl = document.getElementById('winnersList');
 
   var currentDrawStateBadgeEl = document.getElementById('currentDrawStateBadge') || document.getElementById('jackpotGameStateBadge');
   var currentDrawEmptyEl = document.getElementById('currentDrawEmpty');
@@ -116,6 +121,7 @@
   var currentDrawSortMode = 'closest';
   var historyEntries = [];
   var newsBanners = [];
+  var winnerEntries = [];
   var newsBannerIndex = 0;
   var newsBannerAutoplayTimerId = null;
   var newsBannerGestureBound = false;
@@ -165,6 +171,7 @@
   function reapplyLocalizedRuntimeTexts() {
     var selected = resolveSelectedDrawSnapshot(latestState);
     renderNewsBanners(newsBanners);
+    renderWinners(winnerEntries);
     syncDrawSortTabs();
     renderCurrentDraw(selected.draw, selected.tickets, selected.hasMultipleActiveDraws);
     renderActiveDrawBanners(getActiveDraws(latestState), getActiveTicketGroups(latestState));
@@ -368,6 +375,10 @@
 
   function setHistoryStatus(text) {
     if (historyStatusEl) historyStatusEl.textContent = text || '';
+  }
+
+  function setWinnersStatus(text) {
+    if (winnersStatusEl) winnersStatusEl.textContent = text || '';
   }
 
   function setDebugModeBadge(text) {
@@ -927,6 +938,11 @@
       return;
     }
 
+    if (actionValue === 'winners') {
+      setActiveTab('winners');
+      return;
+    }
+
     if (actionValue === 'profile') {
       setActiveTab('profile');
       return;
@@ -1049,6 +1065,76 @@
       })
       .catch(function () {
         renderNewsBanners([]);
+      });
+  }
+
+  function createWinnerEl(entry) {
+    var card = document.createElement('article');
+    card.className = 'winner-card';
+
+    var photo = document.createElement('img');
+    photo.className = 'winner-photo';
+    photo.src = String(entry.photoUrl || '');
+    photo.alt = String(entry.name || '').trim() || t('client.winners.title', 'Winners');
+    photo.decoding = 'async';
+    photo.loading = 'lazy';
+
+    var body = document.createElement('div');
+    body.className = 'winner-body';
+
+    var name = document.createElement('div');
+    name.className = 'winner-name';
+    name.textContent = String(entry.name || '').trim();
+
+    var amount = document.createElement('div');
+    amount.className = 'winner-amount';
+    amount.textContent = String(entry.winningAmount || '').trim();
+
+    body.appendChild(name);
+    body.appendChild(amount);
+    var quote = String(entry.quote || '').trim();
+    if (quote) {
+      var quoteEl = document.createElement('div');
+      quoteEl.className = 'winner-quote';
+      quoteEl.textContent = '«' + quote + '»';
+      body.appendChild(quoteEl);
+    }
+    card.appendChild(photo);
+    card.appendChild(body);
+
+    return card;
+  }
+
+  function renderWinners(items) {
+    winnerEntries = Array.isArray(items)
+      ? items.filter(function (item) {
+          return item && item.photoUrl && item.name && item.winningAmount;
+        })
+      : [];
+
+    if (!winnersListEl) winnersListEl = document.getElementById('winnersList');
+    if (!winnersEmptyEl) winnersEmptyEl = document.getElementById('winnersEmpty');
+    if (!winnersListEl || !winnersEmptyEl) return;
+
+    winnersListEl.innerHTML = '';
+    winnersEmptyEl.hidden = winnerEntries.length > 0;
+
+    winnerEntries.forEach(function (entry) {
+      winnersListEl.appendChild(createWinnerEl(entry));
+    });
+  }
+
+  function loadWinners() {
+    setWinnersStatus(t('client.winners.loading', 'Loading winners...'));
+
+    return getJson('/api/winners')
+      .then(function (res) {
+        renderWinners(res && Array.isArray(res.winners) ? res.winners : []);
+        setWinnersStatus('');
+      })
+      .catch(function () {
+        renderWinners([]);
+        setWinnersStatus(t('client.winners.loadFailed', 'Failed to load winners.'));
       });
   }
 
@@ -1919,22 +2005,36 @@
     activeTabName = tab;
     var isLottery = tab === 'lottery';
     var isTickets = tab === 'tickets';
+    var isWinners = tab === 'winners';
     var isProfile = tab === 'profile';
 
     if (lotteryTabPanel) lotteryTabPanel.hidden = !isLottery;
     if (ticketsTabPanel) ticketsTabPanel.hidden = !isTickets;
+    if (winnersTabPanel) winnersTabPanel.hidden = !isWinners;
     if (profileTabPanel) profileTabPanel.hidden = !isProfile;
 
     if (lotteryTabBtn) lotteryTabBtn.classList.toggle('tabbar-btn-active', isLottery);
     if (ticketsTabBtn) ticketsTabBtn.classList.toggle('tabbar-btn-active', isTickets);
+    if (winnersTabBtn) winnersTabBtn.classList.toggle('tabbar-btn-active', isWinners);
     if (profileTabBtn) profileTabBtn.classList.toggle('tabbar-btn-active', isProfile);
 
     if (isTickets) {
       renderMyTickets(latestState);
     }
 
+    if (isWinners) {
+      renderWinners(winnerEntries);
+    }
+
     // Any footer tab click resets profile to its home menu.
     setProfileScreen('home');
+  }
+
+  function loadPublicMiniAppData() {
+    return Promise.all([
+      loadNewsBanners(),
+      loadWinners()
+    ]);
   }
 
   function openTicketPurchaseScreen(drawId) {
@@ -2764,6 +2864,7 @@
   }
   if (lotteryTabBtn) lotteryTabBtn.addEventListener('click', function () { setActiveTab('lottery'); });
   if (ticketsTabBtn) ticketsTabBtn.addEventListener('click', function () { setActiveTab('tickets'); });
+  if (winnersTabBtn) winnersTabBtn.addEventListener('click', function () { setActiveTab('winners'); });
   if (profileTabBtn) profileTabBtn.addEventListener('click', function () { setActiveTab('profile'); });
   if (closeTicketPurchaseScreenBtn) closeTicketPurchaseScreenBtn.addEventListener('click', closeTicketPurchaseScreen);
   if (submitTicketPurchaseBtn) submitTicketPurchaseBtn.addEventListener('click', submitTicketPurchase);
@@ -2820,6 +2921,7 @@
   setProfileScreen('home');
   renderCurrentDraw(null, [], false);
   renderMyTickets({ balance: 0, currentDraw: null, activeDraws: [], activeTicketGroups: [], currentTickets: [], history: [], ticketPurchase: null });
+  renderWinners([]);
   renderHistory();
   renderBalance(0);
   if (topUpAmountInputEl && !String(topUpAmountInputEl.value || '').trim()) {
@@ -2848,10 +2950,8 @@
     }, 5000);
 
     loadRemoteLocale(initData)
-      .then(function () {
-        loadNewsBanners();
-        return postJson('/api/auth/telegram', { initData: initData });
-      })
+      .then(loadPublicMiniAppData)
+      .then(function () { return postJson('/api/auth/telegram', { initData: initData }); })
       .then(function () { return loadReferralProfile(); })
       .then(function () { return bindReferralCodeFromQuery(); })
       .then(function () { return refreshState(); })
@@ -2888,10 +2988,8 @@
   try {
     initData = Telegram.WebApp.initData;
     loadRemoteLocale(initData)
-      .then(function () {
-        loadNewsBanners();
-        return postJson('/api/auth/telegram', { initData: initData });
-      })
+      .then(loadPublicMiniAppData)
+      .then(function () { return postJson('/api/auth/telegram', { initData: initData }); })
       .then(function () { return loadReferralProfile(); })
       .then(function () { return bindReferralCodeFromQuery(); })
       .then(function () { return refreshState(); })

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="Ludmila debug winner">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ff687a"/>
+      <stop offset="100%" stop-color="#e12639"/>
+    </linearGradient>
+  </defs>
+  <rect width="160" height="160" rx="80" fill="url(#bg)"/>
+  <circle cx="80" cy="62" r="30" fill="#e9e9ee"/>
+  <path d="M42 136c6-26 23-40 38-40s32 14 38 40" fill="#d9d9df"/>
+  <path d="M51 62c3-23 17-39 29-39 13 0 27 16 30 39-8-9-16-13-29-13-13 0-22 4-30 13Z" fill="#bfc1cb"/>
+</svg>
+

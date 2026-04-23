@@ -179,7 +179,7 @@ body.app-loading .loading-shell {
   bottom: 0;
   z-index: 61;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-1);
   max-width: var(--app-max-width);
   margin: 0 auto;
@@ -848,6 +848,62 @@ button:disabled {
   gap: 12px;
 }
 
+.winners-screen {
+  gap: 14px;
+}
+
+.winners-list {
+  display: grid;
+  gap: 14px;
+}
+
+.winner-card {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.03));
+}
+
+.winner-photo {
+  width: 88px;
+  height: 88px;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 3px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.winner-body {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.winner-name {
+  color: #66b6ff;
+  font-size: 1.08rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.winner-amount {
+  color: #ffffff;
+  font-size: clamp(1.35rem, 3.6vw, 1.85rem);
+  font-weight: 900;
+  line-height: 1.08;
+  word-break: break-word;
+}
+
+.winner-quote {
+  color: #c6d3e6;
+  font-size: 0.98rem;
+  line-height: 1.45;
+}
+
 .ticket {
   background: linear-gradient(180deg, #121a29, #0f1725);
   border: 1px solid var(--line);
@@ -1499,7 +1555,7 @@ button:disabled {
   bottom: 0;
   z-index: 40;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-1);
   max-width: var(--app-max-width);
   margin: 0 auto;
@@ -1733,6 +1789,17 @@ button:disabled {
   .profile-back-btn + .section-header {
     align-items: center;
     flex-direction: row;
+  }
+
+  .winner-card {
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .winner-photo {
+    width: 72px;
+    height: 72px;
   }
 
 }

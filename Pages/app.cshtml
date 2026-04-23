@@ -61,6 +61,7 @@
         <div class="loading-skeleton loading-skeleton-tab"></div>
         <div class="loading-skeleton loading-skeleton-tab"></div>
         <div class="loading-skeleton loading-skeleton-tab"></div>
+        <div class="loading-skeleton loading-skeleton-tab"></div>
       </nav>
     </div>
   </div>
@@ -141,6 +142,17 @@
         <div id="timelineStatus" class="section-subtitle"></div>
         <div id="myTicketsEmpty" class="empty-card" data-loc="client.tickets.empty">You have not bought any tickets yet.</div>
         <div id="myTicketsList" class="history-list"></div>
+      </div>
+    </section>
+
+    <section id="winnersTabPanel" class="tab-panel stack" hidden>
+      <div class="card stack winners-screen">
+        <div class="section-header">
+          <div class="section-title" data-loc="client.winners.title">Winners</div>
+        </div>
+        <div id="winnersStatus" class="section-subtitle"></div>
+        <div id="winnersEmpty" class="empty-card" data-loc="client.winners.empty">Winners will appear here soon.</div>
+        <div id="winnersList" class="winners-list"></div>
       </div>
     </section>
 
@@ -245,6 +257,7 @@
   <nav class="tabbar" aria-label="Bottom tabs" data-loc-aria-label="client.tabbar.aria">
     <button id="lotteryTabBtn" type="button" class="tabbar-btn tabbar-btn-active"><span data-loc="client.tab.home">Home</span></button>
     <button id="ticketsTabBtn" type="button" class="tabbar-btn"><span data-loc="client.tab.tickets">My Tickets</span> <span id="ticketsWinningPin" class="tickets-winning-pin" hidden>0</span></button>
+    <button id="winnersTabBtn" type="button" class="tabbar-btn"><span data-loc="client.tab.winners">Winners</span></button>
     <button id="profileTabBtn" type="button" class="tabbar-btn"><span data-loc="client.tab.profile">Profile</span></button>
   </nav>
 

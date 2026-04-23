@@ -1,0 +1,144 @@
+@page
+@model MiniApp.Pages.Admin.WinnersModel
+@{
+	ViewData["Title"] = Model.T("admin.winners.title", "Winners");
+}
+
+<h1>@Model.T("admin.winners.heading", "Winners")</h1>
+<p class="text-muted">@Model.T("admin.winners.subtitle", "Manage the winners list shown in the Mini App Winners tab.")</p>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+	<div class="alert @(Model.StatusIsError ? "alert-danger" : "alert-info")" role="status">@Model.StatusMessage</div>
+}
+
+<div class="card mb-3">
+	<div class="card-body">
+		<h5 class="card-title">@Model.T("admin.winners.create.title", "Create winner")</h5>
+		<p class="text-muted mb-3">@string.Format(Model.T("admin.winners.create.photoHelp", "Upload a .jpg, .jpeg, .png, or .webp image under {0} MB."), Model.MaxUploadMegabytes)</p>
+
+		<form method="post" asp-page-handler="Create" enctype="multipart/form-data" class="row g-3 align-items-end">
+			<div class="col-12 col-lg-4">
+				<label for="winnerPhotoFile" class="form-label">@Model.T("admin.winners.create.photo", "Photo")</label>
+				<input id="winnerPhotoFile" name="photoFile" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" class="form-control" required />
+			</div>
+			<div class="col-12 col-lg-3">
+				<label for="winnerName" class="form-label">@Model.T("admin.winners.create.name", "Name")</label>
+				<input id="winnerName" name="name" type="text" maxlength="128" class="form-control" required />
+			</div>
+			<div class="col-12 col-lg-3">
+				<label for="winnerAmount" class="form-label">@Model.T("admin.winners.create.amount", "Win amount")</label>
+				<input id="winnerAmount" name="winningAmount" type="text" maxlength="128" class="form-control" required />
+			</div>
+			<div class="col-12 col-lg-8">
+				<label for="winnerQuote" class="form-label">@Model.T("admin.winners.create.quote", "Quote")</label>
+				<textarea id="winnerQuote" name="quote" rows="2" maxlength="512" class="form-control" placeholder="@Model.T("admin.winners.create.quotePlaceholder", "Optional winner quote or short testimonial")"></textarea>
+			</div>
+			<div class="col-6 col-lg-1">
+				<label for="winnerDisplayOrder" class="form-label">@Model.T("admin.winners.create.order", "Display order")</label>
+				<input id="winnerDisplayOrder" name="displayOrder" type="number" min="0" step="1" value="0" class="form-control" />
+			</div>
+			<div class="col-6 col-lg-1">
+				<div class="form-check mt-lg-4 pt-lg-2">
+					<input id="winnerIsPublished" name="isPublished" type="checkbox" value="true" class="form-check-input" checked />
+					<label for="winnerIsPublished" class="form-check-label">@Model.T("admin.winners.create.published", "Published")</label>
+				</div>
+			</div>
+			<div class="col-12 col-lg-2">
+				<button type="submit" class="btn btn-primary w-100">@Model.T("admin.winners.create.submit", "Add winner")</button>
+			</div>
+		</form>
+	</div>
+</div>
+
+@if (Model.Items.Count == 0)
+{
+	<div class="alert alert-secondary">@Model.T("admin.winners.empty", "No winners yet.")</div>
+}
+else
+{
+	<div class="card">
+		<div class="card-body">
+			<h5 class="card-title">@Model.T("admin.winners.manage.title", "Manage winners")</h5>
+			<div class="table-responsive">
+				<table class="table table-sm align-middle">
+					<thead>
+					<tr>
+						<th>@Model.T("admin.winners.table.preview", "Preview")</th>
+						<th>@Model.T("admin.winners.table.name", "Name")</th>
+						<th>@Model.T("admin.winners.table.amount", "Win amount")</th>
+						<th>@Model.T("admin.winners.table.quote", "Quote")</th>
+						<th>@Model.T("admin.winners.table.photo", "Replace photo")</th>
+						<th>@Model.T("admin.winners.table.order", "Order")</th>
+						<th>@Model.T("admin.winners.table.status", "Status")</th>
+						<th>@Model.T("admin.winners.table.createdUtc", "Created (UTC)")</th>
+						<th>@Model.T("admin.winners.table.updatedUtc", "Updated (UTC)")</th>
+						<th>@Model.T("admin.winners.table.actions", "Actions")</th>
+					</tr>
+					</thead>
+					<tbody>
+					@foreach (var item in Model.Items)
+					{
+						<tr>
+							<form method="post" asp-page-handler="Update" enctype="multipart/form-data">
+								<input type="hidden" name="id" value="@item.Id" />
+								<td>
+									<img src="@Url.Content(item.PhotoPath)" alt="@item.Name" style="width: 72px; height: 72px; object-fit: cover; border-radius: 999px; border: 1px solid rgba(0,0,0,.08);" />
+								</td>
+								<td style="min-width: 180px;">
+									<input name="name" type="text" maxlength="128" value="@item.Name" class="form-control form-control-sm" />
+								</td>
+								<td style="min-width: 180px;">
+									<input name="winningAmount" type="text" maxlength="128" value="@item.WinningAmount" class="form-control form-control-sm" />
+								</td>
+								<td style="min-width: 260px;">
+									<textarea name="quote" rows="2" maxlength="512" class="form-control form-control-sm" placeholder="@Model.T("admin.winners.create.quotePlaceholder", "Optional winner quote or short testimonial")">@item.Quote</textarea>
+								</td>
+								<td style="min-width: 220px;">
+									<input name="photoFile" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" class="form-control form-control-sm" />
+									<div class="form-text">@Model.T("admin.winners.table.photoHelp", "Leave empty to keep the current photo.")</div>
+								</td>
+								<td style="max-width: 110px;">
+									<input name="displayOrder" type="number" min="0" step="1" value="@item.DisplayOrder" class="form-control form-control-sm" />
+								</td>
+								<td>
+									<div class="form-check mb-2">
+										@if (item.IsPublished)
+										{
+											<input id="winnerPublished_@item.Id" name="isPublished" type="checkbox" value="true" class="form-check-input" checked />
+										}
+										else
+										{
+											<input id="winnerPublished_@item.Id" name="isPublished" type="checkbox" value="true" class="form-check-input" />
+										}
+										<label for="winnerPublished_@item.Id" class="form-check-label">@Model.T("admin.winners.create.published", "Published")</label>
+									</div>
+									<span class="badge @(item.IsPublished ? "bg-success-subtle text-dark border border-success-subtle" : "bg-secondary-subtle text-dark border border-secondary-subtle")">
+										@(item.IsPublished ? Model.T("admin.winners.status.published", "Published") : Model.T("admin.winners.status.hidden", "Hidden"))
+									</span>
+								</td>
+								<td>@item.CreatedAtUtc.ToString("u")</td>
+								<td>@item.UpdatedAtUtc.ToString("u")</td>
+								<td class="text-nowrap">
+									<button type="submit" class="btn btn-sm btn-outline-primary">@Model.T("admin.winners.action.save", "Save")</button>
+									<button type="submit"
+											class="btn btn-sm btn-outline-danger"
+											formmethod="post"
+											formaction="?handler=Delete"
+											name="id"
+											value="@item.Id"
+											onclick="return confirm('@Model.T("admin.winners.confirm.delete", "Delete this winner entry?")');">
+										@Model.T("admin.winners.action.delete", "Delete")
+									</button>
+								</td>
+							</form>
+						</tr>
+					}
+					</tbody>
+				</table>
+			</div>
+		</div>
+	</div>
+}
+
+

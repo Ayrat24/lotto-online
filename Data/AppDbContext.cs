@@ -20,6 +20,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<ReferralProgramSettings> ReferralProgramSettings => Set<ReferralProgramSettings>();
     public DbSet<ReferralReward> ReferralRewards => Set<ReferralReward>();
     public DbSet<NewsBanner> NewsBanners => Set<NewsBanner>();
+    public DbSet<WinnerEntry> WinnerEntries => Set<WinnerEntry>();
     public DbSet<TicketPurchaseSettings> TicketPurchaseSettings => Set<TicketPurchaseSettings>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -144,6 +145,24 @@ public sealed class AppDbContext : DbContext
             b.Property(x => x.ImagePath).HasMaxLength(512).IsRequired();
             b.Property(x => x.ActionType).HasMaxLength(32).IsRequired().HasDefaultValue("none");
             b.Property(x => x.ActionValue).HasMaxLength(1024);
+            b.Property(x => x.DisplayOrder).IsRequired();
+            b.Property(x => x.IsPublished).IsRequired().HasDefaultValue(true);
+            b.Property(x => x.CreatedAtUtc).IsRequired();
+            b.Property(x => x.UpdatedAtUtc).IsRequired();
+        });
+
+        modelBuilder.Entity<WinnerEntry>(b =>
+        {
+            b.ToTable("winner_entries");
+            b.HasKey(x => x.Id);
+
+            b.HasIndex(x => new { x.IsPublished, x.DisplayOrder, x.CreatedAtUtc });
+            b.HasIndex(x => x.UpdatedAtUtc);
+
+            b.Property(x => x.Name).HasMaxLength(128).IsRequired();
+            b.Property(x => x.WinningAmountText).HasMaxLength(128).IsRequired();
+            b.Property(x => x.QuoteText).HasMaxLength(512);
+            b.Property(x => x.PhotoPath).HasMaxLength(512).IsRequired();
             b.Property(x => x.DisplayOrder).IsRequired();
             b.Property(x => x.IsPublished).IsRequired().HasDefaultValue(true);
             b.Property(x => x.CreatedAtUtc).IsRequired();

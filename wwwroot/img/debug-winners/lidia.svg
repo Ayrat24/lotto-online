@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="Lidia debug winner">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ff43b5"/>
+      <stop offset="100%" stop-color="#d8007f"/>
+    </linearGradient>
+  </defs>
+  <rect width="160" height="160" rx="80" fill="url(#bg)"/>
+  <circle cx="80" cy="60" r="28" fill="#ffd8c3"/>
+  <path d="M48 136c7-28 24-44 32-44 9 0 26 16 32 44" fill="#d9e8dc"/>
+  <path d="M49 63c2-24 17-43 31-43 16 0 31 19 31 43-9-7-17-13-31-13s-22 6-31 13Z" fill="#7b4f2f"/>
+  <circle cx="66" cy="58" r="4" fill="#2f2f37"/>
+  <circle cx="94" cy="58" r="4" fill="#2f2f37"/>
+  <path d="M67 75c7 7 19 7 26 0" fill="none" stroke="#b75f61" stroke-width="4" stroke-linecap="round"/>
+</svg>
+
