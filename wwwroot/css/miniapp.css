@@ -290,11 +290,18 @@ body.app-loading .loading-shell {
   overflow: hidden;
   touch-action: pan-y;
   user-select: none;
+  -webkit-user-select: none;
   cursor: grab;
 }
 
 .news-banner-carousel.news-banner-carousel-dragging {
   cursor: grabbing;
+}
+
+.news-banner-carousel.news-banner-carousel-dragging,
+.news-banner-carousel.news-banner-carousel-dragging * {
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .news-banner-track {
@@ -310,6 +317,8 @@ body.app-loading .loading-shell {
 .news-banner-slide {
   flex: 0 0 100%;
   min-width: 100%;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .news-banner-slide-actionable {
@@ -335,6 +344,9 @@ body.app-loading .loading-shell {
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: #0c1320;
   box-shadow: 0 14px 28px rgba(0, 0, 0, 0.28);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
 }
 
 .news-banner-dots {
@@ -419,6 +431,20 @@ body.app-loading .loading-shell {
   padding-bottom: 4px;
   scroll-snap-type: x proximity;
   -webkit-overflow-scrolling: touch;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+}
+
+.draw-card-list.draw-card-list-dragging {
+  cursor: grabbing;
+  scroll-snap-type: none;
+}
+
+.draw-card-list.draw-card-list-dragging,
+.draw-card-list.draw-card-list-dragging * {
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .draw-sort-tabs-section {
@@ -491,6 +517,8 @@ body.app-loading .loading-shell {
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.2);
   cursor: pointer;
   transition: transform 0.12s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .draw-card:hover {

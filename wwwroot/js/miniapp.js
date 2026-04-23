@@ -125,6 +125,13 @@
   var newsBannerDragActive = false;
   var newsBannerDragMoved = false;
   var newsBannerSuppressClickUntil = 0;
+  var drawCardListGestureBound = false;
+  var drawCardListDragPointerId = null;
+  var drawCardListDragStartX = 0;
+  var drawCardListDragStartScrollLeft = 0;
+  var drawCardListDragActive = false;
+  var drawCardListDragMoved = false;
+  var drawCardListSuppressClickUntil = 0;
   var referralInviteCode = '';
   var referralInviteLink = '';
   var referralCodeFromQuery = '';
@@ -694,6 +701,26 @@
     startNewsBannerAutoplay();
   }
 
+  function endDrawCardListDrag(pointerId) {
+    if (!drawCardListDragActive || (pointerId != null && drawCardListDragPointerId !== pointerId)) return;
+
+    var shouldSuppressClick = drawCardListDragMoved;
+
+    drawCardListDragPointerId = null;
+    drawCardListDragStartX = 0;
+    drawCardListDragStartScrollLeft = 0;
+    drawCardListDragActive = false;
+    drawCardListDragMoved = false;
+
+    if (jackpotCardsContainerEl) {
+      jackpotCardsContainerEl.classList.remove('draw-card-list-dragging');
+    }
+
+    if (shouldSuppressClick) {
+      drawCardListSuppressClickUntil = Date.now() + 250;
+    }
+  }
+
   function bindNewsBannerGestures() {
     if (!newsBannerCarouselEl || newsBannerGestureBound) return;
 
@@ -703,6 +730,10 @@
       if (!event) return;
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       if (newsBanners.length <= 1) return;
+
+      if ((event.pointerType === 'mouse' || event.pointerType === 'pen') && event.cancelable) {
+        event.preventDefault();
+      }
 
       newsBannerDragPointerId = event.pointerId;
       newsBannerDragActive = true;
@@ -749,6 +780,84 @@
     newsBannerCarouselEl.addEventListener('lostpointercapture', function (event) {
       endNewsBannerDrag(event && event.pointerId);
     });
+
+    newsBannerCarouselEl.addEventListener('dragstart', function (event) {
+      if (event && event.cancelable) {
+        event.preventDefault();
+      }
+    });
+  }
+
+  function bindDrawCardListGestures() {
+    if (!jackpotCardsContainerEl || drawCardListGestureBound) return;
+
+    drawCardListGestureBound = true;
+
+    jackpotCardsContainerEl.addEventListener('pointerdown', function (event) {
+      if (!event) return;
+      if (event.pointerType === 'touch') return;
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      if (jackpotCardsContainerEl.scrollWidth <= jackpotCardsContainerEl.clientWidth) return;
+
+      drawCardListDragPointerId = event.pointerId;
+      drawCardListDragStartX = Number(event.clientX || 0);
+      drawCardListDragStartScrollLeft = Number(jackpotCardsContainerEl.scrollLeft || 0);
+      drawCardListDragActive = true;
+      drawCardListDragMoved = false;
+      jackpotCardsContainerEl.classList.add('draw-card-list-dragging');
+
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+
+      try {
+        if (typeof jackpotCardsContainerEl.setPointerCapture === 'function') {
+          jackpotCardsContainerEl.setPointerCapture(event.pointerId);
+        }
+      } catch (e) {
+      }
+    });
+
+    jackpotCardsContainerEl.addEventListener('pointermove', function (event) {
+      if (!drawCardListDragActive || !event || drawCardListDragPointerId !== event.pointerId) return;
+
+      var deltaX = Number(event.clientX || 0) - drawCardListDragStartX;
+      if (Math.abs(deltaX) > 6) {
+        drawCardListDragMoved = true;
+      }
+
+      if (drawCardListDragMoved && event.cancelable) {
+        event.preventDefault();
+      }
+
+      jackpotCardsContainerEl.scrollLeft = drawCardListDragStartScrollLeft - deltaX;
+    });
+
+    jackpotCardsContainerEl.addEventListener('pointerup', function (event) {
+      endDrawCardListDrag(event && event.pointerId);
+    });
+
+    jackpotCardsContainerEl.addEventListener('pointercancel', function (event) {
+      endDrawCardListDrag(event && event.pointerId);
+    });
+
+    jackpotCardsContainerEl.addEventListener('lostpointercapture', function (event) {
+      endDrawCardListDrag(event && event.pointerId);
+    });
+
+    jackpotCardsContainerEl.addEventListener('dragstart', function (event) {
+      if (event && event.cancelable) {
+        event.preventDefault();
+      }
+    });
+
+    jackpotCardsContainerEl.addEventListener('click', function (event) {
+      if (Date.now() >= drawCardListSuppressClickUntil) return;
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }, true);
   }
 
   function startNewsBannerAutoplay() {
@@ -850,6 +959,7 @@
       var interactive = isNewsBannerInteractive(banner);
       var slide = document.createElement(interactive ? 'button' : 'article');
       slide.className = 'news-banner-slide';
+      slide.draggable = false;
 
       if (interactive) {
         slide.type = 'button';
@@ -874,6 +984,7 @@
       image.alt = t('client.news.bannerAltPrefix', 'News banner') + ' ' + (index + 1);
       image.decoding = 'async';
       image.loading = index === 0 ? 'eager' : 'lazy';
+      image.draggable = false;
 
       if (interactive && actionType === 'external_url') {
         image.alt = image.alt + ' ↗';
@@ -1473,12 +1584,14 @@
     if (!showMultiDrawBanners) {
       jackpotCardsContainerEl.innerHTML = '';
       jackpotCardsContainerEl.hidden = true;
+      jackpotCardsContainerEl.classList.remove('draw-card-list-dragging');
       return;
     }
 
     jackpotCardsContainerEl.innerHTML = '';
     jackpotCardsContainerEl.hidden = false;
     jackpotCardsContainerEl.classList.add('draw-card-list');
+    bindDrawCardListGestures();
 
     draws.forEach(function (draw) {
       var card = document.createElement('article');
@@ -1544,6 +1657,10 @@
       card.appendChild(footer);
 
       card.addEventListener('click', function () {
+        if (Date.now() < drawCardListSuppressClickUntil) {
+          return;
+        }
+
         selectedActiveDrawId = draw.id;
         currentDisplayedDrawId = draw.id;
         if (!isDrawPurchasable(draw)) {
