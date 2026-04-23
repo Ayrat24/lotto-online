@@ -305,6 +305,7 @@ internal static class LocalizationDefaults
             ["admin.winners.flash.uploadInvalidType"] = ("Only .jpg, .jpeg, .png, or .webp images are allowed.", "Разрешены только изображения .jpg, .jpeg, .png или .webp.", "Faqat .jpg, .jpeg, .png yoki .webp rasmlarga ruxsat beriladi."),
             ["admin.winners.flash.uploadFileTooLarge"] = ("Winner photo is too large. Keep it under {0} MB.", "Фото победителя слишком большое. Держите его меньше {0} МБ.", "G'olib rasmi juda katta. Uni {0} MB dan kichik saqlang."),
             ["admin.winners.flash.uploadFailed"] = ("Winner photo upload failed.", "Не удалось загрузить фото победителя.", "G'olib rasmini yuklash muvaffaqiyatsiz."),
+            ["admin.winners.flash.tableMissing"] = ("Winners table is missing. Apply the latest database migrations and reload this page.", "Таблица победителей отсутствует. Примените последние миграции базы данных и перезагрузите страницу.", "G'oliblar jadvali mavjud emas. Ma'lumotlar bazasining so'nggi migratsiyalarini qo'llang va sahifani qayta yuklang."),
             ["admin.db.title"] = ("Database", "База данных", "Ma'lumotlar bazasi"),
             ["admin.db.heading"] = ("Database", "База данных", "Ma'lumotlar bazasi"),
             ["admin.db.provider"] = ("Provider", "Провайдер", "Provayder"),

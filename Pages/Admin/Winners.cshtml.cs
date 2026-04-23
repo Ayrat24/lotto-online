@@ -5,6 +5,7 @@ using MiniApp.Admin;
 using MiniApp.Data;
 using MiniApp.Features.Localization;
 using MiniApp.Features.Winners;
+using Npgsql;
 
 namespace MiniApp.Pages.Admin;
 
@@ -208,21 +209,30 @@ public sealed class WinnersModel : LocalizedAdminPageModel
 
     private async Task LoadAsync(CancellationToken ct)
     {
-        Items = await _db.WinnerEntries
-            .AsNoTracking()
-            .OrderBy(x => x.DisplayOrder)
-            .ThenByDescending(x => x.CreatedAtUtc)
-            .Select(x => new AdminWinnerRow(
-                x.Id,
-                x.Name,
-                x.WinningAmountText,
-                x.QuoteText,
-                x.PhotoPath,
-                x.DisplayOrder,
-                x.IsPublished,
-                x.CreatedAtUtc,
-                x.UpdatedAtUtc))
-            .ToListAsync(ct);
+        try
+        {
+            Items = await _db.WinnerEntries
+                .AsNoTracking()
+                .OrderBy(x => x.DisplayOrder)
+                .ThenByDescending(x => x.CreatedAtUtc)
+                .Select(x => new AdminWinnerRow(
+                    x.Id,
+                    x.Name,
+                    x.WinningAmountText,
+                    x.QuoteText,
+                    x.PhotoPath,
+                    x.DisplayOrder,
+                    x.IsPublished,
+                    x.CreatedAtUtc,
+                    x.UpdatedAtUtc))
+                .ToListAsync(ct);
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UndefinedTable)
+        {
+            Items = Array.Empty<AdminWinnerRow>();
+            StatusMessage = await GetTextAsync("admin.winners.flash.tableMissing", "Winners table is missing. Apply the latest database migrations and reload this page.", ct);
+            StatusIsError = true;
+        }
     }
 
     private async Task SetFlashAsync(string message, bool isError)
