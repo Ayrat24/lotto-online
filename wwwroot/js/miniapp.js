@@ -240,13 +240,29 @@
       { button: sortCheaperTicketsBtn, mode: 'cheap' }
     ];
 
+    var activeButton = null;
+
     mapping.forEach(function (item) {
       if (!item.button) return;
       var isActive = currentDrawSortMode === item.mode;
       item.button.classList.toggle('draw-sort-tab-active', isActive);
       item.button.setAttribute('aria-selected', isActive ? 'true' : 'false');
       item.button.tabIndex = isActive ? 0 : -1;
+      if (isActive) {
+        activeButton = item.button;
+      }
     });
+
+    if (activeButton && typeof activeButton.scrollIntoView === 'function') {
+      try {
+        activeButton.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+      } catch (e) {
+        try {
+          activeButton.scrollIntoView(false);
+        } catch (e) {
+        }
+      }
+    }
   }
 
   function setDrawSortMode(mode) {

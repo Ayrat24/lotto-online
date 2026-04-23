@@ -450,14 +450,22 @@ body.app-loading .loading-shell {
 .draw-sort-tabs-section {
   display: grid;
   gap: 8px;
+  min-width: 0;
 }
 
 .draw-sort-tabs {
   display: flex;
+  flex-wrap: nowrap;
   gap: 10px;
   overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  min-width: 0;
   padding-bottom: 2px;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
+  scrollbar-width: none;
 }
 
 .draw-sort-tabs::-webkit-scrollbar {
@@ -465,6 +473,7 @@ body.app-loading .loading-shell {
 }
 
 .draw-sort-tab {
+  flex: 0 0 auto;
   width: auto;
   min-width: max-content;
   min-height: 0;
