@@ -8,6 +8,12 @@ public static class PaymentsEndpoints
 {
     public static IEndpointRouteBuilder MapPaymentsEndpoints(this IEndpointRouteBuilder endpoints)
     {
+        endpoints.MapGet("/api/payments/systems", (IPaymentsService payments) =>
+        {
+            var options = payments.GetPaymentSystems();
+            return Results.Ok(new { ok = true, options });
+        });
+
         endpoints.MapPost("/api/payments/deposits/create", async (
             CreateCryptoDepositRequest req,
             HttpContext http,
@@ -25,7 +31,7 @@ public static class PaymentsEndpoints
             var telegramUserId = authResult.TelegramUserId!.Value;
             var user = await users.TouchUserAsync(telegramUserId, ct);
 
-            var result = await payments.CreateCryptoDepositAsync(user.Id, req.Amount, req.Currency, ct);
+            var result = await payments.CreateCryptoDepositAsync(user.Id, req.Amount, req.Currency, req.PaymentMethod, ct);
             if (!result.Success)
                 return Results.BadRequest(new { ok = false, error = result.Error ?? "Failed to create deposit." });
 

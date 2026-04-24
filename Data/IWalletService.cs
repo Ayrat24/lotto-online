@@ -42,6 +42,9 @@ public sealed record WalletHistoryEntry(
     string Currency,
     DateTimeOffset CreatedAtUtc,
     string? ExternalId = null,
-    string? Note = null);
+    string? Note = null,
+    string? PaymentMethod = null,
+    string? AssetCode = null,
+    decimal? AssetAmount = null);
 
 

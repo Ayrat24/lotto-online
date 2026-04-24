@@ -313,9 +313,17 @@ public sealed class AppDbContext : DbContext
 
             b.Property(x => x.Amount).HasPrecision(18, 2).IsRequired();
             b.Property(x => x.Currency).HasMaxLength(16).IsRequired();
+            b.Property(x => x.PaymentMethod).HasMaxLength(32).IsRequired().HasDefaultValue("btcpay_crypto");
+            b.Property(x => x.AssetCode).HasMaxLength(16);
+            b.Property(x => x.AssetAmount).HasPrecision(18, 8);
+            b.Property(x => x.Network).HasMaxLength(32);
             b.Property(x => x.Provider).HasMaxLength(32).IsRequired();
             b.Property(x => x.ProviderInvoiceId).HasMaxLength(128).IsRequired();
             b.Property(x => x.CheckoutLink).HasMaxLength(1024).IsRequired();
+            b.Property(x => x.AlternativeCheckoutLink).HasMaxLength(1024);
+            b.Property(x => x.DestinationAddress).HasMaxLength(256);
+            b.Property(x => x.DestinationMemo).HasMaxLength(128);
+            b.Property(x => x.ProviderTransactionId).HasMaxLength(128);
             b.Property(x => x.Status)
                 .HasConversion<string>()
                 .HasMaxLength(32)

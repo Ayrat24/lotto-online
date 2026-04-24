@@ -2,7 +2,9 @@ namespace MiniApp.Features.Payments;
 
 public interface IPaymentsService
 {
-    Task<CreateCryptoDepositResult> CreateCryptoDepositAsync(long userId, decimal amount, string? currency, CancellationToken ct);
+    PaymentSystemsView GetPaymentSystems();
+
+    Task<CreateCryptoDepositResult> CreateCryptoDepositAsync(long userId, decimal amount, string? currency, string? paymentMethod, CancellationToken ct);
 
     Task<CryptoDepositStatusResult> GetCryptoDepositStatusAsync(long userId, long depositId, CancellationToken ct);
 

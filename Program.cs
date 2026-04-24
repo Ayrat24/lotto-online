@@ -64,6 +64,14 @@ builder.Services.AddHttpClient<IBtcPayClient, BtcPayClient>((sp, http) =>
     var timeoutSeconds = options.RequestTimeoutSeconds <= 0 ? 15 : options.RequestTimeoutSeconds;
     http.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
 });
+builder.Services.AddHttpClient<ITelegramTonClient, TelegramTonClient>((sp, http) =>
+{
+    var options = sp.GetRequiredService<IOptions<PaymentsOptions>>().Value.TelegramTon;
+    var timeoutSeconds = options.RequestTimeoutSeconds <= 0 ? 15 : options.RequestTimeoutSeconds;
+    http.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
+});
+builder.Services.AddSingleton<ITelegramTonRateService, TelegramTonRateService>();
+builder.Services.AddHostedService<TelegramTonRateRefreshHostedService>();
 builder.Services.AddScoped<IPaymentsService, PaymentsService>();
 builder.Services.AddScoped<ILocalizationService, LocalizationService>();
 

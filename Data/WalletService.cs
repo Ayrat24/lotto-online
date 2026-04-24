@@ -313,7 +313,10 @@ public sealed class WalletService : IWalletService
                 x.Currency,
                 x.CreatedAtUtc,
                 x.ProviderInvoiceId,
-                x.LastProviderEventType))
+                x.LastProviderEventType,
+                x.PaymentMethod,
+                x.AssetCode,
+                x.AssetAmount))
             .ToListAsync(ct);
 
         var withdrawals = await _db.WithdrawalRequests
@@ -328,7 +331,10 @@ public sealed class WalletService : IWalletService
                 "USD",
                 x.CreatedAtUtc,
                 x.ExternalPayoutId,
-                x.ReviewNote))
+                x.ReviewNote,
+                null,
+                null,
+                null))
             .ToListAsync(ct);
 
         return deposits

@@ -5,6 +5,19 @@
   var topUpBtn = document.getElementById('topUpBtn');
   var topUpStatusEl = document.getElementById('topUpStatus');
   var topUpAmountInputEl = document.getElementById('topUpAmountInput');
+  var paymentSystemsHintEl = document.getElementById('paymentSystemsHint');
+  var paymentSystemsListEl = document.getElementById('paymentSystemsList');
+  var depositDetailsCardEl = document.getElementById('depositDetailsCard');
+  var depositDetailsAmountEl = document.getElementById('depositDetailsAmount');
+  var depositDetailsAddressEl = document.getElementById('depositDetailsAddress');
+  var depositDetailsMemoEl = document.getElementById('depositDetailsMemo');
+  var depositDetailsTxEl = document.getElementById('depositDetailsTx');
+  var openDepositWalletBtn = document.getElementById('openDepositWalletBtn');
+  var openDepositAltBtn = document.getElementById('openDepositAltBtn');
+  var copyDepositAddressBtn = document.getElementById('copyDepositAddressBtn');
+  var copyDepositMemoBtn = document.getElementById('copyDepositMemoBtn');
+  var copyDepositTxBtn = document.getElementById('copyDepositTxBtn');
+  var checkDepositStatusBtn = document.getElementById('checkDepositStatusBtn');
   var promoCodeInputEl = document.getElementById('promoCodeInput');
   var applyPromoBtn = document.getElementById('applyPromoBtn');
   var promoStatusEl = document.getElementById('promoStatus');
@@ -142,6 +155,9 @@
   var referralInviteLink = '';
   var referralCodeFromQuery = '';
   var referralIsBound = false;
+  var paymentSystemsOptions = null;
+  var selectedPaymentMethod = null;
+  var activeDeposit = null;
 
   var LOTTO_NUMBERS_COUNT = 5;
   var LOTTO_MIN = 1;
@@ -172,6 +188,8 @@
     var selected = resolveSelectedDrawSnapshot(latestState);
     renderNewsBanners(newsBanners);
     renderWinners(winnerEntries);
+    renderPaymentSystems();
+    updateDepositDetails(activeDeposit);
     syncDrawSortTabs();
     renderCurrentDraw(selected.draw, selected.tickets, selected.hasMultipleActiveDraws);
     renderActiveDrawBanners(getActiveDraws(latestState), getActiveTicketGroups(latestState));
@@ -1940,6 +1958,199 @@
       : t('client.history.kind.topup', 'Top up');
   }
 
+  function getPaymentSystems() {
+    if (!paymentSystemsOptions || !Array.isArray(paymentSystemsOptions.systems)) return [];
+    return paymentSystemsOptions.systems.filter(function (x) { return !!x && !!x.key; });
+  }
+
+  function getPaymentSystemByKey(key) {
+    var normalized = String(key || '').trim().toLowerCase();
+    var systems = getPaymentSystems();
+    for (var i = 0; i < systems.length; i++) {
+      if (String(systems[i].key || '').trim().toLowerCase() === normalized) return systems[i];
+    }
+    return null;
+  }
+
+  function getSelectedPaymentMethod() {
+    var systems = getPaymentSystems();
+    if (systems.length === 0) return null;
+    if (selectedPaymentMethod && getPaymentSystemByKey(selectedPaymentMethod)) return selectedPaymentMethod;
+    if (paymentSystemsOptions && paymentSystemsOptions.defaultPaymentMethod && getPaymentSystemByKey(paymentSystemsOptions.defaultPaymentMethod)) {
+      selectedPaymentMethod = paymentSystemsOptions.defaultPaymentMethod;
+      return selectedPaymentMethod;
+    }
+    selectedPaymentMethod = systems[0].key;
+    return selectedPaymentMethod;
+  }
+
+  function setSelectedPaymentMethod(methodKey) {
+    selectedPaymentMethod = getPaymentSystemByKey(methodKey) ? methodKey : getSelectedPaymentMethod();
+    renderPaymentSystems();
+    syncTopUpButtonLabel();
+  }
+
+  function getPaymentMethodTitle(methodKey) {
+    var normalized = String(methodKey || '').trim().toLowerCase();
+    if (normalized === 'telegram_ton') return t('client.topup.system.telegramTon.title', 'Telegram Wallet');
+    if (normalized === 'btcpay_crypto') return t('client.topup.system.btcpay.title', 'BTCPay');
+    return normalized;
+  }
+
+  function getPaymentMethodBadge(methodKey) {
+    var normalized = String(methodKey || '').trim().toLowerCase();
+    if (normalized === 'telegram_ton') return t('client.topup.system.telegramTon.badge', 'Fastest inside Telegram');
+    if (normalized === 'btcpay_crypto') return t('client.topup.system.btcpay.badge', 'More coins');
+    return '';
+  }
+
+  function getPaymentMethodDescription(methodKey) {
+    var normalized = String(methodKey || '').trim().toLowerCase();
+    if (normalized === 'telegram_ton') return t('client.topup.system.telegramTon.description', 'Native TON transfer inside Telegram. We generate the amount and memo automatically.');
+    if (normalized === 'btcpay_crypto') return t('client.topup.system.btcpay.description', 'Create an external crypto invoice and pay with any supported wallet.');
+    return '';
+  }
+
+  function getPaymentMethodCta(methodKey) {
+    var normalized = String(methodKey || '').trim().toLowerCase();
+    if (normalized === 'telegram_ton') return t('client.topup.system.telegramTon.cta', 'Open Telegram Wallet');
+    if (normalized === 'btcpay_crypto') return t('client.topup.system.btcpay.cta', 'Create BTCPay invoice');
+    return t('client.button.deposit', 'Add funds');
+  }
+
+  function formatCryptoAssetAmount(amount, assetCode) {
+    var numeric = Number(amount || 0);
+    if (!Number.isFinite(numeric)) numeric = 0;
+    var code = String(assetCode || '').trim().toUpperCase();
+    var text = numeric.toLocaleString(getIntlLocale(), { minimumFractionDigits: numeric % 1 === 0 ? 0 : 2, maximumFractionDigits: 6 });
+    return code ? text + ' ' + code : text;
+  }
+
+  function formatHistoryProvider(entry) {
+    var method = String(entry && entry.paymentMethod || '').trim().toLowerCase();
+    if (method === 'telegram_ton') return t('client.history.provider.telegramTon', 'Telegram Wallet · TON');
+    if (method === 'btcpay_crypto') return t('client.history.provider.btcpay', 'BTCPay invoice');
+    return '';
+  }
+
+  function syncTopUpButtonLabel() {
+    if (!topUpBtn) return;
+    topUpBtn.textContent = getPaymentMethodCta(getSelectedPaymentMethod());
+  }
+
+  function renderPaymentSystems() {
+    if (!paymentSystemsListEl) return;
+
+    var systems = getPaymentSystems();
+    var selected = getSelectedPaymentMethod();
+    paymentSystemsListEl.innerHTML = '';
+
+    if (paymentSystemsHintEl) paymentSystemsHintEl.hidden = systems.length === 0;
+    if (topUpBtn) topUpBtn.disabled = systems.length === 0;
+    syncTopUpButtonLabel();
+
+    if (systems.length === 0) {
+      var empty = document.createElement('div');
+      empty.className = 'empty-card';
+      empty.textContent = t('client.topup.noSystems', 'Crypto payments are not available right now.');
+      paymentSystemsListEl.appendChild(empty);
+      return;
+    }
+
+    systems.forEach(function (system) {
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'payment-system-card';
+      if (selected === system.key) button.classList.add('payment-system-card-selected');
+
+      var header = document.createElement('div');
+      header.className = 'payment-system-card-header';
+
+      var title = document.createElement('div');
+      title.className = 'payment-system-card-title';
+      title.textContent = getPaymentMethodTitle(system.key);
+
+      var badge = document.createElement('div');
+      badge.className = 'payment-system-card-badge';
+      badge.textContent = getPaymentMethodBadge(system.key);
+      badge.hidden = !badge.textContent;
+
+      var body = document.createElement('div');
+      body.className = 'payment-system-card-description';
+      body.textContent = getPaymentMethodDescription(system.key);
+
+      header.appendChild(title);
+      header.appendChild(badge);
+      button.appendChild(header);
+      button.appendChild(body);
+      button.addEventListener('click', function () {
+        setSelectedPaymentMethod(system.key);
+      });
+
+      paymentSystemsListEl.appendChild(button);
+    });
+  }
+
+  function updateDepositDetails(deposit) {
+    activeDeposit = deposit || null;
+    if (!depositDetailsCardEl) return;
+
+    var hasDeposit = !!deposit;
+    depositDetailsCardEl.hidden = !hasDeposit;
+    if (!hasDeposit) return;
+
+    var displayAmount = formatCurrency(deposit.amount || 0);
+    if (deposit.assetAmount && deposit.assetCode) {
+      displayAmount = formatCryptoAssetAmount(deposit.assetAmount, deposit.assetCode) + ' • ' + formatCurrency(deposit.amount || 0);
+    }
+
+    if (depositDetailsAmountEl) depositDetailsAmountEl.textContent = displayAmount;
+    if (depositDetailsAddressEl) depositDetailsAddressEl.textContent = String(deposit.destinationAddress || '-');
+    if (depositDetailsMemoEl) depositDetailsMemoEl.textContent = String(deposit.destinationMemo || '-');
+    if (depositDetailsTxEl) depositDetailsTxEl.textContent = String(deposit.providerTransactionId || '-');
+    if (openDepositWalletBtn) openDepositWalletBtn.hidden = !String(deposit.checkoutLink || '').trim();
+    if (openDepositAltBtn) openDepositAltBtn.hidden = !String(deposit.alternativeCheckoutLink || '').trim();
+    if (copyDepositAddressBtn) copyDepositAddressBtn.hidden = !String(deposit.destinationAddress || '').trim();
+    if (copyDepositMemoBtn) copyDepositMemoBtn.hidden = !String(deposit.destinationMemo || '').trim();
+    if (copyDepositTxBtn) copyDepositTxBtn.hidden = !String(deposit.providerTransactionId || '').trim();
+    if (checkDepositStatusBtn) checkDepositStatusBtn.hidden = !deposit.id;
+  }
+
+  function copyText(value, successMessage) {
+    var text = String(value || '').trim();
+    if (!text) {
+      setTopUpStatus(t('client.topup.copyFailed', 'Copy failed.'));
+      return Promise.resolve(false);
+    }
+
+    if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text)
+        .then(function () {
+          setTopUpStatus(successMessage);
+          return true;
+        })
+        .catch(function () {
+          setTopUpStatus(t('client.topup.copyFailed', 'Copy failed.'));
+          return false;
+        });
+    }
+
+    setTopUpStatus(t('client.topup.copyFailed', 'Copy failed.'));
+    return Promise.resolve(false);
+  }
+
+  function openActiveDepositLink(useAlternative) {
+    if (!activeDeposit) return;
+    var url = useAlternative ? activeDeposit.alternativeCheckoutLink : activeDeposit.checkoutLink;
+    if (url) openCheckoutLink(url);
+  }
+
+  function checkActiveDepositStatus() {
+    if (!activeDeposit || !activeDeposit.id) return;
+    setTopUpStatus(t('client.topup.creatingInvoice', 'Preparing payment details...'));
+    pollDepositStatus(activeDeposit.id, 1);
+  }
+
   function renderHistory() {
     if (!historyListEl || !historyEmptyEl) return;
 
@@ -1971,8 +2182,16 @@
 
       var sub = document.createElement('div');
       sub.className = 'tx-sub';
-      var dateText = formatUtc(entry.createdAtUtc);
-      sub.textContent = dateText + (entry.externalId ? (' • ' + entry.externalId) : '');
+      var parts = [formatUtc(entry.createdAtUtc)];
+      var provider = formatHistoryProvider(entry);
+      if (provider) parts.push(provider);
+      if (entry.assetAmount && entry.assetCode) {
+        parts.push(t('client.history.assetPrefix', 'Asset:') + ' ' + formatCryptoAssetAmount(entry.assetAmount, entry.assetCode));
+      }
+      if (entry.externalId) {
+        parts.push(t('client.history.externalIdPrefix', 'Reference:') + ' ' + entry.externalId);
+      }
+      sub.textContent = parts.join(' • ');
 
       row.appendChild(top);
       row.appendChild(amount);
@@ -1997,6 +2216,11 @@
 
     if (nextScreen === 'history') {
       loadHistory();
+    }
+
+    if (nextScreen === 'deposit') {
+      renderPaymentSystems();
+      updateDepositDetails(activeDeposit);
     }
   }
 
@@ -2035,6 +2259,23 @@
       loadNewsBanners(),
       loadWinners()
     ]);
+  }
+
+  function loadPaymentSystems() {
+    return getJson('/api/payments/systems')
+      .then(function (res) {
+        paymentSystemsOptions = res && res.ok && res.options ? res.options : { enabled: false, defaultPaymentMethod: null, systems: [] };
+        if (!getPaymentSystemByKey(selectedPaymentMethod)) {
+          selectedPaymentMethod = null;
+        }
+        renderPaymentSystems();
+        return paymentSystemsOptions;
+      })
+      .catch(function () {
+        paymentSystemsOptions = { enabled: false, defaultPaymentMethod: null, systems: [] };
+        renderPaymentSystems();
+        return paymentSystemsOptions;
+      });
   }
 
   function openTicketPurchaseScreen(drawId) {
@@ -2536,12 +2777,17 @@
         }
 
         var deposit = res.deposit;
+        updateDepositDetails(deposit);
         var status = String(deposit.status || '').toLowerCase();
         if (status === 'credited') {
           setTopUpStatus(t('client.topup.creditedPrefix', 'Deposit credited: +') + formatCurrency(deposit.amount || 0) + '.');
           return refreshState()
             .then(function () { return loadHistory(); })
             .then(function () { return loadReferralProfile(); });
+        }
+
+        if (status === 'paid' || status === 'confirmed') {
+          setTopUpStatus(t('client.topup.detected', 'Payment detected. Waiting for final credit...'));
         }
 
         if (status === 'expired' || status === 'invalid') {
@@ -2563,10 +2809,12 @@
   function openCheckoutLink(url) {
     var checkoutUrl = String(url || '').trim();
     if (!checkoutUrl) return;
+    var isHttpUrl = /^https?:\/\//i.test(checkoutUrl);
 
-    // iOS Telegram WebView can block async window.open; prefer Telegram's native openLink API when available.
+    // Telegram openLink is best for normal https checkout pages, but custom wallet schemes like ton://
+    // should fall back to direct navigation.
     try {
-      if (window.Telegram && Telegram.WebApp && typeof Telegram.WebApp.openLink === 'function') {
+      if (isHttpUrl && window.Telegram && Telegram.WebApp && typeof Telegram.WebApp.openLink === 'function') {
         Telegram.WebApp.openLink(checkoutUrl);
         return;
       }
@@ -2589,16 +2837,23 @@
     if (!initData) return;
 
     var topUpAmount = topUpAmountInputEl ? Number(topUpAmountInputEl.value) : NaN;
+    var paymentMethod = getSelectedPaymentMethod();
     if (!Number.isFinite(topUpAmount) || topUpAmount <= 0) {
       setTopUpStatus(t('client.topup.enterValidAmount', 'Enter a valid top up amount.'));
       return;
     }
 
+    if (!paymentMethod) {
+      setTopUpStatus(t('client.topup.systemUnavailable', 'Selected payment method is not available right now.'));
+      return;
+    }
+
     if (topUpBtn) topUpBtn.disabled = true;
+    if (checkDepositStatusBtn) checkDepositStatusBtn.disabled = true;
     setTopUpStatus(t('client.topup.creatingInvoice', 'Creating crypto invoice...'));
     setWithdrawStatus('');
 
-    postJson('/api/payments/deposits/create', { initData: initData || '', amount: topUpAmount, currency: 'USD' }, null)
+    postJson('/api/payments/deposits/create', { initData: initData || '', amount: topUpAmount, currency: 'USD', paymentMethod: paymentMethod }, null)
       .then(function (res) {
         if (!(res && res.ok && res.deposit)) {
           setTopUpStatus(t('client.topup.createFailed', 'Failed to create deposit invoice.'));
@@ -2606,11 +2861,15 @@
         }
 
         var deposit = res.deposit;
+        updateDepositDetails(deposit);
         if (deposit.checkoutLink) {
           openCheckoutLink(deposit.checkoutLink);
         }
 
-        setTopUpStatus(t('client.topup.created', 'Invoice created. Complete payment in BTCPay; status updates every 4s.'));
+        var createdMessage = String(paymentMethod || '').toLowerCase() === 'telegram_ton'
+          ? t('client.topup.created.telegramTon', 'TON payment prepared. Open your wallet, send the exact amount, and keep the memo unchanged.')
+          : t('client.topup.created.btcpay', 'BTCPay invoice created. Complete the payment in the opened checkout screen.');
+        setTopUpStatus(createdMessage);
         return pollDepositStatus(deposit.id, 45);
       })
       .catch(function (err) {
@@ -2618,6 +2877,7 @@
       })
       .finally(function () {
         if (topUpBtn) topUpBtn.disabled = false;
+        if (checkDepositStatusBtn) checkDepositStatusBtn.disabled = false;
       });
   }
 
@@ -2872,6 +3132,12 @@
   if (centerPopupBackdropEl) centerPopupBackdropEl.addEventListener('click', hideCenterPopup);
   // active draw selection handled via per-banner buy buttons
   if (topUpBtn) topUpBtn.addEventListener('click', topUpBalance);
+  if (openDepositWalletBtn) openDepositWalletBtn.addEventListener('click', function () { openActiveDepositLink(false); });
+  if (openDepositAltBtn) openDepositAltBtn.addEventListener('click', function () { openActiveDepositLink(true); });
+  if (copyDepositAddressBtn) copyDepositAddressBtn.addEventListener('click', function () { copyText(activeDeposit && activeDeposit.destinationAddress, t('client.topup.addressCopied', 'Wallet address copied.')); });
+  if (copyDepositMemoBtn) copyDepositMemoBtn.addEventListener('click', function () { copyText(activeDeposit && activeDeposit.destinationMemo, t('client.topup.memoCopied', 'Memo copied.')); });
+  if (copyDepositTxBtn) copyDepositTxBtn.addEventListener('click', function () { copyText(activeDeposit && activeDeposit.providerTransactionId, t('client.topup.txCopied', 'Transaction id copied.')); });
+  if (checkDepositStatusBtn) checkDepositStatusBtn.addEventListener('click', checkActiveDepositStatus);
   if (applyPromoBtn) applyPromoBtn.addEventListener('click', applyPromoCode);
   if (promoCodeInputEl) {
     promoCodeInputEl.addEventListener('keydown', function (event) {
@@ -2952,6 +3218,7 @@
     loadRemoteLocale(initData)
       .then(loadPublicMiniAppData)
       .then(function () { return postJson('/api/auth/telegram', { initData: initData }); })
+      .then(function () { return loadPaymentSystems(); })
       .then(function () { return loadReferralProfile(); })
       .then(function () { return bindReferralCodeFromQuery(); })
       .then(function () { return refreshState(); })
@@ -2990,6 +3257,7 @@
     loadRemoteLocale(initData)
       .then(loadPublicMiniAppData)
       .then(function () { return postJson('/api/auth/telegram', { initData: initData }); })
+      .then(function () { return loadPaymentSystems(); })
       .then(function () { return loadReferralProfile(); })
       .then(function () { return bindReferralCodeFromQuery(); })
       .then(function () { return refreshState(); })

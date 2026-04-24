@@ -799,6 +799,123 @@ body.app-loading .loading-shell {
   color: #95a3ba;
 }
 
+.payment-systems-list {
+  display: grid;
+  gap: 10px;
+}
+
+.payment-system-card {
+  display: grid;
+  gap: 8px;
+  text-align: left;
+  text-transform: none;
+  letter-spacing: normal;
+  min-height: 0;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text);
+}
+
+.payment-system-card-selected {
+  border-color: rgba(255, 111, 152, 0.72);
+  box-shadow: 0 0 0 1px rgba(255, 111, 152, 0.18) inset;
+  background: linear-gradient(180deg, rgba(255, 122, 165, 0.16), rgba(255, 102, 143, 0.08));
+}
+
+.payment-system-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.payment-system-card-title {
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.payment-system-card-badge {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffdbe6;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.payment-system-card-description {
+  color: #c6d3e6;
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.deposit-details-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.03));
+}
+
+.deposit-details-title {
+  font-size: 1rem;
+}
+
+.deposit-details-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.deposit-details-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.deposit-details-label {
+  color: #a9b8ce;
+  font-size: 0.86rem;
+}
+
+.deposit-details-value {
+  color: #ffffff;
+  font-size: 0.9rem;
+  text-align: right;
+  word-break: break-all;
+}
+
+.deposit-details-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.deposit-details-actions .secondary-btn {
+  min-height: 42px;
+}
+
+@media (max-width: 560px) {
+  .deposit-details-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .deposit-details-row {
+    flex-direction: column;
+  }
+
+  .deposit-details-value {
+    text-align: left;
+  }
+}
+
 .empty-card {
   border-radius: 14px;
   padding: 12px;

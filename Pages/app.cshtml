@@ -172,8 +172,43 @@
           <div class="section-title" data-loc="client.profile.menuDeposit">Deposit Money</div>
         </div>
         <input id="topUpAmountInput" type="number" min="0.01" step="0.01" placeholder="Top up amount" data-loc-placeholder="client.topup.amountPlaceholder" class="profile-input" />
-        <button id="topUpBtn" type="button" data-loc="client.button.deposit">Deposit crypto</button>
+        <div class="section-subtitle" data-loc="client.topup.methodTitle">Choose payment method</div>
+        <div id="paymentSystemsHint" class="muted" data-loc="client.topup.methodHint">Use Telegram Wallet for native TON transfers or BTCPay for external crypto checkout.</div>
+        <div id="paymentSystemsList" class="payment-systems-list"></div>
+        <button id="topUpBtn" type="button" data-loc="client.button.deposit">Add funds</button>
         <div id="topUpStatus" class="muted"></div>
+
+        <section id="depositDetailsCard" class="deposit-details-card" hidden>
+          <div class="section-header">
+            <div class="section-title deposit-details-title" data-loc="client.topup.detailsTitle">Payment details</div>
+          </div>
+          <div class="deposit-details-grid">
+            <div class="deposit-details-row">
+              <span class="deposit-details-label" data-loc="client.topup.detailsAmount">Amount to send</span>
+              <strong id="depositDetailsAmount" class="deposit-details-value">-</strong>
+            </div>
+            <div class="deposit-details-row">
+              <span class="deposit-details-label" data-loc="client.topup.detailsAddress">Destination wallet</span>
+              <strong id="depositDetailsAddress" class="deposit-details-value">-</strong>
+            </div>
+            <div class="deposit-details-row">
+              <span class="deposit-details-label" data-loc="client.topup.detailsMemo">Memo / comment</span>
+              <strong id="depositDetailsMemo" class="deposit-details-value">-</strong>
+            </div>
+            <div class="deposit-details-row">
+              <span class="deposit-details-label" data-loc="client.topup.detailsTx">Transaction id</span>
+              <strong id="depositDetailsTx" class="deposit-details-value">-</strong>
+            </div>
+          </div>
+          <div class="deposit-details-actions">
+            <button id="openDepositWalletBtn" type="button" class="secondary-btn" data-loc="client.topup.openWallet">Open wallet</button>
+            <button id="openDepositAltBtn" type="button" class="secondary-btn" data-loc="client.topup.openAlternative">Open fallback link</button>
+            <button id="copyDepositAddressBtn" type="button" class="secondary-btn" data-loc="client.topup.copyAddress">Copy address</button>
+            <button id="copyDepositMemoBtn" type="button" class="secondary-btn" data-loc="client.topup.copyMemo">Copy memo</button>
+            <button id="copyDepositTxBtn" type="button" class="secondary-btn" data-loc="client.topup.copyTx">Copy tx id</button>
+            <button id="checkDepositStatusBtn" type="button" class="secondary-btn" data-loc="client.topup.checkStatus">Check status</button>
+          </div>
+        </section>
       </div>
 
       <div id="profileInviteScreen" class="card stack profile-screen" hidden>

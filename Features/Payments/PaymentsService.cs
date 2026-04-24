@@ -1,5 +1,6 @@
-using System.Security.Cryptography;
 using System.Data;
+using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
@@ -11,23 +12,73 @@ namespace MiniApp.Features.Payments;
 
 public sealed class PaymentsService : IPaymentsService
 {
-    private const string ProviderName = "BTCPay";
+    private const string BtcPayProviderName = "BTCPay";
+    private const string TelegramTonProviderName = "TelegramTon";
     private readonly AppDbContext _db;
     private readonly IWalletService _wallet;
     private readonly IReferralService _referrals;
     private readonly IBtcPayClient _btcPay;
+    private readonly ITelegramTonClient _telegramTon;
+    private readonly ITelegramTonRateService _telegramTonRate;
+    private readonly ILogger<PaymentsService> _logger;
     private readonly PaymentsOptions _options;
 
-    public PaymentsService(AppDbContext db, IWalletService wallet, IReferralService referrals, IBtcPayClient btcPay, IOptions<PaymentsOptions> options)
+    public PaymentsService(
+        AppDbContext db,
+        IWalletService wallet,
+        IReferralService referrals,
+        IBtcPayClient btcPay,
+        ITelegramTonClient telegramTon,
+        ITelegramTonRateService telegramTonRate,
+        ILogger<PaymentsService> logger,
+        IOptions<PaymentsOptions> options)
     {
         _db = db;
         _wallet = wallet;
         _referrals = referrals;
         _btcPay = btcPay;
+        _telegramTon = telegramTon;
+        _telegramTonRate = telegramTonRate;
+        _logger = logger;
         _options = options.Value;
     }
 
-    public async Task<CreateCryptoDepositResult> CreateCryptoDepositAsync(long userId, decimal amount, string? currency, CancellationToken ct)
+    public PaymentSystemsView GetPaymentSystems()
+    {
+        var systems = new List<PaymentSystemView>();
+
+        if (_options.Enabled && _options.TelegramTon.Enabled)
+        {
+            systems.Add(new PaymentSystemView(
+                PaymentMethodKeys.TelegramTon,
+                TelegramTonProviderName,
+                "native_wallet",
+                SupportsNativeTelegram: true,
+                SupportsAlternativeLink: true,
+                AssetCode: "TON",
+                Network: "TON"));
+        }
+
+        if (_options.Enabled && _options.BtcPay.Enabled)
+        {
+            systems.Add(new PaymentSystemView(
+                PaymentMethodKeys.BtcPayCrypto,
+                BtcPayProviderName,
+                "external_invoice",
+                SupportsNativeTelegram: false,
+                SupportsAlternativeLink: false,
+                AssetCode: null,
+                Network: null));
+        }
+
+        var defaultPaymentMethod = NormalizePaymentMethod(_options.DefaultPaymentMethod);
+        if (!systems.Any(x => string.Equals(x.Key, defaultPaymentMethod, StringComparison.Ordinal)))
+            defaultPaymentMethod = systems.FirstOrDefault()?.Key;
+
+        return new PaymentSystemsView(_options.Enabled, defaultPaymentMethod, systems);
+    }
+
+    public async Task<CreateCryptoDepositResult> CreateCryptoDepositAsync(long userId, decimal amount, string? currency, string? paymentMethod, CancellationToken ct)
     {
         if (!_options.Enabled)
             return new CreateCryptoDepositResult(false, "Crypto payments are disabled.");
@@ -39,51 +90,37 @@ public sealed class PaymentsService : IPaymentsService
         if (normalizedAmount > 100000m)
             return new CreateCryptoDepositResult(false, "Amount is too large.");
 
-        var normalizedCurrency = NormalizeCurrency(currency) ?? _options.BtcPay.DefaultCurrency;
-        if (string.IsNullOrWhiteSpace(normalizedCurrency))
-            normalizedCurrency = "USD";
+        var normalizedPaymentMethod = ResolvePaymentMethod(paymentMethod);
+        if (normalizedPaymentMethod is null)
+            return new CreateCryptoDepositResult(false, "Payment method is not available.");
 
-        var orderId = $"u{userId}-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}";
-        var invoice = await _btcPay.CreateInvoiceAsync(normalizedAmount, normalizedCurrency, orderId, ct);
-        if (!invoice.Success)
-            return new CreateCryptoDepositResult(false, invoice.Error ?? "Failed to create invoice.");
-
-        var now = DateTimeOffset.UtcNow;
-        var deposit = new CryptoDepositIntent
+        return normalizedPaymentMethod switch
         {
-            UserId = userId,
-            Amount = normalizedAmount,
-            Currency = normalizedCurrency,
-            Provider = ProviderName,
-            ProviderInvoiceId = invoice.InvoiceId!,
-            CheckoutLink = invoice.CheckoutLink!,
-            Status = CryptoDepositStatus.AwaitingPayment,
-            CreatedAtUtc = now,
-            UpdatedAtUtc = now,
-            ExpiresAtUtc = invoice.ExpirationTimeUtc
+            PaymentMethodKeys.TelegramTon => await CreateTelegramTonDepositAsync(userId, normalizedAmount, currency, ct),
+            PaymentMethodKeys.BtcPayCrypto => await CreateBtcPayDepositAsync(userId, normalizedAmount, currency, ct),
+            _ => new CreateCryptoDepositResult(false, "Payment method is not supported.")
         };
-
-        _db.CryptoDepositIntents.Add(deposit);
-        await _db.SaveChangesAsync(ct);
-
-        return new CreateCryptoDepositResult(true, null, ToView(deposit));
     }
 
     public async Task<CryptoDepositStatusResult> GetCryptoDepositStatusAsync(long userId, long depositId, CancellationToken ct)
     {
         var deposit = await _db.CryptoDepositIntents
-            .AsNoTracking()
             .SingleOrDefaultAsync(x => x.Id == depositId && x.UserId == userId, ct);
 
         if (deposit is null)
             return new CryptoDepositStatusResult(false, "Deposit was not found.");
+
+        var now = DateTimeOffset.UtcNow;
+        await RefreshDepositStatusAsync(deposit, now, ct);
+        if (_db.ChangeTracker.HasChanges())
+            await _db.SaveChangesAsync(ct);
 
         return new CryptoDepositStatusResult(true, null, ToView(deposit));
     }
 
     public async Task<ProcessWebhookResult> ProcessBtcPayWebhookAsync(string payloadJson, string? deliveryId, string? signature, CancellationToken ct)
     {
-        if (!_options.Enabled)
+        if (!_options.Enabled || !_options.BtcPay.Enabled)
             return new ProcessWebhookResult(true, null);
 
         if (!ValidateSignatureIfConfigured(payloadJson, signature))
@@ -97,7 +134,7 @@ public sealed class PaymentsService : IPaymentsService
         var now = DateTimeOffset.UtcNow;
         var evt = new PaymentWebhookEvent
         {
-            Provider = ProviderName,
+            Provider = BtcPayProviderName,
             DeliveryId = normalizedDeliveryId,
             EventType = eventType,
             ProviderObjectId = providerObjectId,
@@ -113,7 +150,7 @@ public sealed class PaymentsService : IPaymentsService
             {
                 var payloadDuplicate = await _db.PaymentWebhookEvents
                     .AsNoTracking()
-                    .AnyAsync(x => x.Provider == ProviderName
+                    .AnyAsync(x => x.Provider == BtcPayProviderName
                         && x.ProviderObjectId == providerObjectId
                         && x.EventType == eventType
                         && x.PayloadJson == payloadJson, ct);
@@ -165,7 +202,7 @@ public sealed class PaymentsService : IPaymentsService
 
             var failedEvent = new PaymentWebhookEvent
             {
-                Provider = ProviderName,
+                Provider = BtcPayProviderName,
                 DeliveryId = normalizedDeliveryId,
                 EventType = eventType,
                 ProviderObjectId = providerObjectId,
@@ -190,9 +227,196 @@ public sealed class PaymentsService : IPaymentsService
         }
     }
 
+    private async Task<CreateCryptoDepositResult> CreateBtcPayDepositAsync(long userId, decimal amount, string? currency, CancellationToken ct)
+    {
+        if (!_options.BtcPay.Enabled)
+            return new CreateCryptoDepositResult(false, "BTCPay deposits are disabled.");
+
+        var normalizedCurrency = NormalizeCurrency(currency) ?? _options.BtcPay.DefaultCurrency;
+        if (string.IsNullOrWhiteSpace(normalizedCurrency))
+            normalizedCurrency = "USD";
+
+        var orderId = $"u{userId}-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}";
+        var invoice = await _btcPay.CreateInvoiceAsync(amount, normalizedCurrency, orderId, ct);
+        if (!invoice.Success)
+            return new CreateCryptoDepositResult(false, invoice.Error ?? "Failed to create invoice.");
+
+        var now = DateTimeOffset.UtcNow;
+        var deposit = new CryptoDepositIntent
+        {
+            UserId = userId,
+            Amount = amount,
+            Currency = normalizedCurrency,
+            PaymentMethod = PaymentMethodKeys.BtcPayCrypto,
+            AssetCode = normalizedCurrency,
+            Provider = BtcPayProviderName,
+            ProviderInvoiceId = invoice.InvoiceId!,
+            CheckoutLink = invoice.CheckoutLink!,
+            Status = CryptoDepositStatus.AwaitingPayment,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+            ExpiresAtUtc = invoice.ExpirationTimeUtc
+        };
+
+        _db.CryptoDepositIntents.Add(deposit);
+        await _db.SaveChangesAsync(ct);
+
+        return new CreateCryptoDepositResult(true, null, ToView(deposit));
+    }
+
+    private async Task<CreateCryptoDepositResult> CreateTelegramTonDepositAsync(long userId, decimal amount, string? currency, CancellationToken ct)
+    {
+        if (!_options.TelegramTon.Enabled)
+            return new CreateCryptoDepositResult(false, "Telegram TON deposits are disabled.");
+
+        var normalizedCurrency = NormalizeCurrency(currency) ?? "USD";
+        if (!string.Equals(normalizedCurrency, "USD", StringComparison.Ordinal))
+            return new CreateCryptoDepositResult(false, "Telegram TON deposits currently credit wallet balance in USD only.");
+
+        var resolvedRate = await _telegramTonRate.GetResolvedRateAsync(ct);
+        var usdPerTon = resolvedRate?.UsdPerTon ?? 0m;
+        if (usdPerTon <= 0m)
+            return new CreateCryptoDepositResult(false, "Telegram TON rate is not configured.");
+
+        if (resolvedRate is not null)
+        {
+            _logger.LogInformation(
+                "Using USD/TON rate {UsdPerTon} from {Source} (fallback={IsFallback}, stale={IsStale}, observedAt={ObservedAtUtc:u}) for Telegram TON deposit creation.",
+                resolvedRate.UsdPerTon,
+                resolvedRate.Source,
+                resolvedRate.IsFallback,
+                resolvedRate.IsStale,
+                resolvedRate.ObservedAtUtc);
+        }
+
+        var tonAmount = RoundAssetAmountUp(amount / usdPerTon, 6);
+        if (tonAmount <= 0m)
+            return new CreateCryptoDepositResult(false, "Calculated TON amount is too small.");
+
+        var merchantAddress = (_options.TelegramTon.MerchantAddress ?? string.Empty).Trim();
+        if (merchantAddress.Length == 0)
+            return new CreateCryptoDepositResult(false, "Telegram TON wallet address is not configured.");
+
+        var reference = BuildTelegramTonReference(userId);
+        var tonLink = BuildTonTransferLink(merchantAddress, tonAmount, reference);
+        var alternativeLink = BuildTonkeeperTransferLink(merchantAddress, tonAmount, reference);
+        var now = DateTimeOffset.UtcNow;
+        var expiresAtUtc = now.AddMinutes(Math.Max(_options.TelegramTon.PaymentTimeoutMinutes, 1));
+
+        var deposit = new CryptoDepositIntent
+        {
+            UserId = userId,
+            Amount = amount,
+            Currency = normalizedCurrency,
+            PaymentMethod = PaymentMethodKeys.TelegramTon,
+            AssetCode = "TON",
+            AssetAmount = tonAmount,
+            Network = "TON",
+            Provider = TelegramTonProviderName,
+            ProviderInvoiceId = reference,
+            CheckoutLink = tonLink,
+            AlternativeCheckoutLink = alternativeLink,
+            DestinationAddress = merchantAddress,
+            DestinationMemo = reference,
+            Status = CryptoDepositStatus.AwaitingPayment,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+            ExpiresAtUtc = expiresAtUtc
+        };
+
+        _db.CryptoDepositIntents.Add(deposit);
+        await _db.SaveChangesAsync(ct);
+
+        return new CreateCryptoDepositResult(true, null, ToView(deposit));
+    }
+
+    private async Task RefreshDepositStatusAsync(CryptoDepositIntent deposit, DateTimeOffset now, CancellationToken ct)
+    {
+        if (IsTerminalDepositStatus(deposit.Status))
+            return;
+
+        if (string.Equals(deposit.PaymentMethod, PaymentMethodKeys.TelegramTon, StringComparison.Ordinal))
+        {
+            await RefreshTelegramTonDepositAsync(deposit, now, ct);
+            return;
+        }
+
+        if (string.Equals(deposit.PaymentMethod, PaymentMethodKeys.BtcPayCrypto, StringComparison.Ordinal))
+        {
+            await RefreshBtcPayDepositAsync(deposit, now, ct);
+        }
+    }
+
+    private async Task RefreshBtcPayDepositAsync(CryptoDepositIntent deposit, DateTimeOffset now, CancellationToken ct)
+    {
+        if (!_options.BtcPay.Enabled || IsTerminalDepositStatus(deposit.Status))
+            return;
+
+        if (deposit.ExpiresAtUtc is not null && deposit.ExpiresAtUtc <= now && deposit.Status == CryptoDepositStatus.AwaitingPayment)
+        {
+            deposit.Status = CryptoDepositStatus.Expired;
+            deposit.LastProviderEventType = "expired";
+            deposit.UpdatedAtUtc = now;
+            return;
+        }
+
+        var invoice = await _btcPay.GetInvoiceAsync(deposit.ProviderInvoiceId, ct);
+        if (!invoice.Success || string.IsNullOrWhiteSpace(invoice.Status))
+            return;
+
+        if (!string.IsNullOrWhiteSpace(invoice.CheckoutLink))
+            deposit.CheckoutLink = invoice.CheckoutLink!;
+
+        if (invoice.ExpirationTimeUtc is not null)
+            deposit.ExpiresAtUtc = invoice.ExpirationTimeUtc;
+
+        ApplyStatusFromSignal(deposit, invoice.Status, now);
+        if (ShouldCreditBalance(invoice.Status))
+            await CreditDepositOnceAsync(deposit, now, ct);
+    }
+
+    private async Task RefreshTelegramTonDepositAsync(CryptoDepositIntent deposit, DateTimeOffset now, CancellationToken ct)
+    {
+        if (deposit.ExpiresAtUtc is not null && deposit.ExpiresAtUtc <= now)
+        {
+            deposit.Status = CryptoDepositStatus.Expired;
+            deposit.LastProviderEventType = "expired";
+            deposit.UpdatedAtUtc = now;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(deposit.DestinationAddress)
+            || string.IsNullOrWhiteSpace(deposit.DestinationMemo)
+            || deposit.AssetAmount is null
+            || deposit.AssetAmount.Value <= 0m)
+        {
+            return;
+        }
+
+        var lookup = await _telegramTon.TryFindIncomingTransferAsync(new TelegramTonLookupRequest(
+            deposit.DestinationAddress,
+            deposit.DestinationMemo,
+            deposit.AssetAmount.Value,
+            deposit.CreatedAtUtc,
+            Math.Max(_options.TelegramTon.TransactionSearchLimit, 1),
+            _options.TelegramTon.ExplorerBaseUrl), ct);
+
+        if (!lookup.Success || !lookup.TransferFound)
+            return;
+
+        deposit.ProviderTransactionId ??= lookup.TransactionId;
+        deposit.LastProviderEventType = "telegram_ton.transfer_detected";
+        deposit.Status = CryptoDepositStatus.Confirmed;
+        deposit.PaidAtUtc ??= lookup.ObservedAtUtc ?? now;
+        deposit.ConfirmedAtUtc ??= lookup.ObservedAtUtc ?? now;
+        deposit.UpdatedAtUtc = now;
+
+        await CreditDepositOnceAsync(deposit, now, ct);
+    }
+
     private async Task CreditDepositOnceAsync(CryptoDepositIntent deposit, DateTimeOffset now, CancellationToken ct)
     {
-        var reference = BuildCreditReference(deposit.ProviderInvoiceId);
+        var reference = BuildCreditReference(deposit.PaymentMethod, deposit.ProviderInvoiceId);
         var alreadyCredited = deposit.CreditedAtUtc is not null
             || await _db.WalletTransactions
                 .AsNoTracking()
@@ -235,12 +459,12 @@ public sealed class PaymentsService : IPaymentsService
     private async Task<bool> ApplyDepositStatusFromWebhookAsync(string providerObjectId, string? eventType, DateTimeOffset now, CancellationToken ct)
     {
         var deposit = await _db.CryptoDepositIntents
-            .SingleOrDefaultAsync(x => x.Provider == ProviderName && x.ProviderInvoiceId == providerObjectId, ct);
+            .SingleOrDefaultAsync(x => x.Provider == BtcPayProviderName && x.ProviderInvoiceId == providerObjectId, ct);
 
         if (deposit is null)
             return false;
 
-        ApplyStatusFromEvent(deposit, eventType, now);
+        ApplyStatusFromSignal(deposit, eventType, now);
         if (ShouldCreditBalance(eventType))
             await CreditDepositOnceAsync(deposit, now, ct);
 
@@ -266,9 +490,7 @@ public sealed class PaymentsService : IPaymentsService
         }
 
         if (IsRejectedPayoutState(payoutState))
-        {
             await RefundWithdrawalAsync(request, now, ct);
-        }
 
         return true;
     }
@@ -313,25 +535,28 @@ public sealed class PaymentsService : IPaymentsService
         });
     }
 
-    private static void ApplyStatusFromEvent(CryptoDepositIntent deposit, string? eventType, DateTimeOffset now)
+    private static void ApplyStatusFromSignal(CryptoDepositIntent deposit, string? signal, DateTimeOffset now)
     {
-        deposit.LastProviderEventType = eventType;
+        deposit.LastProviderEventType = signal;
         deposit.UpdatedAtUtc = now;
 
-        var type = (eventType ?? string.Empty).ToLowerInvariant();
-        if (type.Contains("expired", StringComparison.Ordinal))
+        var value = (signal ?? string.Empty).ToLowerInvariant();
+        if (value.Contains("expired", StringComparison.Ordinal))
         {
             deposit.Status = CryptoDepositStatus.Expired;
             return;
         }
 
-        if (type.Contains("invalid", StringComparison.Ordinal))
+        if (value.Contains("invalid", StringComparison.Ordinal))
         {
             deposit.Status = CryptoDepositStatus.Invalid;
             return;
         }
 
-        if (type.Contains("confirmed", StringComparison.Ordinal) || type.Contains("settled", StringComparison.Ordinal))
+        if (value.Contains("confirmed", StringComparison.Ordinal)
+            || value.Contains("settled", StringComparison.Ordinal)
+            || value.Contains("completed", StringComparison.Ordinal)
+            || value.Contains("succeeded", StringComparison.Ordinal))
         {
             deposit.Status = CryptoDepositStatus.Confirmed;
             deposit.ConfirmedAtUtc ??= now;
@@ -339,19 +564,23 @@ public sealed class PaymentsService : IPaymentsService
             return;
         }
 
-        if (type.Contains("paid", StringComparison.Ordinal) || type.Contains("receivedpayment", StringComparison.Ordinal))
+        if (value.Contains("paid", StringComparison.Ordinal)
+            || value.Contains("receivedpayment", StringComparison.Ordinal)
+            || value.Contains("processing", StringComparison.Ordinal))
         {
             deposit.Status = CryptoDepositStatus.Paid;
             deposit.PaidAtUtc ??= now;
         }
     }
 
-    private static bool ShouldCreditBalance(string? eventType)
+    private static bool ShouldCreditBalance(string? signal)
     {
-        var type = (eventType ?? string.Empty).ToLowerInvariant();
-        return type.Contains("confirmed", StringComparison.Ordinal)
-            || type.Contains("settled", StringComparison.Ordinal)
-            || type.Contains("invoiceconfirmed", StringComparison.Ordinal);
+        var value = (signal ?? string.Empty).ToLowerInvariant();
+        return value.Contains("confirmed", StringComparison.Ordinal)
+            || value.Contains("settled", StringComparison.Ordinal)
+            || value.Contains("invoiceconfirmed", StringComparison.Ordinal)
+            || value.Contains("completed", StringComparison.Ordinal)
+            || value.Contains("succeeded", StringComparison.Ordinal);
     }
 
     private static bool IsPayoutEvent(string? eventType)
@@ -482,6 +711,30 @@ public sealed class PaymentsService : IPaymentsService
         }
     }
 
+    private string? ResolvePaymentMethod(string? paymentMethod)
+    {
+        var available = GetPaymentSystems();
+        if (!available.Enabled || available.Systems.Count == 0)
+            return null;
+
+        var normalized = NormalizePaymentMethod(paymentMethod) ?? NormalizePaymentMethod(available.DefaultPaymentMethod);
+        if (normalized is not null && available.Systems.Any(x => string.Equals(x.Key, normalized, StringComparison.Ordinal)))
+            return normalized;
+
+        return available.Systems[0].Key;
+    }
+
+    private static string? NormalizePaymentMethod(string? paymentMethod)
+    {
+        var normalized = (paymentMethod ?? string.Empty).Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            PaymentMethodKeys.BtcPayCrypto => PaymentMethodKeys.BtcPayCrypto,
+            PaymentMethodKeys.TelegramTon => PaymentMethodKeys.TelegramTon,
+            _ => null
+        };
+    }
+
     private static string? NormalizeCurrency(string? currency)
     {
         if (string.IsNullOrWhiteSpace(currency))
@@ -491,11 +744,35 @@ public sealed class PaymentsService : IPaymentsService
         return normalized.Length is >= 3 and <= 16 ? normalized : null;
     }
 
+    private static bool IsTerminalDepositStatus(CryptoDepositStatus status)
+        => status is CryptoDepositStatus.Credited or CryptoDepositStatus.Expired or CryptoDepositStatus.Invalid;
+
     private static decimal RoundAmount(decimal amount)
         => decimal.Round(amount, 2, MidpointRounding.AwayFromZero);
 
-    private static string BuildCreditReference(string providerInvoiceId)
-        => $"btcpay:{providerInvoiceId}";
+    private static decimal RoundAssetAmountUp(decimal amount, int decimals)
+    {
+        var factor = 1m;
+        for (var i = 0; i < decimals; i++)
+            factor *= 10m;
+
+        return Math.Ceiling(amount * factor) / factor;
+    }
+
+    private static string BuildCreditReference(string paymentMethod, string providerInvoiceId)
+        => $"{paymentMethod}:{providerInvoiceId}";
+
+    private static string BuildTelegramTonReference(long userId)
+        => $"TON-{userId}-{RandomNumberGenerator.GetHexString(4)}";
+
+    private static string BuildTonTransferLink(string address, decimal tonAmount, string memo)
+        => $"ton://transfer/{Uri.EscapeDataString(address)}?amount={ToNanotons(tonAmount).ToString(CultureInfo.InvariantCulture)}&text={Uri.EscapeDataString(memo)}";
+
+    private static string BuildTonkeeperTransferLink(string address, decimal tonAmount, string memo)
+        => $"https://app.tonkeeper.com/transfer/{Uri.EscapeDataString(address)}?amount={ToNanotons(tonAmount).ToString(CultureInfo.InvariantCulture)}&text={Uri.EscapeDataString(memo)}";
+
+    private static decimal ToNanotons(decimal tonAmount)
+        => decimal.Round(tonAmount * 1_000_000_000m, 0, MidpointRounding.AwayFromZero);
 
     private static bool IsDuplicateDeliveryId(DbUpdateException ex)
     {
@@ -512,15 +789,23 @@ public sealed class PaymentsService : IPaymentsService
         return error.Length <= 512 ? error : error[..512];
     }
 
-    private static CryptoDepositView ToView(CryptoDepositIntent x)
+    private CryptoDepositView ToView(CryptoDepositIntent x)
         => new(
             x.Id,
+            x.PaymentMethod,
             x.Provider,
             x.ProviderInvoiceId,
             x.Amount,
             x.Currency,
+            x.AssetAmount,
+            x.AssetCode,
+            x.Network,
             x.Status.ToString(),
             x.CheckoutLink,
+            x.AlternativeCheckoutLink,
+            x.DestinationAddress,
+            x.DestinationMemo,
+            x.ProviderTransactionId,
             x.CreatedAtUtc,
             x.ExpiresAtUtc,
             x.PaidAtUtc,

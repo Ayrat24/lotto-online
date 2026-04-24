@@ -21,11 +21,27 @@ public sealed class CryptoDepositIntent
 
     public string Currency { get; set; } = "USD";
 
+    public string PaymentMethod { get; set; } = "btcpay_crypto";
+
+    public string? AssetCode { get; set; }
+
+    public decimal? AssetAmount { get; set; }
+
+    public string? Network { get; set; }
+
     public string Provider { get; set; } = "BTCPay";
 
     public string ProviderInvoiceId { get; set; } = null!;
 
     public string CheckoutLink { get; set; } = null!;
+
+    public string? AlternativeCheckoutLink { get; set; }
+
+    public string? DestinationAddress { get; set; }
+
+    public string? DestinationMemo { get; set; }
+
+    public string? ProviderTransactionId { get; set; }
 
     public CryptoDepositStatus Status { get; set; } = CryptoDepositStatus.AwaitingPayment;
 
