@@ -26,11 +26,33 @@ services:
 
       # Payments / BTCPay config (set these via .env on server!)
       Payments__Enabled: ${PAYMENTS_ENABLED:-false}
+      Payments__DefaultPaymentMethod: ${PAYMENTS_DEFAULT_PAYMENT_METHOD:-telegram_ton}
+      Payments__BtcPay__Enabled: ${BTCPAY_ENABLED:-false}
       Payments__BtcPay__BaseUrl: ${BTCPAY_BASE_URL}
       Payments__BtcPay__StoreId: ${BTCPAY_STORE_ID}
       Payments__BtcPay__ApiKey: ${BTCPAY_API_KEY}
       Payments__BtcPay__WithdrawalsPullPaymentId: ${BTCPAY_WITHDRAWALS_PULL_PAYMENT_ID}
       Payments__BtcPay__WithdrawalsPaymentMethod: ${BTCPAY_WITHDRAWALS_PAYMENT_METHOD:-BTC-CHAIN}
+      Payments__BtcPay__WebhookSecret: ${BTCPAY_WEBHOOK_SECRET:-}
+      Payments__BtcPay__DefaultCurrency: ${BTCPAY_DEFAULT_CURRENCY:-USD}
+      Payments__BtcPay__RequestTimeoutSeconds: ${BTCPAY_REQUEST_TIMEOUT_SECONDS:-15}
+      Payments__BtcPay__MaxRetryAttempts: ${BTCPAY_MAX_RETRY_ATTEMPTS:-3}
+      Payments__TelegramTon__Enabled: ${TELEGRAMTON_ENABLED:-${Payments__TelegramTon__Enabled:-false}}
+      Payments__TelegramTon__MerchantAddress: ${TELEGRAMTON_MERCHANT_ADDRESS:-${Payments__TelegramTon__MerchantAddress:-}}
+      Payments__TelegramTon__MerchantName: ${TELEGRAMTON_MERCHANT_NAME:-${Payments__TelegramTon__MerchantName:-Lotto}}
+      Payments__TelegramTon__UsdPerTon: ${TELEGRAMTON_USD_PER_TON:-${Payments__TelegramTon__UsdPerTon:-0}}
+      Payments__TelegramTon__AutoRefreshEnabled: ${TELEGRAMTON_AUTO_REFRESH_ENABLED:-${Payments__TelegramTon__AutoRefreshEnabled:-true}}
+      Payments__TelegramTon__RateApiBaseUrl: ${TELEGRAMTON_RATE_API_BASE_URL:-${Payments__TelegramTon__RateApiBaseUrl:-https://api.coingecko.com/api/v3/}}
+      Payments__TelegramTon__RateApiKey: ${TELEGRAMTON_RATE_API_KEY:-${Payments__TelegramTon__RateApiKey:-}}
+      Payments__TelegramTon__RateRefreshIntervalMinutes: ${TELEGRAMTON_RATE_REFRESH_INTERVAL_MINUTES:-${Payments__TelegramTon__RateRefreshIntervalMinutes:-5}}
+      Payments__TelegramTon__MaxRateAgeMinutes: ${TELEGRAMTON_MAX_RATE_AGE_MINUTES:-${Payments__TelegramTon__MaxRateAgeMinutes:-30}}
+      Payments__TelegramTon__ApiBaseUrl: ${TELEGRAMTON_API_BASE_URL:-${Payments__TelegramTon__ApiBaseUrl:-https://toncenter.com/api/v2/}}
+      Payments__TelegramTon__ApiKey: ${TELEGRAMTON_API_KEY:-${Payments__TelegramTon__ApiKey:-}}
+      Payments__TelegramTon__RequestTimeoutSeconds: ${TELEGRAMTON_REQUEST_TIMEOUT_SECONDS:-${Payments__TelegramTon__RequestTimeoutSeconds:-15}}
+      Payments__TelegramTon__TransactionSearchLimit: ${TELEGRAMTON_TRANSACTION_SEARCH_LIMIT:-${Payments__TelegramTon__TransactionSearchLimit:-25}}
+      Payments__TelegramTon__PaymentTimeoutMinutes: ${TELEGRAMTON_PAYMENT_TIMEOUT_MINUTES:-${Payments__TelegramTon__PaymentTimeoutMinutes:-20}}
+      Payments__TelegramTon__ExplorerBaseUrl: ${TELEGRAMTON_EXPLORER_BASE_URL:-${Payments__TelegramTon__ExplorerBaseUrl:-https://tonviewer.com/transaction/}}
+      Payments__Ops__EnableReconciliation: ${PAYMENTS_ENABLE_RECONCILIATION:-false}
 
     ports:
       - "8080:8080"
