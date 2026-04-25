@@ -55,7 +55,8 @@ services:
       Payments__Ops__EnableReconciliation: ${PAYMENTS_ENABLE_RECONCILIATION:-false}
 
     ports:
-      - "8080:8080"
+      # Reverse proxy on the droplet should terminate TLS and forward to this local-only port.
+      - "127.0.0.1:8080:8080"
     volumes:
       - miniapp_uploads:/app/wwwroot/uploads
 

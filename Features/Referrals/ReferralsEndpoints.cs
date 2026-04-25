@@ -70,7 +70,7 @@ public static class ReferralsEndpoints
             var user = await users.TouchUserAsync(telegramUserId, ct);
             var profile = await referrals.GetProfileAsync(user.Id, ct);
 
-            var inviteLink = BuildInviteLink(http, profile.InviteCode);
+            var inviteLink = BuildInviteLink(http, config, profile.InviteCode);
             var dto = new ReferralProfileDto(
                 profile.InviteCode,
                 inviteLink,
@@ -131,12 +131,38 @@ public static class ReferralsEndpoints
         return endpoints;
     }
 
-    private static string BuildInviteLink(HttpContext http, string inviteCode)
+    private static string BuildInviteLink(HttpContext http, IConfiguration config, string inviteCode)
     {
-        var scheme = string.IsNullOrWhiteSpace(http.Request.Scheme) ? "https" : http.Request.Scheme;
-        var host = http.Request.Host.HasValue ? http.Request.Host.Value : "localhost";
+        var configured = (config["BotWebAppUrl"] ?? string.Empty).Trim();
+        var baseUrl = TryResolveConfiguredBaseUrl(configured);
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            var scheme = string.IsNullOrWhiteSpace(http.Request.Scheme) ? "https" : http.Request.Scheme;
+            var host = http.Request.Host.HasValue ? http.Request.Host.Value : "localhost";
+            baseUrl = $"{scheme}://{host}{http.Request.PathBase}".TrimEnd('/');
+        }
+
         var safeCode = Uri.EscapeDataString(inviteCode);
-        return $"{scheme}://{host}/app?ref={safeCode}";
+        return $"{baseUrl}/app?ref={safeCode}";
+    }
+
+    private static string? TryResolveConfiguredBaseUrl(string configuredUrl)
+    {
+        if (!Uri.TryCreate(configuredUrl, UriKind.Absolute, out var uri))
+            return null;
+
+        var builder = new UriBuilder(uri)
+        {
+            Query = string.Empty,
+            Fragment = string.Empty
+        };
+
+        var normalized = builder.Uri.ToString().TrimEnd('/');
+        var normalizedPath = (builder.Uri.AbsolutePath ?? string.Empty).TrimEnd('/');
+        if (normalizedPath.EndsWith("/app", StringComparison.OrdinalIgnoreCase))
+            return normalized[..^"/app".Length];
+
+        return normalized;
     }
 
     private static async Task<(long? TelegramUserId, IResult? ErrorResult)> TryResolveTelegramUserIdAsync(

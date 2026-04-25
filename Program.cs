@@ -39,7 +39,7 @@ if (telegramEnabled && (string.IsNullOrWhiteSpace(token) || token == "YOUR_BOT_T
 var botMode = builder.Configuration["BotMode"]; // Polling | Webhook
 if (string.IsNullOrWhiteSpace(botMode)) botMode = "Polling";
 
-var webAppUrl = builder.Configuration["BotWebAppUrl"]; // public https base url (ngrok/cloudflared)
+var webAppUrl = builder.Configuration["BotWebAppUrl"]; // public https base url for the mini app (domain or reverse proxy)
 var miniAppText = builder.Configuration["MiniApp:Text"] ?? "(No MiniApp:Text configured)";
 
 // ===== Services =====
@@ -291,7 +291,7 @@ static bool IsValidPublicHttpsBaseUrl(string? url)
 
 if (telegramEnabled)
 {
-    // Set the webhook (call this after setting BotWebAppUrl to your ngrok/cloudflared https URL)
+    // Set the webhook (call this after setting BotWebAppUrl to your public https domain)
     app.MapGet("/bot/setWebhook", async (TelegramBotClient bot, BotSettings settings, CancellationToken ct) =>
     {
         if (!string.Equals(settings.Mode, "Webhook", StringComparison.OrdinalIgnoreCase))
@@ -299,7 +299,7 @@ if (telegramEnabled)
 
         var baseUrl = PublicWebAppUrlResolver.ResolveBaseUrl(settings.WebAppUrl);
         if (!IsValidPublicHttpsBaseUrl(baseUrl))
-            return Results.BadRequest("Set BotWebAppUrl to your public https:// URL first (ngrok/cloudflared). Do not use localhost.");
+            return Results.BadRequest("Set BotWebAppUrl to your public https:// domain first. Do not use localhost.");
 
         var webhookUrl = baseUrl!.TrimEnd('/') + "/bot";
         await bot.SetWebhook(webhookUrl, cancellationToken: ct);
