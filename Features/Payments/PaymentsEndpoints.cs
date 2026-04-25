@@ -132,20 +132,46 @@ public static class PaymentsEndpoints
 
     private static string ResolveManifestAppUrl(HttpContext http, IConfiguration config)
     {
-        var configured = (config["BotWebAppUrl"] ?? string.Empty).Trim();
-        if (Uri.TryCreate(configured, UriKind.Absolute, out var configuredUri))
-            return configuredUri.ToString().TrimEnd('/');
+        var siteRoot = ResolveSiteRoot(http, config);
+        if (siteRoot.EndsWith("/app", StringComparison.OrdinalIgnoreCase))
+            return siteRoot;
 
-        return ResolveSiteRoot(http, config) + "/app";
+        return AppendPath(siteRoot, "app");
     }
 
     private static string ResolveSiteRoot(HttpContext http, IConfiguration config)
     {
         var configured = (config["BotWebAppUrl"] ?? string.Empty).Trim();
         if (Uri.TryCreate(configured, UriKind.Absolute, out var configuredUri))
-            return configuredUri.GetLeftPart(UriPartial.Authority).TrimEnd('/');
+            return NormalizeAbsoluteUrl(configuredUri);
 
         return $"{http.Request.Scheme}://{http.Request.Host}{http.Request.PathBase}".TrimEnd('/');
+    }
+
+    private static string NormalizeAbsoluteUrl(Uri uri)
+    {
+        var builder = new UriBuilder(uri)
+        {
+            Query = string.Empty,
+            Fragment = string.Empty
+        };
+
+        var normalized = builder.Uri.ToString().TrimEnd('/');
+        return normalized;
+    }
+
+    private static string AppendPath(string baseUrl, string relativePath)
+    {
+        var trimmedBase = (baseUrl ?? string.Empty).TrimEnd('/');
+        var trimmedPath = (relativePath ?? string.Empty).Trim('/');
+
+        if (string.IsNullOrWhiteSpace(trimmedBase))
+            return "/" + trimmedPath;
+
+        if (string.IsNullOrWhiteSpace(trimmedPath))
+            return trimmedBase;
+
+        return trimmedBase + "/" + trimmedPath;
     }
 }
 
