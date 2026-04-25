@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Options;
 using MiniApp.Admin;
 using MiniApp.Data;
@@ -44,6 +45,14 @@ var miniAppText = builder.Configuration["MiniApp:Text"] ?? "(No MiniApp:Text con
 // ===== Services =====
 builder.Services.AddRazorPages();
 builder.Services.AddMemoryCache();
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor
+        | ForwardedHeaders.XForwardedProto
+        | ForwardedHeaders.XForwardedHost;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 // Admin panel (cookie auth)
 builder.Services.AddAdminArea(builder.Configuration);
@@ -137,6 +146,7 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+app.UseForwardedHeaders();
 app.UseHttpsRedirection();
 
 var provider = new FileExtensionContentTypeProvider
@@ -287,7 +297,7 @@ if (telegramEnabled)
         if (!string.Equals(settings.Mode, "Webhook", StringComparison.OrdinalIgnoreCase))
             return Results.BadRequest("Set BotMode=Webhook first.");
 
-        var baseUrl = settings.WebAppUrl;
+        var baseUrl = PublicWebAppUrlResolver.ResolveBaseUrl(settings.WebAppUrl);
         if (!IsValidPublicHttpsBaseUrl(baseUrl))
             return Results.BadRequest("Set BotWebAppUrl to your public https:// URL first (ngrok/cloudflared). Do not use localhost.");
 
@@ -347,6 +357,56 @@ sealed class BotSettings
 {
     public string Mode { get; init; } = "Polling";
     public string? WebAppUrl { get; init; }
+}
+
+static class PublicWebAppUrlResolver
+{
+    public static string? ResolveMiniAppUrl(string? configuredUrl)
+    {
+        var normalized = NormalizeAbsoluteUrl(configuredUrl);
+        if (string.IsNullOrWhiteSpace(normalized))
+            return string.IsNullOrWhiteSpace(configuredUrl)
+                ? null
+                : configuredUrl.TrimEnd('/') + "/app";
+
+        return PathEndsWithSegment(normalized, "app")
+            ? normalized
+            : normalized.TrimEnd('/') + "/app";
+    }
+
+    public static string? ResolveBaseUrl(string? configuredUrl)
+    {
+        var normalized = NormalizeAbsoluteUrl(configuredUrl);
+        if (string.IsNullOrWhiteSpace(normalized))
+            return configuredUrl?.TrimEnd('/');
+
+        return PathEndsWithSegment(normalized, "app")
+            ? normalized[..^"/app".Length]
+            : normalized;
+    }
+
+    private static string? NormalizeAbsoluteUrl(string? configuredUrl)
+    {
+        if (!Uri.TryCreate((configuredUrl ?? string.Empty).Trim(), UriKind.Absolute, out var uri))
+            return null;
+
+        var builder = new UriBuilder(uri)
+        {
+            Query = string.Empty,
+            Fragment = string.Empty
+        };
+
+        return builder.Uri.ToString().TrimEnd('/');
+    }
+
+    private static bool PathEndsWithSegment(string absoluteUrl, string segment)
+    {
+        if (!Uri.TryCreate(absoluteUrl, UriKind.Absolute, out var uri))
+            return false;
+
+        var normalizedPath = (uri.AbsolutePath ?? string.Empty).TrimEnd('/');
+        return normalizedPath.EndsWith("/" + segment.Trim('/'), StringComparison.OrdinalIgnoreCase);
+    }
 }
 
 static class BotUpdateHandler
@@ -428,12 +488,13 @@ static class BotUpdateHandler
             var changeLabel = await GetTextAsync(locale, "bot.changeLanguage", "Change language");
 
             var rows = new List<InlineKeyboardButton[]>();
-            if (!string.IsNullOrWhiteSpace(settings.WebAppUrl))
+            var miniAppUrl = PublicWebAppUrlResolver.ResolveMiniAppUrl(settings.WebAppUrl);
+            if (!string.IsNullOrWhiteSpace(miniAppUrl))
             {
                 rows.Add([
                     InlineKeyboardButton.WithWebApp(
                         openLabel,
-                        settings.WebAppUrl.TrimEnd('/') + "/app")
+                        miniAppUrl)
                 ]);
             }
 

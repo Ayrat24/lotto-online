@@ -10,16 +10,17 @@ public static class PaymentsEndpoints
     {
         endpoints.MapGet("/tonconnect-manifest.json", (HttpContext http, IConfiguration config) =>
         {
-            var manifestAppUrl = ResolveManifestAppUrl(http, config);
-            var siteRoot = ResolveSiteRoot(http, config);
+            var urls = ResolveTonConnectPublicUrls(http, config);
+            http.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+            http.Response.Headers.Pragma = "no-cache";
 
             return Results.Json(new
             {
-                url = manifestAppUrl,
+                url = urls.AppUrl,
                 name = "LottoVibe",
-                iconUrl = siteRoot + "/favicon.ico",
-                termsOfUseUrl = siteRoot + "/Privacy",
-                privacyPolicyUrl = siteRoot + "/Privacy"
+                iconUrl = AppendPath(urls.SiteRoot, "img/cafe/Cake_148.png"),
+                termsOfUseUrl = AppendPath(urls.SiteRoot, "Privacy"),
+                privacyPolicyUrl = AppendPath(urls.SiteRoot, "Privacy")
             });
         });
 
@@ -130,22 +131,25 @@ public static class PaymentsEndpoints
         return (tgUser!.Id, null);
     }
 
-    private static string ResolveManifestAppUrl(HttpContext http, IConfiguration config)
-    {
-        var siteRoot = ResolveSiteRoot(http, config);
-        if (siteRoot.EndsWith("/app", StringComparison.OrdinalIgnoreCase))
-            return siteRoot;
-
-        return AppendPath(siteRoot, "app");
-    }
-
-    private static string ResolveSiteRoot(HttpContext http, IConfiguration config)
+    private static (string SiteRoot, string AppUrl) ResolveTonConnectPublicUrls(HttpContext http, IConfiguration config)
     {
         var configured = (config["BotWebAppUrl"] ?? string.Empty).Trim();
         if (Uri.TryCreate(configured, UriKind.Absolute, out var configuredUri))
-            return NormalizeAbsoluteUrl(configuredUri);
+        {
+            var configuredUrl = NormalizeAbsoluteUrl(configuredUri);
+            var looksLikeExplicitAppUrl = PathEndsWithSegment(configuredUri.AbsolutePath, "app");
+            var resolvedSiteRoot = looksLikeExplicitAppUrl
+                ? RemoveTrailingPathSegment(configuredUrl, "app")
+                : configuredUrl;
+            var appUrl = looksLikeExplicitAppUrl
+                ? configuredUrl
+                : AppendPath(configuredUrl, "app");
 
-        return $"{http.Request.Scheme}://{http.Request.Host}{http.Request.PathBase}".TrimEnd('/');
+            return (resolvedSiteRoot, appUrl);
+        }
+
+        var siteRoot = $"{http.Request.Scheme}://{http.Request.Host}{http.Request.PathBase}".TrimEnd('/');
+        return (siteRoot, AppendPath(siteRoot, "app"));
     }
 
     private static string NormalizeAbsoluteUrl(Uri uri)
@@ -158,6 +162,25 @@ public static class PaymentsEndpoints
 
         var normalized = builder.Uri.ToString().TrimEnd('/');
         return normalized;
+    }
+
+    private static bool PathEndsWithSegment(string? absolutePath, string segment)
+    {
+        var normalizedPath = (absolutePath ?? string.Empty).TrimEnd('/');
+        if (normalizedPath.Length == 0)
+            return false;
+
+        return normalizedPath.EndsWith("/" + segment.Trim('/'), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string RemoveTrailingPathSegment(string url, string segment)
+    {
+        var trimmedUrl = (url ?? string.Empty).TrimEnd('/');
+        var suffix = "/" + segment.Trim('/');
+        if (trimmedUrl.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+            return trimmedUrl[..^suffix.Length];
+
+        return trimmedUrl;
     }
 
     private static string AppendPath(string baseUrl, string relativePath)

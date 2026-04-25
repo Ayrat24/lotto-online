@@ -2052,9 +2052,11 @@
 
   function getTonConnectManifestUrl() {
     try {
-      return new URL('/tonconnect-manifest.json', window.location.origin).toString();
+      var manifestUrl = new URL('tonconnect-manifest.json', window.location.href);
+      manifestUrl.searchParams.set('v', '20260425b');
+      return manifestUrl.toString();
     } catch (e) {
-      return '/tonconnect-manifest.json';
+      return '/tonconnect-manifest.json?v=20260425b';
     }
   }
 
