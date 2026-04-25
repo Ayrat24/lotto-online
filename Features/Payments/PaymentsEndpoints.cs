@@ -8,6 +8,21 @@ public static class PaymentsEndpoints
 {
     public static IEndpointRouteBuilder MapPaymentsEndpoints(this IEndpointRouteBuilder endpoints)
     {
+        endpoints.MapGet("/tonconnect-manifest.json", (HttpContext http, IConfiguration config) =>
+        {
+            var manifestAppUrl = ResolveManifestAppUrl(http, config);
+            var siteRoot = ResolveSiteRoot(http, config);
+
+            return Results.Json(new
+            {
+                url = manifestAppUrl,
+                name = "LottoVibe",
+                iconUrl = siteRoot + "/favicon.ico",
+                termsOfUseUrl = siteRoot + "/Privacy",
+                privacyPolicyUrl = siteRoot + "/Privacy"
+            });
+        });
+
         endpoints.MapGet("/api/payments/systems", (IPaymentsService payments) =>
         {
             var options = payments.GetPaymentSystems();
@@ -113,6 +128,24 @@ public static class PaymentsEndpoints
         }
 
         return (tgUser!.Id, null);
+    }
+
+    private static string ResolveManifestAppUrl(HttpContext http, IConfiguration config)
+    {
+        var configured = (config["BotWebAppUrl"] ?? string.Empty).Trim();
+        if (Uri.TryCreate(configured, UriKind.Absolute, out var configuredUri))
+            return configuredUri.ToString().TrimEnd('/');
+
+        return ResolveSiteRoot(http, config) + "/app";
+    }
+
+    private static string ResolveSiteRoot(HttpContext http, IConfiguration config)
+    {
+        var configured = (config["BotWebAppUrl"] ?? string.Empty).Trim();
+        if (Uri.TryCreate(configured, UriKind.Absolute, out var configuredUri))
+            return configuredUri.GetLeftPart(UriPartial.Authority).TrimEnd('/');
+
+        return $"{http.Request.Scheme}://{http.Request.Host}{http.Request.PathBase}".TrimEnd('/');
     }
 }
 

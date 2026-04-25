@@ -18,6 +18,10 @@
   var copyDepositMemoBtn = document.getElementById('copyDepositMemoBtn');
   var copyDepositTxBtn = document.getElementById('copyDepositTxBtn');
   var checkDepositStatusBtn = document.getElementById('checkDepositStatusBtn');
+  var tonConnectPanelEl = document.getElementById('tonConnectPanel');
+  var tonConnectStatusEl = document.getElementById('tonConnectStatus');
+  var tonConnectConnectBtn = document.getElementById('tonConnectConnectBtn');
+  var tonConnectDisconnectBtn = document.getElementById('tonConnectDisconnectBtn');
   var promoCodeInputEl = document.getElementById('promoCodeInput');
   var applyPromoBtn = document.getElementById('applyPromoBtn');
   var promoStatusEl = document.getElementById('promoStatus');
@@ -158,6 +162,10 @@
   var paymentSystemsOptions = null;
   var selectedPaymentMethod = null;
   var activeDeposit = null;
+  var tonConnectUi = null;
+  var tonConnectWallet = null;
+  var tonConnectInitPromise = null;
+  var tonConnectStatusUnsubscribe = null;
 
   var LOTTO_NUMBERS_COUNT = 5;
   var LOTTO_MIN = 1;
@@ -189,6 +197,7 @@
     renderNewsBanners(newsBanners);
     renderWinners(winnerEntries);
     renderPaymentSystems();
+    renderTonConnectPanel();
     updateDepositDetails(activeDeposit);
     syncDrawSortTabs();
     renderCurrentDraw(selected.draw, selected.tickets, selected.hasMultipleActiveDraws);
@@ -2033,6 +2042,275 @@
     return '';
   }
 
+  function isTelegramTonMethod(methodKey) {
+    return String(methodKey || '').trim().toLowerCase() === 'telegram_ton';
+  }
+
+  function supportsTonConnect() {
+    return !!(window.TON_CONNECT_UI && window.TON_CONNECT_UI.TonConnectUI && window.TonWeb && window.location && /^https:$/i.test(window.location.protocol || ''));
+  }
+
+  function getTonConnectManifestUrl() {
+    try {
+      return new URL('/tonconnect-manifest.json', window.location.origin).toString();
+    } catch (e) {
+      return '/tonconnect-manifest.json';
+    }
+  }
+
+  function getTonConnectAccountAddress() {
+    var account = null;
+    if (tonConnectUi && tonConnectUi.account) account = tonConnectUi.account;
+    if (!account && tonConnectWallet && tonConnectWallet.account) account = tonConnectWallet.account;
+    if (!account && tonConnectUi && tonConnectUi.wallet && tonConnectUi.wallet.account) account = tonConnectUi.wallet.account;
+    return account && account.address ? String(account.address).trim() : '';
+  }
+
+  function shortenWalletAddress(address) {
+    var value = String(address || '').trim();
+    if (value.length <= 16) return value;
+    return value.slice(0, 6) + '…' + value.slice(-6);
+  }
+
+  function syncDepositWalletButtonLabel() {
+    if (!openDepositWalletBtn) return;
+    if (activeDeposit && isTelegramTonMethod(activeDeposit.paymentMethod) && supportsTonConnect()) {
+      openDepositWalletBtn.textContent = t('client.topup.tonConnect.payAction', 'Pay with TON Connect');
+      return;
+    }
+
+    openDepositWalletBtn.textContent = t('client.topup.openWallet', 'Open wallet');
+  }
+
+  function renderTonConnectPanel() {
+    if (!tonConnectPanelEl) return;
+
+    var hasTonSystem = !!getPaymentSystemByKey('telegram_ton');
+    var shouldShow = hasTonSystem && (isTelegramTonMethod(getSelectedPaymentMethod()) || (activeDeposit && isTelegramTonMethod(activeDeposit.paymentMethod)));
+    tonConnectPanelEl.hidden = !shouldShow;
+    if (!shouldShow) return;
+
+    var connectedAddress = getTonConnectAccountAddress();
+    var available = supportsTonConnect();
+
+    if (tonConnectStatusEl) {
+      if (!available) {
+        tonConnectStatusEl.textContent = t('client.topup.tonConnect.unavailable', 'TON Connect is unavailable here. You can still use the wallet links below.');
+      } else if (connectedAddress) {
+        tonConnectStatusEl.textContent = t('client.topup.tonConnect.connectedPrefix', 'Connected wallet: ') + shortenWalletAddress(connectedAddress);
+      } else {
+        tonConnectStatusEl.textContent = t('client.topup.tonConnect.notConnected', 'No TON wallet connected yet. You can connect now or when you start a payment.');
+      }
+    }
+
+    if (tonConnectConnectBtn) tonConnectConnectBtn.hidden = !available || !!connectedAddress;
+    if (tonConnectDisconnectBtn) tonConnectDisconnectBtn.hidden = !available || !connectedAddress;
+    syncDepositWalletButtonLabel();
+  }
+
+  function ensureTonConnectUi() {
+    if (tonConnectInitPromise) return tonConnectInitPromise;
+
+    tonConnectInitPromise = Promise.resolve()
+      .then(function () {
+        if (!supportsTonConnect()) return null;
+        if (tonConnectUi) return tonConnectUi;
+
+        var ctor = window.TON_CONNECT_UI && window.TON_CONNECT_UI.TonConnectUI;
+        if (typeof ctor !== 'function') return null;
+
+        tonConnectUi = new ctor({
+          manifestUrl: getTonConnectManifestUrl(),
+          uiPreferences: { theme: 'DARK' }
+        });
+
+        if (!tonConnectStatusUnsubscribe && typeof tonConnectUi.onStatusChange === 'function') {
+          tonConnectStatusUnsubscribe = tonConnectUi.onStatusChange(function (wallet) {
+            tonConnectWallet = wallet || null;
+            renderTonConnectPanel();
+          }, function (err) {
+            console.warn('TON Connect status error', err);
+          });
+        }
+
+        return Promise.resolve(tonConnectUi.connectionRestored)
+          .catch(function () { return false; })
+          .then(function () {
+            tonConnectWallet = tonConnectUi.wallet || tonConnectWallet || null;
+            renderTonConnectPanel();
+            return tonConnectUi;
+          });
+      })
+      .catch(function (err) {
+        console.warn('TON Connect init failed', err);
+        tonConnectUi = null;
+        return null;
+      });
+
+    return tonConnectInitPromise;
+  }
+
+  function waitForTonConnectWallet(timeoutMs) {
+    if (getTonConnectAccountAddress()) return Promise.resolve(true);
+
+    return new Promise(function (resolve) {
+      var done = false;
+      var timerId = null;
+      var pollId = null;
+      var unsubscribe = null;
+
+      function finish(result) {
+        if (done) return;
+        done = true;
+        try { if (timerId) clearTimeout(timerId); } catch (e) { }
+        try { if (pollId) clearInterval(pollId); } catch (e) { }
+        try { if (typeof unsubscribe === 'function') unsubscribe(); } catch (e) { }
+        resolve(result);
+      }
+
+      if (tonConnectUi && typeof tonConnectUi.onStatusChange === 'function') {
+        unsubscribe = tonConnectUi.onStatusChange(function (wallet) {
+          tonConnectWallet = wallet || null;
+          if (getTonConnectAccountAddress()) finish(true);
+        }, function () { });
+      }
+
+      pollId = setInterval(function () {
+        if (getTonConnectAccountAddress()) finish(true);
+      }, 500);
+      timerId = setTimeout(function () { finish(false); }, Math.max(Number(timeoutMs) || 60000, 1000));
+    });
+  }
+
+  function connectTonWallet() {
+    ensureTonConnectUi()
+      .then(function (ui) {
+        if (!ui || typeof ui.openModal !== 'function') {
+          setTopUpStatus(t('client.topup.tonConnect.unavailable', 'TON Connect is unavailable here. You can still use the wallet links below.'));
+          renderTonConnectPanel();
+          return false;
+        }
+
+        setTopUpStatus(t('client.topup.tonConnect.connecting', 'Open your TON wallet and confirm the connection.'));
+        return Promise.resolve(ui.openModal())
+          .catch(function () { return null; })
+          .then(function () { return waitForTonConnectWallet(60000); })
+          .then(function (connected) {
+            if (!connected) {
+              setTopUpStatus(t('client.topup.tonConnect.cancelled', 'TON Connect was cancelled. You can retry or use the wallet links below.'));
+              return false;
+            }
+
+            renderTonConnectPanel();
+            return true;
+          });
+      });
+  }
+
+  function disconnectTonWallet() {
+    ensureTonConnectUi()
+      .then(function (ui) {
+        if (!ui || typeof ui.disconnect !== 'function') return null;
+        return ui.disconnect();
+      })
+      .catch(function () {
+        return null;
+      })
+      .finally(function () {
+        tonConnectWallet = null;
+        renderTonConnectPanel();
+        setTopUpStatus(t('client.topup.tonConnect.disconnected', 'TON wallet disconnected.'));
+      });
+  }
+
+  function decimalToNanoString(value, decimals) {
+    var normalized = String(value == null ? '' : value).trim();
+    if (!/^\d+(\.\d+)?$/.test(normalized)) {
+      var numeric = Number(value);
+      if (!Number.isFinite(numeric) || numeric <= 0) return '';
+      normalized = numeric.toFixed(decimals);
+    }
+
+    var parts = normalized.split('.');
+    var whole = parts[0] || '0';
+    var fraction = (parts[1] || '').slice(0, decimals);
+    while (fraction.length < decimals) fraction += '0';
+    var combined = (whole + fraction).replace(/^0+(?=\d)/, '');
+    return combined || '0';
+  }
+
+  function buildTonConnectCommentPayload(comment) {
+    var memo = String(comment || '').trim();
+    if (!memo || !window.TonWeb || !TonWeb.boc || !TonWeb.utils) {
+      return Promise.resolve(null);
+    }
+
+    try {
+      var cell = new TonWeb.boc.Cell();
+      cell.bits.writeUint(0, 32);
+      cell.bits.writeString(memo);
+      return Promise.resolve(cell.toBoc(false))
+        .then(function (boc) {
+          return TonWeb.utils.bytesToBase64(boc);
+        })
+        .catch(function () {
+          return null;
+        });
+    } catch (e) {
+      return Promise.resolve(null);
+    }
+  }
+
+  function sendDepositViaTonConnect(deposit) {
+    if (!deposit || !isTelegramTonMethod(deposit.paymentMethod) || !supportsTonConnect()) {
+      return Promise.resolve('unavailable');
+    }
+
+    var address = String(deposit.destinationAddress || '').trim();
+    var memo = String(deposit.destinationMemo || '').trim();
+    var amount = decimalToNanoString(deposit.assetAmount, 9);
+    if (!address || !memo || !amount) {
+      return Promise.resolve('unavailable');
+    }
+
+    return ensureTonConnectUi()
+      .then(function (ui) {
+        if (!ui) return 'unavailable';
+
+        var connectedAddress = getTonConnectAccountAddress();
+        if (connectedAddress) return true;
+        if (typeof ui.openModal !== 'function') return false;
+
+        setTopUpStatus(t('client.topup.tonConnect.connecting', 'Open your TON wallet and confirm the connection.'));
+        return Promise.resolve(ui.openModal())
+          .catch(function () { return null; })
+          .then(function () { return waitForTonConnectWallet(60000); });
+      })
+      .then(function (connected) {
+        if (connected !== true) return connected === 'unavailable' ? connected : 'cancelled';
+        return buildTonConnectCommentPayload(memo)
+          .then(function (payload) {
+            if (!payload) return 'unavailable';
+
+            setTopUpStatus(t('client.topup.tonConnect.approve', 'Approve the TON transfer in your connected wallet.'));
+            return tonConnectUi.sendTransaction({
+              validUntil: Math.floor(Date.now() / 1000) + 15 * 60,
+              messages: [{
+                address: address,
+                amount: amount,
+                payload: payload
+              }]
+            })
+              .then(function () { return 'sent'; })
+              .catch(function () { return 'cancelled'; });
+          });
+      })
+      .catch(function (err) {
+        console.warn('TON Connect send failed', err);
+        return 'unavailable';
+      });
+  }
+
   function syncTopUpButtonLabel() {
     if (!topUpBtn) return;
     topUpBtn.textContent = getPaymentMethodCta(getSelectedPaymentMethod());
@@ -2048,6 +2326,7 @@
     if (paymentSystemsHintEl) paymentSystemsHintEl.hidden = systems.length === 0;
     if (topUpBtn) topUpBtn.disabled = systems.length === 0;
     syncTopUpButtonLabel();
+    renderTonConnectPanel();
 
     if (systems.length === 0) {
       var empty = document.createElement('div');
@@ -2114,6 +2393,8 @@
     if (copyDepositMemoBtn) copyDepositMemoBtn.hidden = !String(deposit.destinationMemo || '').trim();
     if (copyDepositTxBtn) copyDepositTxBtn.hidden = !String(deposit.providerTransactionId || '').trim();
     if (checkDepositStatusBtn) checkDepositStatusBtn.hidden = !deposit.id;
+    syncDepositWalletButtonLabel();
+    renderTonConnectPanel();
   }
 
   function copyText(value, successMessage) {
@@ -2141,6 +2422,25 @@
 
   function openActiveDepositLink(useAlternative) {
     if (!activeDeposit) return;
+    if (!useAlternative && isTelegramTonMethod(activeDeposit.paymentMethod)) {
+      sendDepositViaTonConnect(activeDeposit)
+        .then(function (result) {
+          if (result === 'sent') {
+            setTopUpStatus(t('client.topup.tonConnect.sent', 'TON transaction was submitted. Waiting for blockchain confirmation.'));
+            return;
+          }
+
+          if (result === 'cancelled') {
+            setTopUpStatus(t('client.topup.tonConnect.cancelled', 'TON Connect was cancelled. You can retry or use the wallet links below.'));
+            return;
+          }
+
+          var fallbackUrl = activeDeposit.checkoutLink;
+          if (fallbackUrl) openCheckoutLink(fallbackUrl);
+        });
+      return;
+    }
+
     var url = useAlternative ? activeDeposit.alternativeCheckoutLink : activeDeposit.checkoutLink;
     if (url) openCheckoutLink(url);
   }
@@ -2220,6 +2520,7 @@
 
     if (nextScreen === 'deposit') {
       renderPaymentSystems();
+      ensureTonConnectUi().finally(renderTonConnectPanel);
       updateDepositDetails(activeDeposit);
     }
   }
@@ -2269,6 +2570,7 @@
           selectedPaymentMethod = null;
         }
         renderPaymentSystems();
+        if (getPaymentSystemByKey('telegram_ton')) ensureTonConnectUi();
         return paymentSystemsOptions;
       })
       .catch(function () {
@@ -2862,14 +3164,27 @@
 
         var deposit = res.deposit;
         updateDepositDetails(deposit);
+        if (isTelegramTonMethod(paymentMethod)) {
+          return sendDepositViaTonConnect(deposit)
+            .then(function (result) {
+              if (result === 'sent') {
+                setTopUpStatus(t('client.topup.tonConnect.sent', 'TON transaction was submitted. Waiting for blockchain confirmation.'));
+              } else if (result === 'unavailable' && deposit.checkoutLink) {
+                openCheckoutLink(deposit.checkoutLink);
+                setTopUpStatus(t('client.topup.created.telegramTon', 'TON payment prepared. Open your wallet, send the exact amount, and keep the memo unchanged.'));
+              } else {
+                setTopUpStatus(t('client.topup.created.telegramTon', 'TON payment prepared. Open your wallet, send the exact amount, and keep the memo unchanged.'));
+              }
+
+              return pollDepositStatus(deposit.id, 45);
+            });
+        }
+
         if (deposit.checkoutLink) {
           openCheckoutLink(deposit.checkoutLink);
         }
 
-        var createdMessage = String(paymentMethod || '').toLowerCase() === 'telegram_ton'
-          ? t('client.topup.created.telegramTon', 'TON payment prepared. Open your wallet, send the exact amount, and keep the memo unchanged.')
-          : t('client.topup.created.btcpay', 'BTCPay invoice created. Complete the payment in the opened checkout screen.');
-        setTopUpStatus(createdMessage);
+        setTopUpStatus(t('client.topup.created.btcpay', 'BTCPay invoice created. Complete the payment in the opened checkout screen.'));
         return pollDepositStatus(deposit.id, 45);
       })
       .catch(function (err) {
@@ -3134,6 +3449,8 @@
   if (topUpBtn) topUpBtn.addEventListener('click', topUpBalance);
   if (openDepositWalletBtn) openDepositWalletBtn.addEventListener('click', function () { openActiveDepositLink(false); });
   if (openDepositAltBtn) openDepositAltBtn.addEventListener('click', function () { openActiveDepositLink(true); });
+  if (tonConnectConnectBtn) tonConnectConnectBtn.addEventListener('click', connectTonWallet);
+  if (tonConnectDisconnectBtn) tonConnectDisconnectBtn.addEventListener('click', disconnectTonWallet);
   if (copyDepositAddressBtn) copyDepositAddressBtn.addEventListener('click', function () { copyText(activeDeposit && activeDeposit.destinationAddress, t('client.topup.addressCopied', 'Wallet address copied.')); });
   if (copyDepositMemoBtn) copyDepositMemoBtn.addEventListener('click', function () { copyText(activeDeposit && activeDeposit.destinationMemo, t('client.topup.memoCopied', 'Memo copied.')); });
   if (copyDepositTxBtn) copyDepositTxBtn.addEventListener('click', function () { copyText(activeDeposit && activeDeposit.providerTransactionId, t('client.topup.txCopied', 'Transaction id copied.')); });

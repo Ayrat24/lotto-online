@@ -14,6 +14,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://unpkg.com/%40tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
+  <script src="https://unpkg.com/tonweb/dist/tonweb.js"></script>
   <link rel="stylesheet" href="~/css/miniapp.css" asp-append-version="true" />
 </head>
 <body class="app-loading">
@@ -175,6 +177,18 @@
         <div class="section-subtitle" data-loc="client.topup.methodTitle">Choose payment method</div>
         <div id="paymentSystemsHint" class="muted" data-loc="client.topup.methodHint">Use Telegram Wallet for native TON transfers or BTCPay for external crypto checkout.</div>
         <div id="paymentSystemsList" class="payment-systems-list"></div>
+        <section id="tonConnectPanel" class="ton-connect-panel" hidden>
+          <div class="ton-connect-panel-header">
+            <div>
+              <div class="section-subtitle ton-connect-title" data-loc="client.topup.tonConnect.title">TON Connect wallet</div>
+              <div id="tonConnectStatus" class="muted" data-loc="client.topup.tonConnect.notConnected">No TON wallet connected yet.</div>
+            </div>
+          </div>
+          <div class="ton-connect-panel-actions">
+            <button id="tonConnectConnectBtn" type="button" class="secondary-btn" data-loc="client.topup.tonConnect.connectWallet">Connect wallet</button>
+            <button id="tonConnectDisconnectBtn" type="button" class="secondary-btn" data-loc="client.topup.tonConnect.disconnectWallet" hidden>Disconnect</button>
+          </div>
+        </section>
         <button id="topUpBtn" type="button" data-loc="client.button.deposit">Add funds</button>
         <div id="topUpStatus" class="muted"></div>
 
