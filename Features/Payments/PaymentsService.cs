@@ -75,7 +75,11 @@ public sealed class PaymentsService : IPaymentsService
         if (!systems.Any(x => string.Equals(x.Key, defaultPaymentMethod, StringComparison.Ordinal)))
             defaultPaymentMethod = systems.FirstOrDefault()?.Key;
 
-        return new PaymentSystemsView(_options.Enabled, defaultPaymentMethod, systems);
+        var twaReturnUrl = string.IsNullOrWhiteSpace(_options.TelegramTon.TwaReturnUrl)
+            ? null
+            : _options.TelegramTon.TwaReturnUrl.Trim();
+
+        return new PaymentSystemsView(_options.Enabled, defaultPaymentMethod, systems, twaReturnUrl);
     }
 
     public async Task<CreateCryptoDepositResult> CreateCryptoDepositAsync(long userId, decimal amount, string? currency, string? paymentMethod, CancellationToken ct)

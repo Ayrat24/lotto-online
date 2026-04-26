@@ -52,6 +52,8 @@ public sealed class TelegramTonOptions
 
     public bool AutoRefreshEnabled { get; set; } = true;
 
+    public string TwaReturnUrl { get; set; } = string.Empty;
+
     public string MerchantAddress { get; set; } = string.Empty;
 
     public string MerchantName { get; set; } = "Lotto";
@@ -134,6 +136,12 @@ public sealed class PaymentsOptionsValidator : IValidateOptions<PaymentsOptions>
 
         if (telegramTon.Enabled)
         {
+            if (!string.IsNullOrWhiteSpace(telegramTon.TwaReturnUrl)
+                && !Uri.TryCreate(telegramTon.TwaReturnUrl, UriKind.Absolute, out _))
+            {
+                errors.Add("Payments:TelegramTon:TwaReturnUrl must be an absolute URI when provided.");
+            }
+
             if (string.IsNullOrWhiteSpace(telegramTon.MerchantAddress))
                 errors.Add("Payments:TelegramTon:MerchantAddress is required when Telegram TON is enabled.");
 

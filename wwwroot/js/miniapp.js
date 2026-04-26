@@ -2068,6 +2068,30 @@
     }
   }
 
+  function getTonConnectTwaReturnUrl() {
+    var value = paymentSystemsOptions && paymentSystemsOptions.tonConnectTwaReturnUrl
+      ? String(paymentSystemsOptions.tonConnectTwaReturnUrl).trim()
+      : '';
+    return value || '';
+  }
+
+  function applyTonConnectUiOptions() {
+    if (!tonConnectUi) return;
+
+    var nextOptions = {
+      uiPreferences: { theme: 'DARK' }
+    };
+
+    var twaReturnUrl = getTonConnectTwaReturnUrl();
+    if (twaReturnUrl) nextOptions.twaReturnUrl = twaReturnUrl;
+
+    try {
+      tonConnectUi.uiOptions = nextOptions;
+    } catch (e) {
+      console.warn('TON Connect UI options setup failed', e);
+    }
+  }
+
   function getTonConnectAccountAddress() {
     var account = null;
     if (tonConnectUi && tonConnectUi.account) account = tonConnectUi.account;
@@ -2133,6 +2157,7 @@
           manifestUrl: getTonConnectManifestUrl(),
           uiPreferences: { theme: 'DARK' }
         });
+        applyTonConnectUiOptions();
 
         if (!tonConnectStatusUnsubscribe && typeof tonConnectUi.onStatusChange === 'function') {
           tonConnectStatusUnsubscribe = tonConnectUi.onStatusChange(function (wallet) {
@@ -2579,12 +2604,14 @@
         if (!getPaymentSystemByKey(selectedPaymentMethod)) {
           selectedPaymentMethod = null;
         }
+        applyTonConnectUiOptions();
         renderPaymentSystems();
         if (getPaymentSystemByKey('telegram_ton')) ensureTonConnectUi();
         return paymentSystemsOptions;
       })
       .catch(function () {
         paymentSystemsOptions = { enabled: false, defaultPaymentMethod: null, systems: [] };
+        applyTonConnectUiOptions();
         renderPaymentSystems();
         return paymentSystemsOptions;
       });

@@ -153,6 +153,7 @@ public static class PaymentsEndpoints
         CancellationToken ct)
     {
         var configuredBotWebAppUrl = (config["BotWebAppUrl"] ?? string.Empty).Trim();
+        var configuredTwaReturnUrl = (config["Payments:TelegramTon:TwaReturnUrl"] ?? string.Empty).Trim();
         var urls = ResolveTonConnectPublicUrls(http, config);
         var request = new TonConnectRequestContextView(
             http.Request.Scheme,
@@ -169,10 +170,20 @@ public static class PaymentsEndpoints
 
         var issues = new List<string>();
         AddUrlIssueIfInvalid(issues, "Configured BotWebAppUrl", configuredBotWebAppUrl, requireHttps: false);
+        AddUrlIssueIfInvalid(issues, "Configured Payments:TelegramTon:TwaReturnUrl", configuredTwaReturnUrl, requireHttps: true);
         AddUrlIssueIfInvalid(issues, "Resolved site root", resolved.SiteRoot);
         AddUrlIssueIfInvalid(issues, "Resolved app URL", resolved.AppUrl);
         AddUrlIssueIfInvalid(issues, "Root manifest URL", resolved.RootManifestUrl);
         AddUrlIssueIfInvalid(issues, "App manifest URL", resolved.AppManifestUrl);
+
+        if (string.IsNullOrWhiteSpace(configuredTwaReturnUrl))
+        {
+            issues.Add("Payments:TelegramTon:TwaReturnUrl is not configured. Telegram Wallet inside Telegram Mini Apps often requires a TMA return URL like https://t.me/<your_bot>.");
+        }
+        else if (!LooksLikeTelegramReturnUrl(configuredTwaReturnUrl))
+        {
+            issues.Add("Payments:TelegramTon:TwaReturnUrl does not look like a Telegram deep link. TonConnect UI expects a Telegram return URL such as https://t.me/<your_bot> or tg://resolve?... for TMA wallets.");
+        }
 
         var probes = new List<TonConnectProbeView>();
         var seenProbeKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -223,6 +234,7 @@ public static class PaymentsEndpoints
         return new TonConnectDiagnosticsView(
             DateTimeOffset.UtcNow,
             string.IsNullOrWhiteSpace(configuredBotWebAppUrl) ? null : configuredBotWebAppUrl,
+            string.IsNullOrWhiteSpace(configuredTwaReturnUrl) ? null : configuredTwaReturnUrl,
             request,
             resolved,
             issues.Distinct(StringComparer.Ordinal).ToArray(),
@@ -326,6 +338,19 @@ public static class PaymentsEndpoints
 
         if (requireHttps && !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
             issues.Add(label + " is not HTTPS: " + url);
+    }
+
+    private static bool LooksLikeTelegramReturnUrl(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            return false;
+
+        if (string.Equals(uri.Scheme, "tg", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        var host = uri.Host;
+        return host.Equals("t.me", StringComparison.OrdinalIgnoreCase)
+            || host.EndsWith(".t.me", StringComparison.OrdinalIgnoreCase);
     }
 
     private static TonConnectManifestView? TryParseTonConnectManifest(string? body, List<string> issues, string sourceName)

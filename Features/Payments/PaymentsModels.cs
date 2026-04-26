@@ -2,7 +2,7 @@ namespace MiniApp.Features.Payments;
 
 public sealed record CreateCryptoDepositRequest(string InitData, decimal Amount, string? Currency, string? PaymentMethod);
 
-public sealed record PaymentSystemsView(bool Enabled, string? DefaultPaymentMethod, IReadOnlyList<PaymentSystemView> Systems);
+public sealed record PaymentSystemsView(bool Enabled, string? DefaultPaymentMethod, IReadOnlyList<PaymentSystemView> Systems, string? TonConnectTwaReturnUrl = null);
 
 public sealed record PaymentSystemView(
     string Key,
@@ -79,6 +79,7 @@ public sealed record TonConnectProbeView(
 public sealed record TonConnectDiagnosticsView(
     DateTimeOffset GeneratedAtUtc,
     string? ConfiguredBotWebAppUrl,
+    string? ConfiguredTonConnectTwaReturnUrl,
     TonConnectRequestContextView Request,
     TonConnectResolvedUrlsView ResolvedUrls,
     IReadOnlyList<string> Issues,

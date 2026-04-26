@@ -38,6 +38,7 @@ services:
       Payments__BtcPay__RequestTimeoutSeconds: ${BTCPAY_REQUEST_TIMEOUT_SECONDS:-15}
       Payments__BtcPay__MaxRetryAttempts: ${BTCPAY_MAX_RETRY_ATTEMPTS:-3}
       Payments__TelegramTon__Enabled: ${TELEGRAMTON_ENABLED:-${Payments__TelegramTon__Enabled:-false}}
+      Payments__TelegramTon__TwaReturnUrl: ${TELEGRAMTON_TWA_RETURN_URL:-${Payments__TelegramTon__TwaReturnUrl:-}}
       Payments__TelegramTon__MerchantAddress: ${TELEGRAMTON_MERCHANT_ADDRESS:-${Payments__TelegramTon__MerchantAddress:-}}
       Payments__TelegramTon__MerchantName: ${TELEGRAMTON_MERCHANT_NAME:-${Payments__TelegramTon__MerchantName:-Lotto}}
       Payments__TelegramTon__UsdPerTon: ${TELEGRAMTON_USD_PER_TON:-${Payments__TelegramTon__UsdPerTon:-0}}
