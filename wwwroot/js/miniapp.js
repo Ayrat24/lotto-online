@@ -176,6 +176,7 @@
   var ticketSlotsPerPurchaseScreen = 10;
   var purchaseScreenDrawId = null;
   var purchaseScreenTicketStates = [];
+  var activePurchaseScreenTicketIndex = 0;
   var purchaseScreenSubmitting = false;
   var pollingIntervalId = null;
   var countdownIntervalId = null;
@@ -1242,6 +1243,47 @@
     }
 
     purchaseScreenTicketStates = next;
+
+    if (!Number.isFinite(activePurchaseScreenTicketIndex)) {
+      activePurchaseScreenTicketIndex = 0;
+    }
+
+    if (purchaseScreenTicketStates.length === 0) {
+      activePurchaseScreenTicketIndex = 0;
+      return;
+    }
+
+    if (activePurchaseScreenTicketIndex < 0) {
+      activePurchaseScreenTicketIndex = 0;
+    } else if (activePurchaseScreenTicketIndex >= purchaseScreenTicketStates.length) {
+      activePurchaseScreenTicketIndex = purchaseScreenTicketStates.length - 1;
+    }
+  }
+
+  function setActivePurchaseScreenTicket(index, options) {
+    ensurePurchaseScreenTicketStates();
+    if (purchaseScreenTicketStates.length === 0) return;
+
+    var normalizedIndex = Math.max(0, Math.min(purchaseScreenTicketStates.length - 1, parseInt(index, 10) || 0));
+    var changed = activePurchaseScreenTicketIndex !== normalizedIndex;
+    activePurchaseScreenTicketIndex = normalizedIndex;
+
+    if (!changed && !(options && options.forceRender)) {
+      return;
+    }
+
+    renderTicketPurchaseScreen();
+
+    if (options && options.scrollIntoView && ticketPurchaseTicketsListEl) {
+      var activeCard = ticketPurchaseTicketsListEl.querySelector('[data-purchase-ticket-index="' + normalizedIndex + '"]');
+      if (activeCard && typeof activeCard.scrollIntoView === 'function') {
+        try {
+          activeCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } catch (e) {
+          activeCard.scrollIntoView();
+        }
+      }
+    }
   }
 
   function getPurchaseScreenDraw() {
@@ -1316,6 +1358,7 @@
 
   function setPurchaseScreenTicketNumbers(index, numbers) {
     if (index < 0 || index >= purchaseScreenTicketStates.length) return;
+    activePurchaseScreenTicketIndex = index;
     purchaseScreenTicketStates[index].numbers = normalizeTicketNumbers(numbers);
     renderTicketPurchaseScreen();
   }
@@ -1393,9 +1436,19 @@
   function createPurchaseTicketCard(ticketState, index) {
     var card = document.createElement('section');
     card.className = 'purchase-ticket-card';
+    card.setAttribute('data-purchase-ticket-index', String(index));
 
     var completed = isPurchaseTicketComplete(ticketState);
     if (completed) card.classList.add('purchase-ticket-card-complete');
+    if (index === activePurchaseScreenTicketIndex) card.classList.add('purchase-ticket-card-active');
+
+    card.addEventListener('click', function (event) {
+      if (event && event.target && typeof event.target.closest === 'function' && event.target.closest('button')) {
+        return;
+      }
+
+      setActivePurchaseScreenTicket(index, { scrollIntoView: true });
+    });
 
     var header = document.createElement('div');
     header.className = 'purchase-ticket-card-header';
@@ -2674,6 +2727,7 @@
 
     purchaseScreenSubmitting = false;
     ensurePurchaseScreenTicketStates();
+    setActivePurchaseScreenTicket(0);
     setTicketPurchaseScreenStatus('');
     ticketPurchaseScreenEl.hidden = false;
     setSheetOpenClass();
@@ -2684,14 +2738,30 @@
     if (!ticketPurchaseScreenEl) return;
 
     ticketPurchaseScreenEl.hidden = true;
+    activePurchaseScreenTicketIndex = 0;
     purchaseScreenSubmitting = false;
     setTicketPurchaseScreenStatus('');
     syncTicketPurchaseFooterVisibility(false);
     setSheetOpenClass();
   }
 
+  function getSessionRequiredMessage() {
+    return t('client.status.authOpenFromTelegram', 'Authentication failed. Open this app from Telegram, or use the local debug profile in Development.');
+  }
+
+  function ensureSessionReadyForPurchase(statusSetter) {
+    if (initData) return true;
+
+    var message = getSessionRequiredMessage();
+    if (typeof statusSetter === 'function') {
+      statusSetter(message);
+    }
+    showCenterPopup(message);
+    return false;
+  }
+
   function submitTicketPurchase() {
-    if (!initData) return;
+    if (!ensureSessionReadyForPurchase(setTicketPurchaseScreenStatus)) return;
 
     var draw = getPurchaseScreenDraw();
     if (!draw || !isDrawPurchasable(draw)) {
@@ -3493,7 +3563,7 @@
   }
 
   function purchaseTicket() {
-    if (!initData) return;
+    if (!ensureSessionReadyForPurchase(setPurchaseStatus)) return;
     var selected = resolveSelectedDrawSnapshot(latestState);
     if (!selected.draw || !isDrawPurchasable(selected.draw)) {
       setPurchaseStatus(getDrawUnavailableMessage(selected.draw));
