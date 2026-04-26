@@ -19,6 +19,9 @@
   --line-soft: rgba(255, 255, 255, 0.06);
   --text: #eef3ff;
   --muted: #95a3ba;
+  --button-bg: #161f29;
+  --button-bg-strong: #1d2835;
+  --button-border: rgba(255, 255, 255, 0.08);
   --pink: #ff6f98;
   --pink-strong: #ff5f8d;
   --green: #47d17b;
@@ -27,7 +30,7 @@
 
   --tg-theme-bg-color: var(--bg);
   --tg-theme-text-color: var(--text);
-  --tg-theme-button-color: var(--pink);
+  --tg-theme-button-color: var(--button-bg);
   --tg-theme-button-text-color: #ffffff;
 }
 
@@ -382,7 +385,7 @@ body.app-loading .loading-shell {
 }
 
 .news-banner-dot-active {
-  background: #ff6f98;
+  background: var(--button-bg);
   transform: scale(1.18);
 }
 
@@ -797,8 +800,8 @@ body.app-loading .loading-shell {
 }
 
 .profile-screen {
-  gap: 14px;
-  background: linear-gradient(180deg, #17212b, #141d27);
+  gap: 12px;
+  background: linear-gradient(180deg, #121a29, #0f1624);
   border-color: rgba(255, 255, 255, 0.06);
   box-shadow: 0 16px 32px rgba(0, 0, 0, 0.24);
 }
@@ -822,14 +825,22 @@ body.app-loading .loading-shell {
   min-width: 0;
 }
 
-.profile-balance-card,
-.profile-section-card {
+.profile-balance-card {
   display: grid;
   gap: 12px;
   padding: 16px;
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(22, 31, 41, 0.82);
+}
+
+.profile-section-card {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
 }
 
 .profile-balance-label,
@@ -847,24 +858,16 @@ body.app-loading .loading-shell {
   color: #ffffff;
 }
 
-.profile-menu-group {
-  display: grid;
-  gap: 2px;
-  padding: 6px;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(255, 255, 255, 0.03);
-}
-
 .profile-menu-item {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
   min-height: 0;
-  padding: 12px;
-  background: transparent;
-  border: 0;
+  padding: 14px 16px;
+  background: var(--button-bg);
+  border: 1px solid var(--button-border);
+  border-radius: 18px;
   color: var(--text);
   text-align: left;
   text-transform: none;
@@ -873,7 +876,7 @@ body.app-loading .loading-shell {
 }
 
 .profile-menu-item + .profile-menu-item {
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: 0;
 }
 
 .profile-menu-icon {
@@ -988,8 +991,8 @@ body.app-loading .loading-shell {
   min-height: 88px;
   padding: 12px;
   border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--button-border);
+  background: var(--button-bg);
   color: var(--text);
   text-transform: none;
   letter-spacing: 0;
@@ -999,7 +1002,7 @@ body.app-loading .loading-shell {
 .payment-system-card-selected {
   border-color: rgba(51, 144, 236, 0.72);
   box-shadow: 0 0 0 1px rgba(51, 144, 236, 0.18) inset;
-  background: rgba(51, 144, 236, 0.12);
+  background: var(--button-bg-strong);
 }
 
 .payment-system-icon {
@@ -1032,23 +1035,23 @@ body.app-loading .loading-shell {
 }
 
 .profile-primary-cta {
-  background: linear-gradient(180deg, #3390ec, #2d80d3);
+  background: var(--button-bg);
   color: #ffffff;
-  border: 0;
+  border: 1px solid var(--button-border);
 }
 
 .ton-connect-panel,
 .deposit-details-card {
   display: grid;
   gap: 12px;
-  padding: 16px;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
 }
 
 .ton-connect-panel {
-  border-color: rgba(51, 144, 236, 0.22);
+  border-color: transparent;
 }
 
 .ton-connect-panel-header {
@@ -1154,17 +1157,18 @@ body.app-loading .loading-shell {
 .purchase-screen button,
 .center-popup button {
   width: 100%;
-  border: 0;
+  border: 1px solid var(--button-border);
   border-radius: var(--radius-control);
   min-height: var(--control-min-height);
   padding: 12px var(--space-3);
-  background: linear-gradient(180deg, #ff7aa5, #ff668f);
+  background: var(--button-bg);
   color: #ffffff;
   font-size: var(--font-button);
   text-transform: uppercase;
   font-weight: 800;
   letter-spacing: 0.02em;
   cursor: pointer;
+  box-shadow: none;
   transition: transform 0.08s ease, opacity 0.16s ease, filter 0.18s ease;
 }
 
@@ -1645,8 +1649,8 @@ body.app-loading .loading-shell {
   min-height: 42px;
   padding: 0 12px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--button-bg);
+  border: 1px solid var(--button-border);
   color: #fff;
   font-size: 1.4rem;
   line-height: 1;
@@ -1734,8 +1738,8 @@ body.app-loading .loading-shell {
 }
 
 .purchase-ticket-card-clear {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--button-bg);
+  border: 1px solid var(--button-border);
   color: #eef3ff;
 }
 
@@ -1893,7 +1897,7 @@ body.app-loading .loading-shell {
 
 .center-popup-confirm {
   width: 100%;
-  background: linear-gradient(180deg, #ff8c8c, #ff6161);
+  background: var(--button-bg);
   color: #ffffff;
 }
 
@@ -1917,6 +1921,7 @@ body.app-loading .loading-shell {
 
 .tabbar-btn {
   background: transparent;
+  border: 1px solid transparent;
   color: #a8b7ce;
   text-transform: none;
   font-size: 0.82rem;
@@ -1927,13 +1932,14 @@ body.app-loading .loading-shell {
 }
 
 .tabbar-btn-active {
-  color: #ff739d;
-  background: rgba(255, 111, 152, 0.12);
+  color: #ffffff;
+  background: var(--button-bg);
+  border-color: var(--button-border);
 }
 
 .secondary-btn {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--button-bg);
+  border: 1px solid var(--button-border);
   color: #d9e4f6;
   text-transform: none;
   letter-spacing: 0;
@@ -1947,9 +1953,9 @@ body.app-loading .loading-shell {
   flex: 0 0 40px;
   padding: 0;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--button-bg);
   color: var(--text);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--button-border);
   font-size: 1.1rem;
   font-weight: 700;
   line-height: 1;
