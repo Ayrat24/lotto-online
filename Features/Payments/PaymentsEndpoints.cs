@@ -1,3 +1,7 @@
+using System.Net;
+using System.Text.Json;
+using Microsoft.AspNetCore.Authorization;
+using MiniApp.Admin;
 using MiniApp.Data;
 using MiniApp.Features.Auth;
 using MiniApp.TelegramLogin;
@@ -10,6 +14,15 @@ public static class PaymentsEndpoints
     {
         endpoints.MapGet("/tonconnect-manifest.json", BuildTonConnectManifestResult);
         endpoints.MapGet("/app/tonconnect-manifest.json", BuildTonConnectManifestResult);
+
+        endpoints.MapGet("/api/admin/payments/tonconnect/diagnostics", [Authorize(Policy = AdminAuth.PolicyName)] async (
+            HttpContext http,
+            IConfiguration config,
+            CancellationToken ct) =>
+        {
+            var diagnostics = await BuildTonConnectDiagnosticsAsync(http, config, ct);
+            return Results.Ok(diagnostics);
+        });
 
         endpoints.MapGet("/api/payments/systems", (IPaymentsService payments) =>
         {
@@ -134,6 +147,90 @@ public static class PaymentsEndpoints
         });
     }
 
+    private static async Task<TonConnectDiagnosticsView> BuildTonConnectDiagnosticsAsync(
+        HttpContext http,
+        IConfiguration config,
+        CancellationToken ct)
+    {
+        var configuredBotWebAppUrl = (config["BotWebAppUrl"] ?? string.Empty).Trim();
+        var urls = ResolveTonConnectPublicUrls(http, config);
+        var request = new TonConnectRequestContextView(
+            http.Request.Scheme,
+            http.Request.Host.HasValue ? http.Request.Host.Value : string.Empty,
+            http.Request.PathBase.Value ?? string.Empty,
+            http.Request.Headers["X-Forwarded-Proto"].ToString(),
+            http.Request.Headers["X-Forwarded-Host"].ToString());
+
+        var resolved = new TonConnectResolvedUrlsView(
+            urls.SiteRoot,
+            urls.AppUrl,
+            AppendPath(urls.SiteRoot, "tonconnect-manifest.json"),
+            AppendPath(urls.AppUrl, "tonconnect-manifest.json"));
+
+        var issues = new List<string>();
+        AddUrlIssueIfInvalid(issues, "Configured BotWebAppUrl", configuredBotWebAppUrl, requireHttps: false);
+        AddUrlIssueIfInvalid(issues, "Resolved site root", resolved.SiteRoot);
+        AddUrlIssueIfInvalid(issues, "Resolved app URL", resolved.AppUrl);
+        AddUrlIssueIfInvalid(issues, "Root manifest URL", resolved.RootManifestUrl);
+        AddUrlIssueIfInvalid(issues, "App manifest URL", resolved.AppManifestUrl);
+
+        var probes = new List<TonConnectProbeView>();
+        var seenProbeKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var rootManifestProbe = await ProbeUrlAsync("rootManifest", resolved.RootManifestUrl, ct);
+        probes.Add(rootManifestProbe.View);
+        var rootManifest = TryParseTonConnectManifest(rootManifestProbe.Body, issues, "root manifest");
+
+        var appManifestProbe = await ProbeUrlAsync("appManifest", resolved.AppManifestUrl, ct);
+        probes.Add(appManifestProbe.View);
+        var appManifest = TryParseTonConnectManifest(appManifestProbe.Body, issues, "app manifest");
+
+        if (rootManifest is not null && appManifest is not null && !TonConnectManifestEquals(rootManifest, appManifest))
+            issues.Add("Root and /app manifest responses are different. Telegram Wallet may be loading a different manifest than expected.");
+
+        var manifests = new[]
+        {
+            (Label: "rootManifest", Manifest: rootManifest),
+            (Label: "appManifest", Manifest: appManifest)
+        };
+
+        foreach (var item in manifests)
+        {
+            if (item.Manifest is null)
+                continue;
+
+            AddUrlIssueIfInvalid(issues, item.Label + ".url", item.Manifest.Url);
+            AddUrlIssueIfInvalid(issues, item.Label + ".iconUrl", item.Manifest.IconUrl);
+            AddUrlIssueIfInvalid(issues, item.Label + ".termsOfUseUrl", item.Manifest.TermsOfUseUrl);
+            AddUrlIssueIfInvalid(issues, item.Label + ".privacyPolicyUrl", item.Manifest.PrivacyPolicyUrl);
+
+            await AddProbeIfNeededAsync(seenProbeKeys, probes, item.Label + ".url", item.Manifest.Url, ct);
+            await AddProbeIfNeededAsync(seenProbeKeys, probes, item.Label + ".iconUrl", item.Manifest.IconUrl, ct);
+            await AddProbeIfNeededAsync(seenProbeKeys, probes, item.Label + ".termsOfUseUrl", item.Manifest.TermsOfUseUrl, ct);
+            await AddProbeIfNeededAsync(seenProbeKeys, probes, item.Label + ".privacyPolicyUrl", item.Manifest.PrivacyPolicyUrl, ct);
+        }
+
+        foreach (var probe in probes)
+        {
+            if (!probe.Ok)
+                issues.Add($"{probe.Name} probe failed: {probe.Error ?? $"HTTP {(probe.StatusCode?.ToString() ?? "unknown")}"}.");
+            else if (probe.StatusCode is < 200 or >= 300)
+                issues.Add($"{probe.Name} returned HTTP {probe.StatusCode}. Telegram Wallet may reject redirected or non-success manifest resources.");
+            else if (!probe.IsHttps)
+                issues.Add($"{probe.Name} resolved to a non-HTTPS URL.");
+        }
+
+        return new TonConnectDiagnosticsView(
+            DateTimeOffset.UtcNow,
+            string.IsNullOrWhiteSpace(configuredBotWebAppUrl) ? null : configuredBotWebAppUrl,
+            request,
+            resolved,
+            issues.Distinct(StringComparer.Ordinal).ToArray(),
+            rootManifest,
+            appManifest,
+            probes);
+    }
+
     private static (string SiteRoot, string AppUrl) ResolveTonConnectPublicUrls(HttpContext http, IConfiguration config)
     {
         var configured = (config["BotWebAppUrl"] ?? string.Empty).Trim();
@@ -199,5 +296,159 @@ public static class PaymentsEndpoints
 
         return trimmedBase + "/" + trimmedPath;
     }
+
+    private static async Task AddProbeIfNeededAsync(HashSet<string> seenProbeKeys, List<TonConnectProbeView> probes, string name, string? url, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return;
+
+        var key = name + "|" + url.Trim();
+        if (!seenProbeKeys.Add(key))
+            return;
+
+        var probe = await ProbeUrlAsync(name, url, ct);
+        probes.Add(probe.View);
+    }
+
+    private static void AddUrlIssueIfInvalid(List<string> issues, string label, string? url, bool requireHttps = true)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            issues.Add(label + " is empty.");
+            return;
+        }
+
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            issues.Add(label + " is not an absolute URL: " + url);
+            return;
+        }
+
+        if (requireHttps && !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+            issues.Add(label + " is not HTTPS: " + url);
+    }
+
+    private static TonConnectManifestView? TryParseTonConnectManifest(string? body, List<string> issues, string sourceName)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            issues.Add("Unable to parse " + sourceName + ": empty response body.");
+            return null;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+            {
+                issues.Add("Unable to parse " + sourceName + ": JSON root is not an object.");
+                return null;
+            }
+
+            return new TonConnectManifestView(
+                ReadJsonString(root, "url"),
+                ReadJsonString(root, "name"),
+                ReadJsonString(root, "iconUrl"),
+                ReadJsonString(root, "termsOfUseUrl"),
+                ReadJsonString(root, "privacyPolicyUrl"));
+        }
+        catch (JsonException ex)
+        {
+            issues.Add("Unable to parse " + sourceName + ": " + ex.Message);
+            return null;
+        }
+    }
+
+    private static bool TonConnectManifestEquals(TonConnectManifestView left, TonConnectManifestView right)
+        => string.Equals(left.Url, right.Url, StringComparison.Ordinal)
+           && string.Equals(left.Name, right.Name, StringComparison.Ordinal)
+           && string.Equals(left.IconUrl, right.IconUrl, StringComparison.Ordinal)
+           && string.Equals(left.TermsOfUseUrl, right.TermsOfUseUrl, StringComparison.Ordinal)
+           && string.Equals(left.PrivacyPolicyUrl, right.PrivacyPolicyUrl, StringComparison.Ordinal);
+
+    private static string? ReadJsonString(JsonElement root, string propertyName)
+    {
+        if (!root.TryGetProperty(propertyName, out var property) || property.ValueKind == JsonValueKind.Null)
+            return null;
+
+        return property.ValueKind == JsonValueKind.String
+            ? property.GetString()
+            : property.ToString();
+    }
+
+    private static async Task<TonConnectProbeResult> ProbeUrlAsync(string name, string url, CancellationToken ct)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            return new TonConnectProbeResult(
+                new TonConnectProbeView(name, url, false, null, null, null, null, false, null, "URL is not absolute.", null),
+                null);
+        }
+
+        try
+        {
+            using var handler = CreateDiagnosticsHttpHandler();
+            using var client = CreateDiagnosticsHttpClient(handler);
+            using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+            request.Headers.UserAgent.ParseAdd("MiniApp-TonConnect-Diagnostics/1.0");
+
+            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseContentRead, ct);
+            var body = await response.Content.ReadAsStringAsync(ct);
+            var finalUrl = response.RequestMessage?.RequestUri?.ToString();
+            var redirectLocation = response.Headers.Location?.ToString();
+            var contentType = response.Content.Headers.ContentType?.ToString();
+            var contentLength = response.Content.Headers.ContentLength;
+            var statusCode = (int)response.StatusCode;
+            var ok = statusCode >= 200 && statusCode < 300;
+
+            return new TonConnectProbeResult(
+                new TonConnectProbeView(
+                    name,
+                    url,
+                    ok,
+                    statusCode,
+                    contentType,
+                    redirectLocation,
+                    finalUrl,
+                    string.Equals((response.RequestMessage?.RequestUri ?? uri).Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase),
+                    contentLength,
+                    ok ? null : "HTTP " + statusCode,
+                    TruncateBody(body)),
+                body);
+        }
+        catch (Exception ex)
+        {
+            return new TonConnectProbeResult(
+                new TonConnectProbeView(name, url, false, null, null, null, null, string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase), null, ex.Message, null),
+                null);
+        }
+    }
+
+    private static string? TruncateBody(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+            return body;
+
+        const int maxLength = 800;
+        return body.Length <= maxLength
+            ? body
+            : body[..maxLength] + "…";
+    }
+
+    private static HttpClientHandler CreateDiagnosticsHttpHandler()
+        => new()
+        {
+            AllowAutoRedirect = false,
+            AutomaticDecompression = DecompressionMethods.All
+        };
+
+    private static HttpClient CreateDiagnosticsHttpClient(HttpClientHandler handler)
+        => new(handler)
+        {
+            Timeout = TimeSpan.FromSeconds(15)
+        };
+
+    private sealed record TonConnectProbeResult(TonConnectProbeView View, string? Body);
 }
 

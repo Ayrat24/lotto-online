@@ -43,3 +43,46 @@ public sealed record CryptoDepositView(
     DateTimeOffset? ConfirmedAtUtc,
     DateTimeOffset? CreditedAtUtc);
 
+public sealed record TonConnectRequestContextView(
+    string Scheme,
+    string Host,
+    string PathBase,
+    string? ForwardedProto,
+    string? ForwardedHost);
+
+public sealed record TonConnectResolvedUrlsView(
+    string SiteRoot,
+    string AppUrl,
+    string RootManifestUrl,
+    string AppManifestUrl);
+
+public sealed record TonConnectManifestView(
+    string? Url,
+    string? Name,
+    string? IconUrl,
+    string? TermsOfUseUrl,
+    string? PrivacyPolicyUrl);
+
+public sealed record TonConnectProbeView(
+    string Name,
+    string Url,
+    bool Ok,
+    int? StatusCode,
+    string? ContentType,
+    string? RedirectLocation,
+    string? FinalUrl,
+    bool IsHttps,
+    long? ContentLength,
+    string? Error,
+    string? BodySnippet);
+
+public sealed record TonConnectDiagnosticsView(
+    DateTimeOffset GeneratedAtUtc,
+    string? ConfiguredBotWebAppUrl,
+    TonConnectRequestContextView Request,
+    TonConnectResolvedUrlsView ResolvedUrls,
+    IReadOnlyList<string> Issues,
+    TonConnectManifestView? RootManifest,
+    TonConnectManifestView? AppManifest,
+    IReadOnlyList<TonConnectProbeView> Probes);
+
