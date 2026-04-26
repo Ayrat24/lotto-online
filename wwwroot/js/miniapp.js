@@ -175,6 +175,7 @@
   var LOTTO_MAX = 36;
   var ticketSlotsPerPurchaseScreen = 10;
   var purchaseScreenDrawId = null;
+  var purchaseScreenDrawSnapshot = null;
   var purchaseScreenTicketStates = [];
   var activePurchaseScreenTicketIndex = 0;
   var purchaseScreenSubmitting = false;
@@ -1290,9 +1291,18 @@
 
   function getPurchaseScreenDraw() {
     var activeDraws = getActiveDraws(latestState);
+    if (purchaseScreenDrawSnapshot && purchaseScreenDrawId != null && purchaseScreenDrawSnapshot.id === purchaseScreenDrawId) {
+      if (isDrawPurchasable(purchaseScreenDrawSnapshot)) {
+        return purchaseScreenDrawSnapshot;
+      }
+
+      purchaseScreenDrawSnapshot = null;
+    }
+
     if (purchaseScreenDrawId != null) {
       for (var i = 0; i < activeDraws.length; i++) {
         if (activeDraws[i] && activeDraws[i].id === purchaseScreenDrawId) {
+          purchaseScreenDrawSnapshot = activeDraws[i];
           return activeDraws[i];
         }
       }
@@ -1300,6 +1310,34 @@
 
     var snapshot = resolveSelectedDrawSnapshot(latestState);
     return snapshot.draw && snapshot.draw.state === 'active' ? snapshot.draw : null;
+  }
+
+  function selectDrawForPurchase(draw) {
+    if (!draw) return;
+
+    selectedActiveDrawId = draw.id;
+    currentDisplayedDrawId = draw.id;
+    purchaseScreenDrawId = draw.id;
+    purchaseScreenDrawSnapshot = draw;
+  }
+
+  function resolveDrawForPurchase(drawOrId) {
+    if (drawOrId && typeof drawOrId === 'object') {
+      return drawOrId;
+    }
+
+    var targetId = drawOrId != null ? Number(drawOrId) : null;
+    var activeDraws = getActiveDraws(latestState);
+    if (targetId != null) {
+      for (var i = 0; i < activeDraws.length; i++) {
+        if (activeDraws[i] && activeDraws[i].id === targetId) {
+          return activeDraws[i];
+        }
+      }
+    }
+
+    var snapshot = resolveSelectedDrawSnapshot(latestState);
+    return snapshot.draw || null;
   }
 
   function isPurchaseTicketComplete(ticketState) {
@@ -1844,20 +1882,22 @@
       card.appendChild(amount);
       card.appendChild(footer);
 
-      card.addEventListener('click', function () {
+      card.addEventListener('click', function (event) {
+        if (event && event.cancelable) {
+          event.preventDefault();
+        }
+
         if (Date.now() < drawCardListSuppressClickUntil) {
           return;
         }
 
-        selectedActiveDrawId = draw.id;
-        currentDisplayedDrawId = draw.id;
         if (!isDrawPurchasable(draw)) {
           setPurchaseStatus(getDrawUnavailableMessage(draw));
           return;
         }
 
         setPurchaseStatus('');
-        openTicketPurchaseScreen(draw.id);
+        openTicketPurchaseScreen(draw);
       });
 
       jackpotCardsContainerEl.appendChild(card);
@@ -2717,16 +2757,16 @@
       });
   }
 
-  function openTicketPurchaseScreen(drawId) {
+  function openTicketPurchaseScreen(drawOrId) {
     if (!ticketPurchaseScreenEl) return;
 
-    purchaseScreenDrawId = drawId != null ? drawId : currentDisplayedDrawId;
-    var draw = getPurchaseScreenDraw();
+    var draw = resolveDrawForPurchase(drawOrId != null ? drawOrId : currentDisplayedDrawId);
     if (!draw || !isDrawPurchasable(draw)) {
       setPurchaseStatus(getDrawUnavailableMessage(draw));
       return;
     }
 
+    selectDrawForPurchase(draw);
     purchaseScreenSubmitting = false;
     ensurePurchaseScreenTicketStates();
     setActivePurchaseScreenTicket(0);
@@ -2740,6 +2780,8 @@
     if (!ticketPurchaseScreenEl) return;
 
     ticketPurchaseScreenEl.hidden = true;
+    purchaseScreenDrawId = null;
+    purchaseScreenDrawSnapshot = null;
     activePurchaseScreenTicketIndex = 0;
     purchaseScreenSubmitting = false;
     setTicketPurchaseScreenStatus('');
@@ -3575,7 +3617,7 @@
     setPurchaseStatus('');
     // Ensure purchases from jackpot card target the featured/current draw
     if (currentDisplayedDrawId != null) selectedActiveDrawId = currentDisplayedDrawId;
-    openTicketPurchaseScreen(currentDisplayedDrawId);
+    openTicketPurchaseScreen(selected.draw || currentDisplayedDrawId);
   }
 
   if (purchaseBtn) purchaseBtn.addEventListener('click', purchaseTicket);
