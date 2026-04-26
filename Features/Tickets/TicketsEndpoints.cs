@@ -120,6 +120,10 @@ public static class TicketsEndpoints
                 .Select(x => new { x.Id, x.PurchaseClosesAtUtc })
                 .ToListAsync(ct);
 
+            activeDraws = activeDraws
+                .Where(x => x.PurchaseClosesAtUtc > nowUtc)
+                .ToList();
+
             if (activeDraws.Count == 0)
                 return Results.BadRequest(new { ok = false, error = "There is no active draw right now." });
 

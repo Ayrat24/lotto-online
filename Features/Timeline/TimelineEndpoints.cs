@@ -52,6 +52,10 @@ public static class TimelineEndpoints
                 .AsNoTracking()
                 .ToListAsync(ct);
 
+            activeDrawEntities = activeDrawEntities
+                .Where(x => DrawManagement.CanPurchase(x, nowUtc))
+                .ToList();
+
             var activeDrawEntity = activeDrawEntities.FirstOrDefault();
 
             Draw? featuredDrawEntity = activeDrawEntity;

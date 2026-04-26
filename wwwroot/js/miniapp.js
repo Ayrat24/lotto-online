@@ -218,7 +218,9 @@
   }
 
   function getActiveDraws(state) {
-    var draws = (state && Array.isArray(state.activeDraws)) ? state.activeDraws.filter(function (x) { return !!x; }) : [];
+    var draws = (state && Array.isArray(state.activeDraws))
+      ? state.activeDraws.filter(function (x) { return !!x && isDrawPurchasable(x); })
+      : [];
     return draws.slice().sort(compareActiveDraws);
   }
 
