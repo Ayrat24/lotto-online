@@ -4,6 +4,7 @@
   var timelineStatusEl = document.getElementById('timelineStatus');
   var topUpBtn = document.getElementById('topUpBtn');
   var topUpStatusEl = document.getElementById('topUpStatus');
+  var topUpTonStatusEl = document.getElementById('topUpTonStatus');
   var topUpAmountInputEl = document.getElementById('topUpAmountInput');
   var paymentSystemsHintEl = document.getElementById('paymentSystemsHint');
   var paymentSystemsListEl = document.getElementById('paymentSystemsList');
@@ -40,11 +41,13 @@
   var openWithdrawScreenBtn = document.getElementById('openWithdrawScreenBtn');
   var openHistoryScreenBtn = document.getElementById('openHistoryScreenBtn');
   var backFromDepositBtn = document.getElementById('backFromDepositBtn');
+  var backFromTonDepositBtn = document.getElementById('backFromTonDepositBtn');
   var backFromInviteBtn = document.getElementById('backFromInviteBtn');
   var backFromWithdrawBtn = document.getElementById('backFromWithdrawBtn');
   var closeHistoryBtn = document.getElementById('closeHistoryBtn');
   var profileHomeScreenEl = document.getElementById('profileHomeScreen');
   var profileDepositScreenEl = document.getElementById('profileDepositScreen');
+  var profileTonDepositScreenEl = document.getElementById('profileTonDepositScreen');
   var profileInviteScreenEl = document.getElementById('profileInviteScreen');
   var profileWithdrawScreenEl = document.getElementById('profileWithdrawScreen');
   var historyScreenEl = document.getElementById('profileHistoryScreen');
@@ -382,6 +385,7 @@
 
   function setTopUpStatus(text) {
     if (topUpStatusEl) topUpStatusEl.textContent = text || '';
+    if (topUpTonStatusEl) topUpTonStatusEl.textContent = text || '';
   }
 
   function setPromoStatus(text) {
@@ -2020,6 +2024,33 @@
     return '';
   }
 
+  function createPaymentSystemIcon(methodKey) {
+    var normalized = String(methodKey || '').trim().toLowerCase();
+    var icon = document.createElement('span');
+    icon.className = 'payment-system-icon payment-system-icon-' + normalized.replace(/[^a-z0-9]+/g, '-');
+
+    if (normalized === 'btcpay_crypto') {
+      icon.textContent = '₿';
+      return icon;
+    }
+
+    if (normalized === 'telegram_ton') {
+      var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('aria-hidden', 'true');
+
+      var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('fill', 'currentColor');
+      path.setAttribute('d', 'M6.5 7.5h11c.9 0 1.46.97 1.01 1.75l-5.08 8.81a1.66 1.66 0 0 1-2.87 0L5.49 9.25A1.17 1.17 0 0 1 6.5 7.5Zm4.65 7.89V9.01H8.21c-.27 0-.43.29-.31.51l3.25 5.87Zm1.7 0 3.25-5.87c.12-.22-.04-.51-.31-.51h-2.94v6.38Z');
+      svg.appendChild(path);
+      icon.appendChild(svg);
+      return icon;
+    }
+
+    icon.textContent = '¤';
+    return icon;
+  }
+
   function getPaymentMethodCta(methodKey) {
     var normalized = String(methodKey || '').trim().toLowerCase();
     if (normalized === 'telegram_ton') return t('client.topup.system.telegramTon.cta', 'Open Telegram Wallet');
@@ -2106,6 +2137,15 @@
     return value.slice(0, 6) + '…' + value.slice(-6);
   }
 
+  function syncTonDepositScreenState() {
+    if (!profileTonDepositScreenEl) return;
+
+    var connectedAddress = getTonConnectAccountAddress();
+    var hasTonDeposit = !!(activeDeposit && isTelegramTonMethod(activeDeposit.paymentMethod));
+    profileTonDepositScreenEl.classList.toggle('profile-ton-screen-connected', !!connectedAddress && hasTonDeposit);
+    profileTonDepositScreenEl.classList.toggle('profile-ton-screen-has-deposit', hasTonDeposit);
+  }
+
   function syncDepositWalletButtonLabel() {
     if (!openDepositWalletBtn) return;
     if (activeDeposit && isTelegramTonMethod(activeDeposit.paymentMethod) && supportsTonConnect()) {
@@ -2120,9 +2160,12 @@
     if (!tonConnectPanelEl) return;
 
     var hasTonSystem = !!getPaymentSystemByKey('telegram_ton');
-    var shouldShow = hasTonSystem && (isTelegramTonMethod(getSelectedPaymentMethod()) || (activeDeposit && isTelegramTonMethod(activeDeposit.paymentMethod)));
+    var shouldShow = hasTonSystem && (activeProfileScreen === 'deposit-ton' || isTelegramTonMethod(getSelectedPaymentMethod()) || (activeDeposit && isTelegramTonMethod(activeDeposit.paymentMethod)));
     tonConnectPanelEl.hidden = !shouldShow;
-    if (!shouldShow) return;
+    if (!shouldShow) {
+      syncTonDepositScreenState();
+      return;
+    }
 
     var connectedAddress = getTonConnectAccountAddress();
     var available = supportsTonConnect();
@@ -2140,6 +2183,7 @@
     if (tonConnectConnectBtn) tonConnectConnectBtn.hidden = !available || !!connectedAddress;
     if (tonConnectDisconnectBtn) tonConnectDisconnectBtn.hidden = !available || !connectedAddress;
     syncDepositWalletButtonLabel();
+    syncTonDepositScreenState();
   }
 
   function ensureTonConnectUi() {
@@ -2218,7 +2262,7 @@
   }
 
   function connectTonWallet() {
-    ensureTonConnectUi()
+    return ensureTonConnectUi()
       .then(function (ui) {
         if (!ui || typeof ui.openModal !== 'function') {
           setTopUpStatus(t('client.topup.tonConnect.unavailable', 'TON Connect is unavailable here. You can still use the wallet links below.'));
@@ -2348,7 +2392,8 @@
 
   function syncTopUpButtonLabel() {
     if (!topUpBtn) return;
-    topUpBtn.textContent = getPaymentMethodCta(getSelectedPaymentMethod());
+    topUpBtn.textContent = t('client.button.continue', 'Continue');
+    topUpBtn.disabled = !getSelectedPaymentMethod();
   }
 
   function renderPaymentSystems() {
@@ -2374,29 +2419,19 @@
     systems.forEach(function (system) {
       var button = document.createElement('button');
       button.type = 'button';
-      button.className = 'payment-system-card';
+      button.className = 'payment-system-icon-btn';
       if (selected === system.key) button.classList.add('payment-system-card-selected');
+      button.setAttribute('aria-label', getPaymentMethodTitle(system.key));
+      button.setAttribute('title', getPaymentMethodTitle(system.key));
+      button.setAttribute('aria-pressed', selected === system.key ? 'true' : 'false');
 
-      var header = document.createElement('div');
-      header.className = 'payment-system-card-header';
+      button.appendChild(createPaymentSystemIcon(system.key));
 
-      var title = document.createElement('div');
-      title.className = 'payment-system-card-title';
-      title.textContent = getPaymentMethodTitle(system.key);
+      var srText = document.createElement('span');
+      srText.className = 'visually-hidden';
+      srText.textContent = getPaymentMethodTitle(system.key);
+      button.appendChild(srText);
 
-      var badge = document.createElement('div');
-      badge.className = 'payment-system-card-badge';
-      badge.textContent = getPaymentMethodBadge(system.key);
-      badge.hidden = !badge.textContent;
-
-      var body = document.createElement('div');
-      body.className = 'payment-system-card-description';
-      body.textContent = getPaymentMethodDescription(system.key);
-
-      header.appendChild(title);
-      header.appendChild(badge);
-      button.appendChild(header);
-      button.appendChild(body);
       button.addEventListener('click', function () {
         setSelectedPaymentMethod(system.key);
       });
@@ -2409,9 +2444,12 @@
     activeDeposit = deposit || null;
     if (!depositDetailsCardEl) return;
 
-    var hasDeposit = !!deposit;
+    var hasDeposit = !!deposit && isTelegramTonMethod(deposit.paymentMethod);
     depositDetailsCardEl.hidden = !hasDeposit;
-    if (!hasDeposit) return;
+    if (!hasDeposit) {
+      syncTonDepositScreenState();
+      return;
+    }
 
     var displayAmount = formatCurrency(deposit.amount || 0);
     if (deposit.assetAmount && deposit.assetCode) {
@@ -2430,6 +2468,7 @@
     if (checkDepositStatusBtn) checkDepositStatusBtn.hidden = !deposit.id;
     syncDepositWalletButtonLabel();
     renderTonConnectPanel();
+    syncTonDepositScreenState();
   }
 
   function copyText(value, successMessage) {
@@ -2537,7 +2576,7 @@
 
   function setProfileScreen(name) {
     var nextScreen = String(name || 'home').toLowerCase();
-    if (nextScreen !== 'home' && nextScreen !== 'deposit' && nextScreen !== 'invite' && nextScreen !== 'withdraw' && nextScreen !== 'history') {
+    if (nextScreen !== 'home' && nextScreen !== 'deposit' && nextScreen !== 'deposit-ton' && nextScreen !== 'invite' && nextScreen !== 'withdraw' && nextScreen !== 'history') {
       nextScreen = 'home';
     }
 
@@ -2545,6 +2584,7 @@
 
     if (profileHomeScreenEl) profileHomeScreenEl.hidden = nextScreen !== 'home';
     if (profileDepositScreenEl) profileDepositScreenEl.hidden = nextScreen !== 'deposit';
+    if (profileTonDepositScreenEl) profileTonDepositScreenEl.hidden = nextScreen !== 'deposit-ton';
     if (profileInviteScreenEl) profileInviteScreenEl.hidden = nextScreen !== 'invite';
     if (profileWithdrawScreenEl) profileWithdrawScreenEl.hidden = nextScreen !== 'withdraw';
     if (historyScreenEl) historyScreenEl.hidden = nextScreen !== 'history';
@@ -2555,6 +2595,11 @@
 
     if (nextScreen === 'deposit') {
       renderPaymentSystems();
+      ensureTonConnectUi().finally(renderTonConnectPanel);
+      updateDepositDetails(activeDeposit);
+    }
+
+    if (nextScreen === 'deposit-ton') {
       ensureTonConnectUi().finally(renderTonConnectPanel);
       updateDepositDetails(activeDeposit);
     }
@@ -3202,13 +3247,13 @@
         var deposit = res.deposit;
         updateDepositDetails(deposit);
         if (isTelegramTonMethod(paymentMethod)) {
+          setProfileScreen('deposit-ton');
           return sendDepositViaTonConnect(deposit)
             .then(function (result) {
               if (result === 'sent') {
                 setTopUpStatus(t('client.topup.tonConnect.sent', 'TON transaction was submitted. Waiting for blockchain confirmation.'));
-              } else if (result === 'unavailable' && deposit.checkoutLink) {
-                openCheckoutLink(deposit.checkoutLink);
-                setTopUpStatus(t('client.topup.created.telegramTon', 'TON payment prepared. Open your wallet, send the exact amount, and keep the memo unchanged.'));
+              } else if (result === 'cancelled') {
+                setTopUpStatus(t('client.topup.tonConnect.cancelled', 'TON Connect was cancelled. You can retry or use the wallet links below.'));
               } else {
                 setTopUpStatus(t('client.topup.created.telegramTon', 'TON payment prepared. Open your wallet, send the exact amount, and keep the memo unchanged.'));
               }
@@ -3509,6 +3554,7 @@
   if (openWithdrawScreenBtn) openWithdrawScreenBtn.addEventListener('click', function () { setProfileScreen('withdraw'); });
   if (openHistoryScreenBtn) openHistoryScreenBtn.addEventListener('click', function () { setProfileScreen('history'); });
   if (backFromDepositBtn) backFromDepositBtn.addEventListener('click', function () { setProfileScreen('home'); });
+  if (backFromTonDepositBtn) backFromTonDepositBtn.addEventListener('click', function () { setProfileScreen('deposit'); });
   if (backFromInviteBtn) backFromInviteBtn.addEventListener('click', function () { setProfileScreen('home'); });
   if (backFromWithdrawBtn) backFromWithdrawBtn.addEventListener('click', function () { setProfileScreen('home'); });
   if (closeHistoryBtn) closeHistoryBtn.addEventListener('click', function () { setProfileScreen('home'); });

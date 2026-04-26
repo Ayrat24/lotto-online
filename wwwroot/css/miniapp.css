@@ -255,6 +255,18 @@ body.app-loading .loading-shell {
   font-size: 0.84rem;
 }
 
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .debug-mode-badge {
   border-radius: 10px;
   border: 1px solid rgba(241, 190, 55, 0.4);
@@ -784,14 +796,133 @@ body.app-loading .loading-shell {
   color: #ffffff;
 }
 
+.profile-screen {
+  gap: 14px;
+  background: linear-gradient(180deg, #17212b, #141d27);
+  border-color: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.24);
+}
+
+.profile-page-screen,
+.profile-home-screen {
+  padding: 18px;
+}
+
+.profile-page-header,
+.profile-screen-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.profile-page-heading,
+.profile-screen-heading {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.profile-balance-card,
+.profile-section-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.profile-balance-label,
+.profile-field-label {
+  color: #8fa4bc;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.profile-balance-value {
+  font-size: clamp(1.75rem, 4vw, 2.15rem);
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.profile-menu-group {
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.profile-menu-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 0;
+  padding: 12px;
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  text-align: left;
+  text-transform: none;
+  letter-spacing: 0;
+  box-shadow: none;
+}
+
+.profile-menu-item + .profile-menu-item {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.profile-menu-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  color: #dbe7f6;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.profile-menu-icon-accent {
+  background: rgba(51, 144, 236, 0.18);
+  color: #65b7ff;
+}
+
+.profile-menu-copy {
+  min-width: 0;
+}
+
+.profile-menu-title {
+  display: block;
+  color: #ffffff;
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+
+.profile-menu-arrow {
+  color: #7e91a8;
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.profile-field-block {
+  display: grid;
+  gap: 10px;
+}
+
 .profile-input {
   width: 100%;
   box-sizing: border-box;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.03);
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
   color: var(--text);
-  padding: 11px 12px;
+  padding: 13px 14px;
   font-size: 1rem;
 }
 
@@ -799,74 +930,125 @@ body.app-loading .loading-shell {
   color: #95a3ba;
 }
 
+.profile-amount-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.profile-amount-prefix {
+  color: #65b7ff;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.profile-amount-input {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+
+.profile-amount-input:focus {
+  outline: none;
+}
+
+.profile-amount-input::-webkit-outer-spin-button,
+.profile-amount-input::-webkit-inner-spin-button,
+#withdrawAmountInput::-webkit-outer-spin-button,
+#withdrawAmountInput::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.profile-amount-input,
+#withdrawAmountInput {
+  -moz-appearance: textfield;
+}
+
 .payment-systems-list {
   display: grid;
   gap: 10px;
 }
 
-.payment-system-card {
+.payment-systems-icon-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.payment-system-icon-btn {
   display: grid;
-  gap: 8px;
-  text-align: left;
-  text-transform: none;
-  letter-spacing: normal;
-  min-height: 0;
-  padding: 14px;
-  background: rgba(255, 255, 255, 0.04);
+  place-items: center;
+  min-height: 88px;
+  padding: 12px;
+  border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
   color: var(--text);
+  text-transform: none;
+  letter-spacing: 0;
+  box-shadow: none;
 }
 
 .payment-system-card-selected {
-  border-color: rgba(255, 111, 152, 0.72);
-  box-shadow: 0 0 0 1px rgba(255, 111, 152, 0.18) inset;
-  background: linear-gradient(180deg, rgba(255, 122, 165, 0.16), rgba(255, 102, 143, 0.08));
+  border-color: rgba(51, 144, 236, 0.72);
+  box-shadow: 0 0 0 1px rgba(51, 144, 236, 0.18) inset;
+  background: rgba(51, 144, 236, 0.12);
 }
 
-.payment-system-card-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
+.payment-system-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  font-size: 1.7rem;
+  font-weight: 900;
 }
 
-.payment-system-card-title {
-  font-size: 1rem;
-  font-weight: 800;
+.payment-system-icon svg {
+  width: 26px;
+  height: 26px;
 }
 
-.payment-system-card-badge {
-  flex: 0 0 auto;
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
-  color: #ffdbe6;
-  font-size: 0.72rem;
-  font-weight: 800;
+.payment-system-icon-telegram-ton {
+  color: #65b7ff;
 }
 
-.payment-system-card-description {
-  color: #c6d3e6;
-  font-size: 0.92rem;
-  line-height: 1.4;
+.payment-system-icon-btcpay-crypto {
+  color: #f5c152;
 }
 
+.profile-status {
+  min-height: 18px;
+}
+
+.profile-primary-cta {
+  background: linear-gradient(180deg, #3390ec, #2d80d3);
+  color: #ffffff;
+  border: 0;
+}
+
+.ton-connect-panel,
 .deposit-details-card {
   display: grid;
   gap: 12px;
-  padding: 14px;
-  border-radius: 16px;
+  padding: 16px;
+  border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.03));
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .ton-connect-panel {
-  display: grid;
-  gap: 12px;
-  padding: 14px;
-  border-radius: 16px;
-  border: 1px solid rgba(33, 144, 255, 0.24);
-  background: linear-gradient(180deg, rgba(33, 144, 255, 0.12), rgba(33, 144, 255, 0.05));
+  border-color: rgba(51, 144, 236, 0.22);
 }
 
 .ton-connect-panel-header {
@@ -878,17 +1060,14 @@ body.app-loading .loading-shell {
 
 .ton-connect-title {
   margin-bottom: 4px;
-  color: #dce8ff;
+  color: #dce9f8;
 }
 
-.ton-connect-panel-actions {
+.ton-connect-panel-actions,
+.deposit-details-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-}
-
-.ton-connect-panel-actions .secondary-btn {
-  min-height: 42px;
 }
 
 .deposit-details-title {
@@ -905,35 +1084,50 @@ body.app-loading .loading-shell {
   justify-content: space-between;
   align-items: flex-start;
   gap: 12px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
+  padding: 11px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .deposit-details-label {
   color: #a9b8ce;
-  font-size: 0.86rem;
+  font-size: 0.84rem;
 }
 
 .deposit-details-value {
   color: #ffffff;
-  font-size: 0.9rem;
+  font-size: 0.92rem;
   text-align: right;
   word-break: break-all;
 }
 
-.deposit-details-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+.profile-ton-screen .ton-connect-panel {
+  order: 1;
 }
 
-.deposit-details-actions .secondary-btn {
-  min-height: 42px;
+.profile-ton-screen .profile-status {
+  order: 2;
+}
+
+.profile-ton-screen .deposit-details-card {
+  order: 3;
+}
+
+.profile-ton-screen.profile-ton-screen-connected .deposit-details-card {
+  order: 1;
+}
+
+.profile-ton-screen.profile-ton-screen-connected .profile-status {
+  order: 2;
+}
+
+.profile-ton-screen.profile-ton-screen-connected .ton-connect-panel {
+  order: 3;
 }
 
 @media (max-width: 560px) {
+  .payment-systems-icon-list,
   .ton-connect-panel-actions,
   .deposit-details-actions {
     grid-template-columns: minmax(0, 1fr);
@@ -956,7 +1150,9 @@ body.app-loading .loading-shell {
   background: rgba(255, 255, 255, 0.02);
 }
 
-button {
+.app-shell button,
+.purchase-screen button,
+.center-popup button {
   width: 100%;
   border: 0;
   border-radius: var(--radius-control);
@@ -972,11 +1168,15 @@ button {
   transition: transform 0.08s ease, opacity 0.16s ease, filter 0.18s ease;
 }
 
-button:active {
+.app-shell button:active,
+.purchase-screen button:active,
+.center-popup button:active {
   transform: translateY(1px) scale(0.99);
 }
 
-button:disabled {
+.app-shell button:disabled,
+.purchase-screen button:disabled,
+.center-popup button:disabled {
   opacity: 0.52;
   cursor: not-allowed;
 }
@@ -1735,32 +1935,21 @@ button:disabled {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.14);
   color: #d9e4f6;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
-/* Make profile action buttons share the primary gradient color (exclude the floating back button). */
-.profile-screen button:not(.profile-back-btn),
-.profile-screen .secondary-btn,
-.profile-screen .link-btn {
-  background: linear-gradient(180deg, #ff7aa5, #ff668f);
-  color: #ffffff;
-  border: 0;
-}
-
-/* Small arrow back button positioned top-left above the profile card */
 .profile-back-btn {
-  position: absolute;
-  left: var(--profile-back-inset);
-  top: var(--profile-back-inset);
-  z-index: 46;
   box-sizing: border-box;
-  width: var(--profile-back-size);
-  height: var(--profile-back-size);
-  min-height: 0;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  flex: 0 0 40px;
   padding: 0;
-  border-radius: 10px;
-  background: rgba(255,255,255,0.04);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
   color: var(--text);
-  border: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   font-size: 1.1rem;
   font-weight: 700;
   line-height: 1;
@@ -1768,27 +1957,14 @@ button:disabled {
   letter-spacing: 0;
   display: grid;
   place-items: center;
-  box-shadow: 0 6px 18px rgba(0,0,0,0.36);
-}
-
-/* Ensure profile screens are relatively positioned so the absolute back button aligns */
-.profile-screen {
-  position: relative;
-  --profile-back-size: 42px;
-  --profile-back-inset: 16px;
-}
-
-/* Reserve layout space for the floating back button only where it exists. */
-.profile-back-btn + .section-header {
-  padding-left: calc(var(--profile-back-size) + 14px);
-  min-height: var(--profile-back-size);
+  box-shadow: none;
 }
 
 .tx-row {
   border: 1px solid var(--line-soft);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.02);
-  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 12px;
   display: grid;
   gap: 6px;
 }
@@ -1935,10 +2111,6 @@ button:disabled {
     flex-direction: column;
   }
 
-  .profile-back-btn + .section-header {
-    align-items: center;
-    flex-direction: row;
-  }
 
   .winner-card {
     grid-template-columns: 72px minmax(0, 1fr);
