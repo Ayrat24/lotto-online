@@ -8,21 +8,8 @@ public static class PaymentsEndpoints
 {
     public static IEndpointRouteBuilder MapPaymentsEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGet("/tonconnect-manifest.json", (HttpContext http, IConfiguration config) =>
-        {
-            var urls = ResolveTonConnectPublicUrls(http, config);
-            http.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
-            http.Response.Headers.Pragma = "no-cache";
-
-            return Results.Json(new
-            {
-                url = urls.AppUrl,
-                name = "LottoVibe",
-                iconUrl = AppendPath(urls.SiteRoot, "img/cafe/Cake_148.png"),
-                termsOfUseUrl = AppendPath(urls.SiteRoot, "Privacy"),
-                privacyPolicyUrl = AppendPath(urls.SiteRoot, "Privacy")
-            });
-        });
+        endpoints.MapGet("/tonconnect-manifest.json", BuildTonConnectManifestResult);
+        endpoints.MapGet("/app/tonconnect-manifest.json", BuildTonConnectManifestResult);
 
         endpoints.MapGet("/api/payments/systems", (IPaymentsService payments) =>
         {
@@ -129,6 +116,22 @@ public static class PaymentsEndpoints
         }
 
         return (tgUser!.Id, null);
+    }
+
+    private static IResult BuildTonConnectManifestResult(HttpContext http, IConfiguration config)
+    {
+        var urls = ResolveTonConnectPublicUrls(http, config);
+        http.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+        http.Response.Headers.Pragma = "no-cache";
+
+        return Results.Json(new
+        {
+            url = urls.AppUrl,
+            name = "LottoVibe",
+            iconUrl = AppendPath(urls.SiteRoot, "img/cafe/Cake_148.png"),
+            termsOfUseUrl = AppendPath(urls.SiteRoot, "Privacy"),
+            privacyPolicyUrl = AppendPath(urls.SiteRoot, "Privacy")
+        });
     }
 
     private static (string SiteRoot, string AppUrl) ResolveTonConnectPublicUrls(HttpContext http, IConfiguration config)

@@ -2051,12 +2051,20 @@
   }
 
   function getTonConnectManifestUrl() {
+    var manifestVersion = '20260426b';
+
     try {
-      var manifestUrl = new URL('tonconnect-manifest.json', window.location.href);
-      manifestUrl.searchParams.set('v', '20260425b');
+      var pathname = String(window.location && window.location.pathname || '/app');
+      var normalizedPath = pathname.replace(/\/+$/, '') || '/';
+      var lastSlashIndex = normalizedPath.lastIndexOf('/');
+      var manifestPath = lastSlashIndex >= 0
+        ? normalizedPath.slice(0, lastSlashIndex + 1) + 'tonconnect-manifest.json'
+        : '/tonconnect-manifest.json';
+      var manifestUrl = new URL(manifestPath, window.location.href);
+      manifestUrl.searchParams.set('v', manifestVersion);
       return manifestUrl.toString();
     } catch (e) {
-      return '/tonconnect-manifest.json?v=20260425b';
+      return '/tonconnect-manifest.json?v=' + encodeURIComponent(manifestVersion);
     }
   }
 
