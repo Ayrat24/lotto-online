@@ -630,8 +630,10 @@ body.app-loading .loading-shell {
 
 .draw-card-footer {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
   margin-top: auto;
 }
 
@@ -659,6 +661,34 @@ body.app-loading .loading-shell {
   font-size: 0.82rem;
   line-height: 1;
   font-weight: 900;
+}
+
+.draw-card-action-btn {
+  width: auto;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  color: #10141b;
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.18);
+}
+
+.draw-card-action-btn:hover,
+.draw-card-action-btn:focus-visible {
+  background: #ffffff;
+  border-color: #ffffff;
+}
+
+.draw-card-action-btn:disabled {
+  background: rgba(255, 255, 255, 0.45);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(16, 20, 27, 0.62);
+  box-shadow: none;
 }
 
 .draw-card-theme-gold {
@@ -713,6 +743,10 @@ body.app-loading .loading-shell {
   .draw-card-cost-block {
     min-width: 68px;
     padding: 5px 8px;
+  }
+
+  .draw-card-action-btn {
+    width: 100%;
   }
 
    .draw-sort-tab {

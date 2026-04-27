@@ -1822,6 +1822,10 @@
     draws.forEach(function (draw) {
       var card = document.createElement('article');
       card.className = 'card draw-card draw-card-compact duplicate-jackpot-card';
+      card.setAttribute('role', 'button');
+      card.setAttribute('tabindex', '0');
+      card.setAttribute('aria-haspopup', 'dialog');
+      card.setAttribute('aria-controls', 'ticketPurchaseScreen');
       applyDrawCardTheme(card, draw);
       if (selectedActiveDrawId != null && draw.id === selectedActiveDrawId) {
         card.classList.add('draw-card-selected');
@@ -1872,9 +1876,22 @@
       costValue.className = 'draw-card-cost-value';
       costValue.textContent = formatCurrency(draw.ticketCost);
 
+      var openBtn = document.createElement('button');
+      openBtn.type = 'button';
+      openBtn.className = 'draw-card-action-btn';
+      openBtn.textContent = t('client.button.purchase', 'Purchase ticket');
+      openBtn.disabled = !isDrawPurchasable(draw);
+      openBtn.title = isDrawPurchasable(draw) ? '' : getDrawUnavailableMessage(draw);
+      openBtn.addEventListener('click', function (event) {
+        if (event && event.cancelable) event.preventDefault();
+        if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
+        tryOpenTicketPurchaseScreen(draw, setPurchaseStatus);
+      });
+
       costBlock.appendChild(costLabel);
       costBlock.appendChild(costValue);
       footer.appendChild(costBlock);
+      footer.appendChild(openBtn);
 
       card.appendChild(header);
       card.appendChild(status);
@@ -1891,13 +1908,13 @@
           return;
         }
 
-        if (!isDrawPurchasable(draw)) {
-          setPurchaseStatus(getDrawUnavailableMessage(draw));
-          return;
-        }
+        tryOpenTicketPurchaseScreen(draw, setPurchaseStatus);
+      });
 
-        setPurchaseStatus('');
-        openTicketPurchaseScreen(draw);
+      card.addEventListener('keydown', function (event) {
+        if (!event || (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar')) return;
+        event.preventDefault();
+        tryOpenTicketPurchaseScreen(draw, setPurchaseStatus);
       });
 
       jackpotCardsContainerEl.appendChild(card);
@@ -1935,6 +1952,10 @@
       if (currentDrawTicketPriceRowEl) currentDrawTicketPriceRowEl.hidden = false;
       if (currentDrawTicketCostEl) currentDrawTicketCostEl.textContent = '$2.00';
       if (currentDrawPurchaseBlockEl) currentDrawPurchaseBlockEl.hidden = false;
+      if (purchaseBtn) {
+        purchaseBtn.disabled = true;
+        purchaseBtn.title = t('client.status.noActiveDraw', 'There is no active draw right now.');
+      }
       applyDrawCardTheme(featuredJackpotCardEl, null);
       // legacy picker cleanup not required
       return;
@@ -1969,6 +1990,10 @@
     if (currentDrawPrizePool4El) currentDrawPrizePool4El.textContent = '$' + formatPrizeTierPool(draw.prizePoolMatch4 || 0);
     if (currentDrawPrizePool5El) currentDrawPrizePool5El.textContent = '$' + formatPrizeTierPool(draw.prizePoolMatch5 || 0);
     if (currentDrawTicketCostEl) currentDrawTicketCostEl.textContent = formatCurrency(draw.ticketCost);
+    if (purchaseBtn) {
+      purchaseBtn.disabled = !purchasable;
+      purchaseBtn.title = purchasable ? '' : getDrawUnavailableMessage(draw);
+    }
 
     // Update jackpot purchase price and track the displayed draw id
     try {
@@ -2774,6 +2799,21 @@
     ticketPurchaseScreenEl.hidden = false;
     setSheetOpenClass();
     renderTicketPurchaseScreen();
+  }
+
+  function tryOpenTicketPurchaseScreen(drawOrId, statusSetter) {
+    var setStatus = typeof statusSetter === 'function' ? statusSetter : setPurchaseStatus;
+    if (!ensureSessionReadyForPurchase(setStatus)) return false;
+
+    var draw = resolveDrawForPurchase(drawOrId != null ? drawOrId : currentDisplayedDrawId);
+    if (!draw || !isDrawPurchasable(draw)) {
+      setStatus(getDrawUnavailableMessage(draw));
+      return false;
+    }
+
+    setStatus('');
+    openTicketPurchaseScreen(draw);
+    return true;
   }
 
   function closeTicketPurchaseScreen() {
@@ -3607,17 +3647,10 @@
   }
 
   function purchaseTicket() {
-    if (!ensureSessionReadyForPurchase(setPurchaseStatus)) return;
     var selected = resolveSelectedDrawSnapshot(latestState);
-    if (!selected.draw || !isDrawPurchasable(selected.draw)) {
-      setPurchaseStatus(getDrawUnavailableMessage(selected.draw));
-      return;
-    }
-
-    setPurchaseStatus('');
     // Ensure purchases from jackpot card target the featured/current draw
     if (currentDisplayedDrawId != null) selectedActiveDrawId = currentDisplayedDrawId;
-    openTicketPurchaseScreen(selected.draw || currentDisplayedDrawId);
+    tryOpenTicketPurchaseScreen(selected.draw || currentDisplayedDrawId, setPurchaseStatus);
   }
 
   if (purchaseBtn) purchaseBtn.addEventListener('click', purchaseTicket);
@@ -3630,6 +3663,12 @@
         return;
       }
 
+      purchaseTicket();
+    });
+    featuredJackpotCardEl.addEventListener('keydown', function (event) {
+      if (!event || (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar')) return;
+      if (purchaseBtn && document.activeElement === purchaseBtn) return;
+      event.preventDefault();
       purchaseTicket();
     });
   }

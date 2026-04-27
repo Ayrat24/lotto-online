@@ -96,7 +96,7 @@
         </div>
       </section>
 
-      <section id="featuredJackpotCard" class="card draw-card featured-draw-card">
+      <section id="featuredJackpotCard" class="card draw-card featured-draw-card" role="button" tabindex="0" aria-haspopup="dialog" aria-controls="ticketPurchaseScreen">
         <div class="draw-card-header">
           <div id="jackpotGameTitle" class="draw-card-title" data-loc="client.drawCard.titlePrefix">Draw #</div>
           <div id="currentDrawCreatedAt" class="draw-card-timer" data-loc="client.jackpot.endsIn">Ends in --:--:--</div>
@@ -111,6 +111,7 @@
             <div class="draw-card-cost-label" data-loc="client.drawCard.ticketCostLabel">Ticket cost</div>
             <div id="jackpotBuyPrice" class="draw-card-cost-value">$2.00</div>
           </div>
+          <button id="purchaseTicketBtn" type="button" class="draw-card-action-btn" data-loc="client.button.purchase">Purchase ticket</button>
         </div>
 
         <div id="currentDrawPrizeTiers" hidden>
