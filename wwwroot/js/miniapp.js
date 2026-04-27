@@ -112,8 +112,7 @@
   var ticketPurchasePanelEl = document.getElementById('ticketPurchasePanel');
   var closeTicketPurchaseScreenBtn = document.getElementById('closeTicketPurchaseScreenBtn');
   var ticketPurchaseSubtitleEl = document.getElementById('ticketPurchaseSubtitle');
-  var ticketPurchaseDrawIdEl = document.getElementById('ticketPurchaseDrawId');
-  var ticketPurchaseDrawCostEl = document.getElementById('ticketPurchaseDrawCost');
+  var ticketPurchaseDrawsStripEl = document.getElementById('ticketPurchaseDrawsStrip');
   var ticketPurchaseScreenStatusEl = document.getElementById('ticketPurchaseScreenStatus');
   var ticketPurchaseTicketsListEl = document.getElementById('ticketPurchaseTicketsList');
   var ticketPurchaseFooterEl = document.getElementById('ticketPurchaseFooter');
@@ -158,6 +157,14 @@
   var drawCardListDragActive = false;
   var drawCardListDragMoved = false;
   var drawCardListSuppressClickUntil = 0;
+  var purchaseDrawStripGestureBound = false;
+  var purchaseDrawStripDragPointerId = null;
+  var purchaseDrawStripDragStartX = 0;
+  var purchaseDrawStripDragStartScrollLeft = 0;
+  var purchaseDrawStripDragActive = false;
+  var purchaseDrawStripDragMoved = false;
+  var purchaseDrawStripSuppressClickUntil = 0;
+  var purchaseDrawStripRenderSig = '';
   var referralInviteCode = '';
   var referralInviteLink = '';
   var referralCodeFromQuery = '';
@@ -780,6 +787,26 @@
 
     if (shouldSuppressClick) {
       drawCardListSuppressClickUntil = Date.now() + 250;
+    }
+  }
+
+  function endPurchaseDrawStripDrag(pointerId) {
+    if (!purchaseDrawStripDragActive || (pointerId != null && purchaseDrawStripDragPointerId !== pointerId)) return;
+
+    var shouldSuppressClick = purchaseDrawStripDragMoved;
+
+    purchaseDrawStripDragPointerId = null;
+    purchaseDrawStripDragStartX = 0;
+    purchaseDrawStripDragStartScrollLeft = 0;
+    purchaseDrawStripDragActive = false;
+    purchaseDrawStripDragMoved = false;
+
+    if (ticketPurchaseDrawsStripEl) {
+      ticketPurchaseDrawsStripEl.classList.remove('draw-card-list-dragging');
+    }
+
+    if (shouldSuppressClick) {
+      purchaseDrawStripSuppressClickUntil = Date.now() + 250;
     }
   }
 
@@ -1425,6 +1452,29 @@
       next.push(number);
     }
 
+    // Immediately update the button visual state for snappy feedback
+    // (the full render will run in setPurchaseScreenTicketNumbers and recreate DOM).
+    try {
+      if (ticketPurchaseTicketsListEl) {
+        var card = ticketPurchaseTicketsListEl.querySelector('[data-purchase-ticket-index="' + index + '"]');
+        if (card) {
+          var btns = card.querySelectorAll('.purchase-ticket-number-btn');
+          for (var i = 0; i < btns.length; i++) {
+            var btn = btns[i];
+            if (!btn) continue;
+            // match by visible text (number)
+            if (String(btn.textContent || '').trim() === String(number)) {
+              var shouldBeSelected = existingIndex < 0;
+              btn.classList.toggle('purchase-ticket-number-btn-selected', shouldBeSelected);
+              break;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // ignore DOM update failures and fall back to full render
+    }
+
     setPurchaseScreenTicketNumbers(index, next);
   }
 
@@ -1473,6 +1523,289 @@
     }
   }
 
+  function getDrawThemeColors(draw) {
+    var color = String(draw && draw.cardColor || '').trim().toLowerCase();
+    if (color === 'teal') return { start: '#1ecdc4', end: '#0d9fa6' };
+    if (color === 'pink') return { start: '#e65ac9', end: '#c748b4' };
+    if (color === 'blue') return { start: '#18a8ee', end: '#0c78d8' };
+    if (color === 'orange') return { start: '#ff951d', end: '#ff6d00' };
+    return { start: '#f5c41e', end: '#d99900' };
+  }
+
+  // Ball SVGs are now rendered via a mask SVG and CSS backgrounds/gradients,
+  // so inline SVG-to-data-uri helpers and generated SVGs are no longer used.
+
+  function centerPurchaseDrawStripSelection(draw, behavior) {
+    if (!ticketPurchaseDrawsStripEl || !draw) return;
+
+    var selectedCard = ticketPurchaseDrawsStripEl.querySelector('[data-purchase-draw-id="' + draw.id + '"]');
+    if (!selectedCard) return;
+
+    var targetLeft = Number(selectedCard.offsetLeft || 0) - Math.max(0, (Number(ticketPurchaseDrawsStripEl.clientWidth || 0) - Number(selectedCard.offsetWidth || 0)) / 2);
+    try {
+      ticketPurchaseDrawsStripEl.scrollTo({ left: Math.max(0, targetLeft), behavior: behavior || 'smooth' });
+    } catch (e) {
+      ticketPurchaseDrawsStripEl.scrollLeft = Math.max(0, targetLeft);
+    }
+  }
+
+  function syncPurchaseDrawStripSelection(selectedDraw) {
+    if (!ticketPurchaseDrawsStripEl) return;
+
+    var selectedId = selectedDraw ? Number(selectedDraw.id) : null;
+    var cards = ticketPurchaseDrawsStripEl.querySelectorAll('[data-purchase-draw-id]');
+    for (var i = 0; i < cards.length; i++) {
+      var card = cards[i];
+      var drawId = Number(card.getAttribute('data-purchase-draw-id') || 0);
+      var isSelected = selectedId != null && drawId === selectedId;
+      card.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+      card.classList.toggle('draw-card-selected', isSelected);
+      card.classList.toggle('purchase-screen-draw-switch-card-selected', isSelected);
+    }
+  }
+
+  function renderTicketPurchaseCards() {
+    if (!ticketPurchaseTicketsListEl) return;
+
+    ticketPurchaseTicketsListEl.innerHTML = '';
+    purchaseScreenTicketStates.forEach(function (ticketState, index) {
+      ticketPurchaseTicketsListEl.appendChild(createPurchaseTicketCard(ticketState, index));
+    });
+  }
+
+  function syncTicketPurchaseScreenState(draw) {
+    var validation = getPurchaseScreenValidation();
+    var purchasable = isDrawPurchasable(draw);
+    if (!purchaseScreenSubmitting) {
+      if (!draw || !purchasable) {
+        setTicketPurchaseScreenStatus(getDrawUnavailableMessage(draw));
+      } else {
+        setTicketPurchaseScreenStatus(validation.ok ? '' : validation.message);
+      }
+    }
+
+    var completedCount = validation.completedCount || 0;
+    var totalCost = draw ? Number(draw.ticketCost || 0) * completedCount : 0;
+    syncTicketPurchaseFooterVisibility(completedCount > 0);
+    if (submitTicketPurchaseLabelEl) submitTicketPurchaseLabelEl.textContent = formatPurchaseTicketsButtonLabel(completedCount);
+    if (submitTicketPurchaseCostEl) submitTicketPurchaseCostEl.textContent = formatCurrency(totalCost);
+    if (submitTicketPurchaseBtn) {
+      submitTicketPurchaseBtn.disabled = purchaseScreenSubmitting || !validation.ok || !draw || !purchasable;
+    }
+  }
+
+  function setPurchaseScreenSelectedDraw(draw, options) {
+    if (!draw) return;
+
+    var previousDrawId = purchaseScreenDrawId;
+    selectDrawForPurchase(draw);
+    applyPurchaseScreenTheme(draw);
+    syncPurchaseDrawStripSelection(draw);
+
+    if (!(options && options.skipCentering)) {
+      requestAnimationFrame(function () {
+        centerPurchaseDrawStripSelection(draw, options && options.instantCenter ? 'auto' : 'smooth');
+      });
+    }
+
+    if (!(options && options.skipTicketRender) || previousDrawId !== draw.id) {
+      renderTicketPurchaseCards();
+      syncTicketPurchaseScreenState(draw);
+    }
+  }
+
+  function bindPurchaseDrawStripGestures() {
+    if (!ticketPurchaseDrawsStripEl || purchaseDrawStripGestureBound) return;
+    purchaseDrawStripGestureBound = true;
+    ticketPurchaseDrawsStripEl.classList.add('draw-card-list');
+
+    ticketPurchaseDrawsStripEl.addEventListener('pointerdown', function (event) {
+      if (!event) return;
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      if (ticketPurchaseDrawsStripEl.scrollWidth <= ticketPurchaseDrawsStripEl.clientWidth) return;
+
+      purchaseDrawStripDragPointerId = event.pointerId;
+      purchaseDrawStripDragStartX = Number(event.clientX || 0);
+      purchaseDrawStripDragStartScrollLeft = Number(ticketPurchaseDrawsStripEl.scrollLeft || 0);
+      purchaseDrawStripDragActive = true;
+      purchaseDrawStripDragMoved = false;
+      ticketPurchaseDrawsStripEl.classList.add('draw-card-list-dragging');
+
+      if (event.cancelable) event.preventDefault();
+
+      try {
+        if (typeof ticketPurchaseDrawsStripEl.setPointerCapture === 'function') {
+          ticketPurchaseDrawsStripEl.setPointerCapture(event.pointerId);
+        }
+      } catch (e) {
+      }
+    });
+
+    ticketPurchaseDrawsStripEl.addEventListener('pointermove', function (event) {
+      if (!purchaseDrawStripDragActive || !event || purchaseDrawStripDragPointerId !== event.pointerId) return;
+
+      var deltaX = Number(event.clientX || 0) - purchaseDrawStripDragStartX;
+      if (Math.abs(deltaX) > 6) {
+        purchaseDrawStripDragMoved = true;
+      }
+
+      if (purchaseDrawStripDragMoved && event.cancelable) event.preventDefault();
+
+      ticketPurchaseDrawsStripEl.scrollLeft = purchaseDrawStripDragStartScrollLeft - deltaX;
+    });
+
+    ticketPurchaseDrawsStripEl.addEventListener('pointerup', function (event) {
+      endPurchaseDrawStripDrag(event && event.pointerId);
+    });
+
+    ticketPurchaseDrawsStripEl.addEventListener('pointercancel', function (event) {
+      endPurchaseDrawStripDrag(event && event.pointerId);
+    });
+
+    ticketPurchaseDrawsStripEl.addEventListener('lostpointercapture', function (event) {
+      endPurchaseDrawStripDrag(event && event.pointerId);
+    });
+
+    ticketPurchaseDrawsStripEl.addEventListener('dragstart', function (event) {
+      if (event && event.cancelable) event.preventDefault();
+    });
+
+    ticketPurchaseDrawsStripEl.addEventListener('click', function (event) {
+      if (Date.now() >= purchaseDrawStripSuppressClickUntil) return;
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }, true);
+  }
+
+  function getPurchaseDrawStripSignature(draws) {
+    return (draws || []).map(function (draw) {
+      if (!draw) return 'x';
+      return [draw.id, draw.cardColor || '', draw.ticketCost || 0, draw.purchaseClosesAtUtc || ''].join(':');
+    }).join('|');
+  }
+
+  function applyPurchaseScreenTheme(draw) {
+    if (!ticketPurchasePanelEl) return;
+    applyDrawCardTheme(ticketPurchasePanelEl, draw || null);
+
+    var colors = getDrawThemeColors(draw);
+    // Use an SVG mask for the ball shape and expose accent colors so CSS can
+    // tint the masked background (gradient or solid) at runtime.
+    // Primary: set on the purchase panel so descendants inherit the mask and
+    // accent colors. Fallback: also set on the document root so variables are
+    // available if the purchase controls are rendered outside the panel in
+    // certain debug layouts or if DOM was restructured.
+    var maskUrl = 'url("/images/purchase-ball-mask.svg")';
+    ticketPurchasePanelEl.style.setProperty('--purchase-ball-mask', maskUrl);
+    try {
+      document.documentElement.style.setProperty('--purchase-ball-mask', maskUrl);
+    } catch (e) {
+      // ignore if setting on root is not allowed in some environments
+    }
+    ticketPurchasePanelEl.style.setProperty('--purchase-accent-start', colors.start);
+    ticketPurchasePanelEl.style.setProperty('--purchase-accent-end', colors.end);
+  }
+
+  function createPurchaseScreenDrawSwitchCard(draw, isSelected) {
+    var card = document.createElement('article');
+    card.className = 'draw-card draw-card-compact purchase-screen-draw-switch-card';
+    card.setAttribute('data-purchase-draw-id', String(draw.id));
+    card.setAttribute('role', 'button');
+    card.setAttribute('tabindex', '0');
+    card.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+    if (isSelected) {
+      card.classList.add('draw-card-selected');
+      card.classList.add('purchase-screen-draw-switch-card-selected');
+    }
+    applyDrawCardTheme(card, draw);
+
+    var header = document.createElement('div');
+    header.className = 'draw-card-header';
+
+    var title = document.createElement('div');
+    title.className = 'draw-card-title';
+    title.textContent = t('client.drawCard.titlePrefix', 'Draw #') + draw.id;
+
+    var timer = document.createElement('div');
+    timer.className = 'draw-card-timer';
+    timer.textContent = getDrawCountdownText(draw);
+    if (!isDrawPurchasable(draw)) timer.classList.add('draw-card-timer-closed');
+
+    header.appendChild(title);
+    header.appendChild(timer);
+
+    var amount = document.createElement('div');
+    amount.className = 'draw-card-jackpot-value';
+    amount.textContent = formatJackpot(draw.prizePoolMatch5);
+
+    var footer = document.createElement('div');
+    footer.className = 'draw-card-footer';
+
+    var costBlock = document.createElement('div');
+    costBlock.className = 'draw-card-cost-block';
+
+    var costLabel = document.createElement('div');
+    costLabel.className = 'draw-card-cost-label';
+    costLabel.textContent = t('client.drawCard.ticketCostLabel', 'Ticket cost');
+
+    var costValue = document.createElement('div');
+    costValue.className = 'draw-card-cost-value';
+    costValue.textContent = formatCurrency(draw.ticketCost);
+
+    costBlock.appendChild(costLabel);
+    costBlock.appendChild(costValue);
+    footer.appendChild(costBlock);
+
+    card.appendChild(header);
+    card.appendChild(amount);
+    card.appendChild(footer);
+
+    card.addEventListener('click', function () {
+      if (Date.now() < purchaseDrawStripSuppressClickUntil) return;
+      setPurchaseScreenSelectedDraw(draw);
+    });
+
+    card.addEventListener('keydown', function (event) {
+      if (!event || (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar')) return;
+      event.preventDefault();
+      setPurchaseScreenSelectedDraw(draw);
+    });
+
+    return card;
+  }
+
+  function renderPurchaseScreenDrawSwitcher(activeDraws, selectedDraw) {
+    if (!ticketPurchaseDrawsStripEl) return;
+
+    var draws = Array.isArray(activeDraws) ? activeDraws.filter(function (x) { return !!x; }) : [];
+    ticketPurchaseDrawsStripEl.hidden = draws.length <= 1;
+    if (draws.length <= 1) {
+      ticketPurchaseDrawsStripEl.innerHTML = '';
+      purchaseDrawStripRenderSig = '';
+      return;
+    }
+
+    bindPurchaseDrawStripGestures();
+
+    var renderSig = getPurchaseDrawStripSignature(draws);
+    if (purchaseDrawStripRenderSig !== renderSig || ticketPurchaseDrawsStripEl.childElementCount !== draws.length) {
+      ticketPurchaseDrawsStripEl.innerHTML = '';
+      draws.forEach(function (draw) {
+        ticketPurchaseDrawsStripEl.appendChild(createPurchaseScreenDrawSwitchCard(draw, !!selectedDraw && selectedDraw.id === draw.id));
+      });
+      purchaseDrawStripRenderSig = renderSig;
+    }
+
+    syncPurchaseDrawStripSelection(selectedDraw);
+    if (selectedDraw) {
+      requestAnimationFrame(function () {
+        centerPurchaseDrawStripSelection(selectedDraw, 'auto');
+      });
+    }
+  }
+
   function createPurchaseTicketCard(ticketState, index) {
     var card = document.createElement('section');
     card.className = 'purchase-ticket-card';
@@ -1480,15 +1813,6 @@
 
     var completed = isPurchaseTicketComplete(ticketState);
     if (completed) card.classList.add('purchase-ticket-card-complete');
-    if (index === activePurchaseScreenTicketIndex) card.classList.add('purchase-ticket-card-active');
-
-    card.addEventListener('click', function (event) {
-      if (event && event.target && typeof event.target.closest === 'function' && event.target.closest('button')) {
-        return;
-      }
-
-      setActivePurchaseScreenTicket(index, { scrollIntoView: true });
-    });
 
     var header = document.createElement('div');
     header.className = 'purchase-ticket-card-header';
@@ -1533,30 +1857,30 @@
     actions.appendChild(clearBtn);
 
     header.appendChild(titleWrap);
-    header.appendChild(actions);
     card.appendChild(header);
 
-    var selectedLabel = document.createElement('div');
-    selectedLabel.className = 'purchase-ticket-selected-label';
-    selectedLabel.textContent = t('client.purchaseScreen.selectedNumbers', 'Selected numbers');
-    card.appendChild(selectedLabel);
+    var progress = document.createElement('div');
+    progress.className = 'purchase-ticket-progress';
 
-    var selectedRow = document.createElement('div');
-    selectedRow.className = 'purchase-ticket-selected-row';
-    if (ticketState.numbers.length === 0) {
-      var empty = document.createElement('div');
-      empty.className = 'purchase-ticket-selected-empty';
-      empty.textContent = t('client.purchaseScreen.noNumbersSelected', 'No numbers selected yet.');
-      selectedRow.appendChild(empty);
-    } else {
-      ticketState.numbers.forEach(function (number) {
-        var chip = document.createElement('span');
-        chip.className = 'purchase-ticket-selected-chip';
-        chip.textContent = String(number);
-        selectedRow.appendChild(chip);
-      });
+    var progressCount = document.createElement('div');
+    progressCount.className = 'purchase-ticket-progress-count';
+    progressCount.textContent = ticketState.numbers.length + '/' + LOTTO_NUMBERS_COUNT;
+
+    var progressBar = document.createElement('div');
+    progressBar.className = 'purchase-ticket-progress-bar';
+    progressBar.style.gridTemplateColumns = 'repeat(' + LOTTO_NUMBERS_COUNT + ', minmax(0, 1fr))';
+    for (var segmentIndex = 0; segmentIndex < LOTTO_NUMBERS_COUNT; segmentIndex++) {
+      var segment = document.createElement('span');
+      segment.className = 'purchase-ticket-progress-segment';
+      if (segmentIndex < ticketState.numbers.length) {
+        segment.classList.add('purchase-ticket-progress-segment-active');
+      }
+      progressBar.appendChild(segment);
     }
-    card.appendChild(selectedRow);
+
+    progress.appendChild(progressBar);
+    progress.appendChild(progressCount);
+    card.appendChild(progress);
 
     var grid = document.createElement('div');
     grid.className = 'purchase-ticket-number-grid';
@@ -1577,6 +1901,8 @@
     }
     card.appendChild(grid);
 
+    card.appendChild(actions);
+
     return card;
   }
 
@@ -1586,35 +1912,14 @@
     ensurePurchaseScreenTicketStates();
 
     var draw = getPurchaseScreenDraw();
-    if (ticketPurchaseDrawIdEl) ticketPurchaseDrawIdEl.textContent = draw ? String(draw.id) : '-';
-    if (ticketPurchaseDrawCostEl) ticketPurchaseDrawCostEl.textContent = draw ? formatCurrency(draw.ticketCost) : formatCurrency(0);
     if (ticketPurchaseSubtitleEl) {
       ticketPurchaseSubtitleEl.textContent = t('client.purchaseScreen.subtitle', 'Complete one or more tickets to buy them together.');
     }
 
-    ticketPurchaseTicketsListEl.innerHTML = '';
-    purchaseScreenTicketStates.forEach(function (ticketState, index) {
-      ticketPurchaseTicketsListEl.appendChild(createPurchaseTicketCard(ticketState, index));
-    });
-
-    var validation = getPurchaseScreenValidation();
-    var purchasable = isDrawPurchasable(draw);
-    if (!purchaseScreenSubmitting) {
-      if (!draw || !purchasable) {
-        setTicketPurchaseScreenStatus(getDrawUnavailableMessage(draw));
-      } else {
-        setTicketPurchaseScreenStatus(validation.ok ? '' : validation.message);
-      }
-    }
-
-    var completedCount = validation.completedCount || 0;
-    var totalCost = draw ? Number(draw.ticketCost || 0) * completedCount : 0;
-    syncTicketPurchaseFooterVisibility(completedCount > 0);
-    if (submitTicketPurchaseLabelEl) submitTicketPurchaseLabelEl.textContent = formatPurchaseTicketsButtonLabel(completedCount);
-    if (submitTicketPurchaseCostEl) submitTicketPurchaseCostEl.textContent = formatCurrency(totalCost);
-    if (submitTicketPurchaseBtn) {
-      submitTicketPurchaseBtn.disabled = purchaseScreenSubmitting || !validation.ok || !draw || !purchasable;
-    }
+    applyPurchaseScreenTheme(draw);
+    renderPurchaseScreenDrawSwitcher(getActiveDraws(latestState), draw);
+    renderTicketPurchaseCards();
+    syncTicketPurchaseScreenState(draw);
   }
 
   function createNumbersRow(numbersStr, drawNumbersStr) {
@@ -1876,22 +2181,9 @@
       costValue.className = 'draw-card-cost-value';
       costValue.textContent = formatCurrency(draw.ticketCost);
 
-      var openBtn = document.createElement('button');
-      openBtn.type = 'button';
-      openBtn.className = 'draw-card-action-btn';
-      openBtn.textContent = t('client.button.purchase', 'Purchase ticket');
-      openBtn.disabled = !isDrawPurchasable(draw);
-      openBtn.title = isDrawPurchasable(draw) ? '' : getDrawUnavailableMessage(draw);
-      openBtn.addEventListener('click', function (event) {
-        if (event && event.cancelable) event.preventDefault();
-        if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
-        tryOpenTicketPurchaseScreen(draw, setPurchaseStatus);
-      });
-
       costBlock.appendChild(costLabel);
       costBlock.appendChild(costValue);
       footer.appendChild(costBlock);
-      footer.appendChild(openBtn);
 
       card.appendChild(header);
       card.appendChild(status);
@@ -2727,6 +3019,9 @@
 
   function setActiveTab(name) {
     var tab = name || 'lottery';
+    if (ticketPurchaseScreenEl && !ticketPurchaseScreenEl.hidden) {
+      closeTicketPurchaseScreen();
+    }
     activeTabName = tab;
     var isLottery = tab === 'lottery';
     var isTickets = tab === 'tickets';

@@ -111,7 +111,6 @@
             <div class="draw-card-cost-label" data-loc="client.drawCard.ticketCostLabel">Ticket cost</div>
             <div id="jackpotBuyPrice" class="draw-card-cost-value">$2.00</div>
           </div>
-          <button id="purchaseTicketBtn" type="button" class="draw-card-action-btn" data-loc="client.button.purchase">Purchase ticket</button>
         </div>
 
         <div id="currentDrawPrizeTiers" hidden>
@@ -342,25 +341,12 @@
   </main>
 
   <div id="ticketPurchaseScreen" class="purchase-screen" hidden>
-    <div id="ticketPurchasePanel" class="purchase-screen-panel" role="dialog" aria-modal="true" aria-labelledby="ticketPurchaseTitle">
+    <div id="ticketPurchasePanel" class="purchase-screen-panel" role="dialog" aria-modal="true" aria-label="Pick your tickets" data-loc-aria-label="client.purchaseScreen.title">
       <div class="purchase-screen-header">
-        <div class="purchase-screen-header-copy">
-          <div id="ticketPurchaseTitle" class="section-title" data-loc="client.purchaseScreen.title">Pick your tickets</div>
-          <div id="ticketPurchaseSubtitle" class="section-subtitle" data-loc="client.purchaseScreen.subtitle">Complete one or more tickets to buy them together.</div>
-        </div>
         <button id="closeTicketPurchaseScreenBtn" type="button" class="purchase-screen-close-btn" aria-label="Close purchase screen" data-loc-aria-label="client.purchaseScreen.closeAria">×</button>
       </div>
 
-      <div class="purchase-screen-draw-meta">
-        <div class="purchase-screen-draw-meta-line">
-          <span data-loc="client.purchaseScreen.drawPrefix">Draw #</span>
-          <strong id="ticketPurchaseDrawId">-</strong>
-        </div>
-        <div class="purchase-screen-draw-meta-line">
-          <span data-loc="client.currentDraw.ticketCostPrefix">Ticket cost:</span>
-          <strong id="ticketPurchaseDrawCost">$0.00</strong>
-        </div>
-      </div>
+      <div id="ticketPurchaseDrawsStrip" class="purchase-screen-draws-strip" hidden></div>
 
       <div id="ticketPurchaseScreenStatus" class="muted purchase-screen-status"></div>
       <div id="ticketPurchaseTicketsList" class="purchase-ticket-list"></div>
