@@ -540,13 +540,12 @@ body.app-loading .loading-shell {
   background: linear-gradient(135deg, var(--draw-card-bg-start) 0%, var(--draw-card-bg-end) 100%);
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.2);
   cursor: pointer;
-  transition: transform 0.12s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
   user-select: none;
   -webkit-user-select: none;
 }
 
 .draw-card:hover {
-  transform: translateY(-1px);
   border-color: rgba(255, 255, 255, 0.18);
 }
 
@@ -1784,6 +1783,7 @@ body.app-loading .loading-shell {
   --purchase-accent-start: var(--draw-card-bg-start);
   --purchase-accent-end: var(--draw-card-bg-end);
   --purchase-accent-solid: color-mix(in srgb, var(--purchase-accent-start) 58%, var(--purchase-accent-end) 42%);
+  --purchase-accent-foreground: #2b1b00;
   --purchase-ball-bg-normal: none;
   --purchase-ball-bg-selected: none;
   display: grid;
@@ -1988,7 +1988,7 @@ body.app-loading .loading-shell {
   place-items: center;
   margin: 0 auto;
   max-width: var(--app-max-width);
-  padding: 8px 0px 12px;
+  padding: 8px 0 12px;
   box-sizing: border-box;
   pointer-events: none; /* allow clicks only on the button itself */
 }
