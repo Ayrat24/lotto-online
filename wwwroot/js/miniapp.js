@@ -1312,6 +1312,12 @@
         } catch (e) {
           activeCard.scrollIntoView();
         }
+        // Keep the draw carousel centered on the currently selected draw
+        // when the ticket list is scrolled into view (desktop + mobile).
+        try {
+          var drawForPurchase = getPurchaseScreenDraw();
+          if (drawForPurchase) centerPurchaseDrawStripSelection(drawForPurchase, 'smooth');
+        } catch (e) {}
       }
     }
   }
@@ -1459,13 +1465,20 @@
         var card = ticketPurchaseTicketsListEl.querySelector('[data-purchase-ticket-index="' + index + '"]');
         if (card) {
           var btns = card.querySelectorAll('.purchase-ticket-number-btn');
+          // compute accent colors from panel (fallbacks present)
+          var panelStyles = ticketPurchasePanelEl ? getComputedStyle(ticketPurchasePanelEl) : null;
+          var accentStart = panelStyles ? panelStyles.getPropertyValue('--purchase-accent-start').trim() : '';
+          var accentEnd = panelStyles ? panelStyles.getPropertyValue('--purchase-accent-end').trim() : '';
+
           for (var i = 0; i < btns.length; i++) {
             var btn = btns[i];
             if (!btn) continue;
             // match by visible text (number)
             if (String(btn.textContent || '').trim() === String(number)) {
-              var shouldBeSelected = existingIndex < 0;
-              btn.classList.toggle('purchase-ticket-number-btn-selected', shouldBeSelected);
+                  var shouldBeSelected = existingIndex < 0;
+                  // Pure CSS visual: toggle the selected class and let CSS handle
+                  // dotted vs filled visuals. Avoid inline styles for robustness.
+                  btn.classList.toggle('purchase-ticket-number-btn-selected', shouldBeSelected);
               break;
             }
           }
@@ -1534,6 +1547,9 @@
 
   // Ball SVGs are now rendered via a mask SVG and CSS backgrounds/gradients,
   // so inline SVG-to-data-uri helpers and generated SVGs are no longer used.
+
+  // Note: SVG mask-based ball visuals removed. Use simple CSS-based dotted
+  // outline for unselected numbers and filled background for selected numbers.
 
   function centerPurchaseDrawStripSelection(draw, behavior) {
     if (!ticketPurchaseDrawsStripEl || !draw) return;
@@ -1679,6 +1695,26 @@
     }, true);
   }
 
+  // When the ticket list is scrolled (vertical), keep the purchase draw strip
+  // centered on the currently selected draw. Debounce to avoid fighting user
+  // scrolling and to reduce layout thrashing.
+  var ticketListScrollSyncBound = false;
+  var ticketListScrollSyncTimer = null;
+  function bindTicketPurchaseListScrollSync() {
+    if (!ticketPurchaseTicketsListEl || ticketListScrollSyncBound) return;
+    ticketListScrollSyncBound = true;
+
+    ticketPurchaseTicketsListEl.addEventListener('scroll', function () {
+      try { if (ticketListScrollSyncTimer) clearTimeout(ticketListScrollSyncTimer); } catch (e) {}
+      ticketListScrollSyncTimer = setTimeout(function () {
+        try {
+          var drawForPurchase = getPurchaseScreenDraw();
+          if (drawForPurchase) centerPurchaseDrawStripSelection(drawForPurchase, 'smooth');
+        } catch (e) {}
+      }, 160);
+    }, { passive: true });
+  }
+
   function getPurchaseDrawStripSignature(draws) {
     return (draws || []).map(function (draw) {
       if (!draw) return 'x';
@@ -1691,21 +1727,40 @@
     applyDrawCardTheme(ticketPurchasePanelEl, draw || null);
 
     var colors = getDrawThemeColors(draw);
-    // Use an SVG mask for the ball shape and expose accent colors so CSS can
-    // tint the masked background (gradient or solid) at runtime.
-    // Primary: set on the purchase panel so descendants inherit the mask and
-    // accent colors. Fallback: also set on the document root so variables are
-    // available if the purchase controls are rendered outside the panel in
-    // certain debug layouts or if DOM was restructured.
-    var maskUrl = 'url("/images/purchase-ball-mask.svg")';
-    ticketPurchasePanelEl.style.setProperty('--purchase-ball-mask', maskUrl);
-    try {
-      document.documentElement.style.setProperty('--purchase-ball-mask', maskUrl);
-    } catch (e) {
-      // ignore if setting on root is not allowed in some environments
-    }
+    // Expose accent colors on the panel for selected balls to use.
     ticketPurchasePanelEl.style.setProperty('--purchase-accent-start', colors.start);
     ticketPurchasePanelEl.style.setProperty('--purchase-accent-end', colors.end);
+    // Also set on :root so elements outside the panel (floating footer) can
+    // inherit the same accent colors.
+    try { document.documentElement.style.setProperty('--purchase-accent-start', colors.start); } catch (e) {}
+    try { document.documentElement.style.setProperty('--purchase-accent-end', colors.end); } catch (e) {}
+
+    // Compute a readable foreground color for the accent (black-ish or white)
+    // based on perceived brightness of the start color.
+    try {
+      function hexToRgb(h) {
+        if (!h) return null;
+        var s = String(h).trim();
+        if (s[0] === '#') s = s.slice(1);
+        if (s.length === 3) {
+          s = s.split('').map(function (c) { return c + c; }).join('');
+        }
+        if (s.length !== 6) return null;
+        var r = parseInt(s.slice(0,2), 16);
+        var g = parseInt(s.slice(2,4), 16);
+        var b = parseInt(s.slice(4,6), 16);
+        return { r: r, g: g, b: b };
+      }
+
+      var rgb = hexToRgb(colors.start || '');
+      var fg = '#ffffff';
+      if (rgb) {
+        var brightness = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
+        fg = brightness > 150 ? '#20131d' : '#ffffff';
+      }
+      try { document.documentElement.style.setProperty('--purchase-accent-foreground', fg); } catch (e) {}
+      try { ticketPurchasePanelEl.style.setProperty('--purchase-accent-foreground', fg); } catch (e) {}
+    } catch (e) {}
   }
 
   function createPurchaseScreenDrawSwitchCard(draw, isSelected) {
@@ -1888,10 +1943,16 @@
       var numberBtn = document.createElement('button');
       numberBtn.type = 'button';
       numberBtn.className = 'purchase-ticket-number-btn';
-      if (ticketState.numbers.indexOf(number) >= 0) {
-        numberBtn.classList.add('purchase-ticket-number-btn-selected');
+      // Defensive presence check: ticketState.numbers may contain strings or
+      // numbers, so coerce both sides to Number for reliable matching.
+      try {
+        var isSelectedNumber = Array.isArray(ticketState.numbers) && ticketState.numbers.some(function (n) { return Number(n) === Number(number); });
+        if (isSelectedNumber) numberBtn.classList.add('purchase-ticket-number-btn-selected');
+      } catch (e) {
+        if (ticketState.numbers.indexOf(number) >= 0) numberBtn.classList.add('purchase-ticket-number-btn-selected');
       }
       numberBtn.textContent = String(number);
+       // Visual state is controlled purely via CSS classes (.purchase-ticket-number-btn-selected).
       (function (ticketIndex, value) {
         numberBtn.addEventListener('click', function () {
           togglePurchaseScreenNumber(ticketIndex, value);
@@ -1919,6 +1980,8 @@
     applyPurchaseScreenTheme(draw);
     renderPurchaseScreenDrawSwitcher(getActiveDraws(latestState), draw);
     renderTicketPurchaseCards();
+    // Ensure the ticket list scroll -> draw carousel sync is active.
+    try { bindTicketPurchaseListScrollSync(); } catch (e) {}
     syncTicketPurchaseScreenState(draw);
   }
 

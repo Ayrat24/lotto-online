@@ -1663,7 +1663,7 @@ body.app-loading .loading-shell {
 
 .purchase-screen {
   position: fixed;
-  inset: 0 0 calc(74px + env(safe-area-inset-bottom, 0px)) 0;
+  inset: 0 0 calc(49px + env(safe-area-inset-bottom, 0px)) 0;
   z-index: 35;
   background: rgba(4, 8, 14, 0.72);
   backdrop-filter: blur(8px);
@@ -1679,6 +1679,19 @@ body.app-loading .loading-shell {
   grid-template-rows: auto auto auto minmax(0, 1fr) auto;
   gap: 12px;
   background: linear-gradient(180deg, #0f1725, #0a111d);
+  /* Allow the entire purchase panel (including header) to scroll with the rest
+     of the purchase screen so header is not stuck while ticket list scrolls. */
+  overflow-y: auto;
+}
+
+/* Hide native scrollbars in the purchase panel while keeping scrolling
+   functional (works on WebKit, Blink, Firefox, and legacy IE/Edge). */
+.purchase-screen-panel {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE 10+ */
+}
+.purchase-screen-panel::-webkit-scrollbar {
+  display: none; /* WebKit/Blink */
 }
 
 .purchase-screen-panel-footer-visible {
@@ -1709,6 +1722,8 @@ body.app-loading .loading-shell {
   overflow-x: auto;
   padding: 4px 0 2px;
   -webkit-overflow-scrolling: touch;
+  /* Allow horizontal panning on touch and pointer devices */
+  touch-action: pan-x;
   scrollbar-width: none;
   user-select: none;
   -webkit-user-select: none;
@@ -1753,7 +1768,8 @@ body.app-loading .loading-shell {
 
 .purchase-ticket-list {
   min-height: 0;
-  overflow-y: auto;
+  /* Parent panel (.purchase-screen-panel) handles scrolling so header and
+     footer scroll together with the ticket list. */
   display: grid;
   gap: 14px;
   padding-right: 2px;
@@ -1898,34 +1914,41 @@ body.app-loading .loading-shell {
 
 .purchase-ticket-number-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  /* Use fixed-size columns so the grid does not stretch horizontally. This
+     keeps the horizontal gap equal to the vertical gap. Columns will wrap to
+     new rows when there's not enough space (responsive). */
+  grid-template-columns: repeat(auto-fill, 54px);
   gap: 8px;
   justify-items: center;
+  grid-auto-rows: 54px; /* match button height for equal vertical spacing */
+  justify-content: center;
 }
 
 .purchase-ticket-number-btn {
   width: 54px;
-  min-width: 54px;
   height: 54px;
+  min-width: 54px;
   min-height: 54px;
+  max-width: 54px;
+  max-height: 54px;
+  box-sizing: border-box;
+  /* Keep buttons perfectly circular regardless of grid column resizing */
+  aspect-ratio: 1 / 1;
+  justify-self: center;
+  align-self: center;
   padding: 0;
   display: inline-grid;
   place-items: center;
   position: relative;
   border-radius: 50%;
-  /* Use an SVG mask for the ball shape and tint it via background-color.
-     The mask URL is provided by the --purchase-ball-mask variable. */
-  -webkit-mask-image: var(--purchase-ball-mask);
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  -webkit-mask-size: 70%;
-  mask-image: var(--purchase-ball-mask);
-  mask-repeat: no-repeat;
-  mask-position: center;
-  mask-size: 70%;
-  background-color: rgba(255,255,255,0.06);
-  border: 0;
-  color: #ffffff;
+  /* Simplified visuals: dotted outline for unselected, filled for selected. */
+  background-image: none;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 70%;
+  background-color: transparent;
+  border: 2px dotted rgba(255, 255, 255, 0.12);
+  color: #dbe8fc;
   font-size: 0.95rem;
   font-weight: 800;
   text-transform: none;
@@ -1942,34 +1965,61 @@ body.app-loading .loading-shell {
 }
 
 .purchase-ticket-number-btn-selected {
-  /* Gradient tint clipped by the same mask */
-  background-image: linear-gradient(var(--purchase-accent-start, #1ecdc4), var(--purchase-accent-end, #0d9fa6));
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 76%;
+  background-image: none !important;
+  background-color: var(--purchase-accent-start, #1ecdc4) !important;
   color: #ffffff;
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.22);
-  box-shadow: none;
+  /* Filled circle look: remove outline and dotted border */
+  border: none;
+  transform: scale(1.06);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease, border 0.12s ease;
+  box-shadow: 0 8px 18px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.06);
 }
 
 .purchase-screen-footer {
-  position: sticky;
-  bottom: 0;
+  /* Floating purchase footer anchored just above the tabbar. */
+  position: fixed;
+  left: 0;
+  right: 0;
+  /* sit just above the tabbar; increased safe offset for taller tabbars */
+  bottom: calc(0px + env(safe-area-inset-bottom, 0px));
+  z-index: 50; /* above tabbar and most app chrome */
   display: grid;
-  align-self: end;
-  margin: 0;
-  padding: 4px 0 0;
+  place-items: center;
+  margin: 0 auto;
+  max-width: var(--app-max-width);
+  padding: 8px 0px 12px;
+  box-sizing: border-box;
+  pointer-events: none; /* allow clicks only on the button itself */
 }
 
-.purchase-screen-submit-btn {
+.purchase-screen-footer > .purchase-screen-submit-btn {
+  pointer-events: auto;
+}
+
+.purchase-screen button.purchase-screen-submit-btn {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   width: 100%;
-  background: linear-gradient(180deg, #ffe26a, #f1be37);
-  color: #2b1b00;
-  box-shadow: 0 14px 24px rgba(0, 0, 0, 0.34);
+  /* Use draw accent colors (set on :root by JS) with sensible fallback */
+  background: linear-gradient(90deg, var(--purchase-accent-start, #ffe26a), var(--purchase-accent-end, #f1be37));
+  color: var(--purchase-accent-foreground, #2b1b00);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.42), 0 6px 18px rgba(0,0,0,0.28) inset;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--purchase-accent-start, #ffd455) 20%, transparent 80%);
+  padding: 12px 16px;
+  transition: transform 140ms cubic-bezier(.2,.9,.2,1), box-shadow 140ms ease, opacity 120ms ease;
+}
+
+.purchase-screen button.purchase-screen-submit-btn:hover:not(:disabled) {
+  transform: translateY(-4px);
+}
+
+.purchase-screen button.purchase-screen-submit-btn:disabled {
+  opacity: 0.6;
+  transform: none;
 }
 
 @media (max-width: 560px) {
@@ -2014,7 +2064,7 @@ body.app-loading .loading-shell {
   }
 
   .purchase-ticket-number-grid {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fill, 50px);
     gap: 7px;
   }
 
