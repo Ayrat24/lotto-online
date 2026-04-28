@@ -1041,7 +1041,11 @@
       jackpotCardsContainerEl.classList.add('draw-card-list-dragging');
 
       try {
-        if (typeof jackpotCardsContainerEl.setPointerCapture === 'function') {
+        // Only capture non-mouse pointers (touch/pen). Capturing mouse pointers
+        // may interfere with normal click delivery in some embedded webviews
+        // (Telegram Desktop at narrow widths). Keep capture for touch to
+        // maintain good touch dragging behavior.
+        if (typeof jackpotCardsContainerEl.setPointerCapture === 'function' && event.pointerType !== 'mouse') {
           jackpotCardsContainerEl.setPointerCapture(event.pointerId);
         }
       } catch (e) {
@@ -1109,7 +1113,7 @@
       drawSortTabsEl.classList.add('draw-sort-tabs-dragging');
 
       try {
-        if (typeof drawSortTabsEl.setPointerCapture === 'function') {
+        if (typeof drawSortTabsEl.setPointerCapture === 'function' && event.pointerType !== 'mouse') {
           drawSortTabsEl.setPointerCapture(event.pointerId);
         }
       } catch (e) {
@@ -1977,7 +1981,7 @@
       ticketPurchaseDrawsStripEl.classList.add('draw-card-list-dragging');
 
       try {
-        if (typeof ticketPurchaseDrawsStripEl.setPointerCapture === 'function') {
+        if (typeof ticketPurchaseDrawsStripEl.setPointerCapture === 'function' && event.pointerType !== 'mouse') {
           ticketPurchaseDrawsStripEl.setPointerCapture(event.pointerId);
         }
       } catch (e) {
