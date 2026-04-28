@@ -142,7 +142,14 @@ public static class TicketsEndpoints
 
             var purchaseResult = await wallet.TryPurchaseTicketsAsync(u.Id, req.DrawId, normalizedTickets, ct);
             if (!purchaseResult.Success || purchaseResult.Tickets is null)
-                return Results.BadRequest(new { ok = false, error = purchaseResult.Error ?? "Purchase failed.", balance = purchaseResult.UserBalance, totalCost = purchaseResult.TotalCost });
+                return Results.BadRequest(new
+                {
+                    ok = false,
+                    error = purchaseResult.Error ?? "Purchase failed.",
+                    errorCode = GetPurchaseErrorCode(purchaseResult.Error),
+                    balance = purchaseResult.UserBalance,
+                    totalCost = purchaseResult.TotalCost
+                });
 
             var tickets = purchaseResult.Tickets
                 .Select(ticket => new TicketDto(ticket.Id, ticket.DrawId, ticket.Numbers, DrawManagement.ToTicketStatusValue(ticket.Status), ticket.PurchasedAtUtc, 0m))
@@ -244,4 +251,9 @@ public static class TicketsEndpoints
         normalizedTickets = normalized;
         return true;
     }
+
+    private static string? GetPurchaseErrorCode(string? error)
+        => string.Equals(error, "Insufficient balance.", StringComparison.Ordinal)
+            ? "insufficient_balance"
+            : null;
 }

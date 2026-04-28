@@ -1663,7 +1663,7 @@ body.app-loading .loading-shell {
 
 .purchase-screen {
   position: fixed;
-  inset: 0 0 calc(49px + env(safe-area-inset-bottom, 0px)) 0;
+  inset: 0 0 calc(52px + env(safe-area-inset-bottom, 0px)) 0;
   z-index: 35;
   background: rgba(4, 8, 14, 0.72);
   backdrop-filter: blur(8px);
@@ -2118,10 +2118,32 @@ body.app-loading .loading-shell {
   color: #fff1f3;
 }
 
+.center-popup-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.center-popup-actions-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.center-popup-topup {
+  background: linear-gradient(180deg, #ffe26a, #f1be37);
+  border-color: rgba(255, 226, 106, 0.44);
+  color: #352400;
+}
+
 .center-popup-confirm {
   width: 100%;
   background: var(--button-bg);
   color: #ffffff;
+}
+
+@media (max-width: 560px) {
+  .center-popup-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .tabbar {

@@ -122,6 +122,8 @@
   var centerPopupEl = document.getElementById('centerPopup');
   var centerPopupBackdropEl = document.getElementById('centerPopupBackdrop');
   var centerPopupMessageEl = document.getElementById('centerPopupMessage');
+  var centerPopupActionsEl = document.getElementById('centerPopupActions');
+  var centerPopupTopUpBtn = document.getElementById('centerPopupTopUpBtn');
   var centerPopupConfirmBtn = document.getElementById('centerPopupConfirmBtn');
 
   var highlightTicketId = null;
@@ -191,6 +193,7 @@
   var serverClockOffsetMs = 0;
   var debugModeBadgeReason = '';
   var localDebugWatchdog = null;
+  var centerPopupTopUpAction = null;
 
   function getDebugModeBadgeText(reason) {
     if (reason === 'forced-local') {
@@ -438,6 +441,28 @@
 
     if (value == null || String(value).trim().length === 0) return String(fallback || '');
     return String(value);
+  }
+
+  function asFiniteNumber(value, fallback) {
+    var amount = Number(value);
+    if (Number.isFinite(amount)) return amount;
+    if (arguments.length >= 2) return Number(fallback);
+    return 0;
+  }
+
+  function roundCurrencyAmount(value) {
+    return Math.round(asFiniteNumber(value, 0) * 100) / 100;
+  }
+
+  function formatAmountInputValue(value) {
+    return roundCurrencyAmount(value).toFixed(2);
+  }
+
+  function setTopUpAmountValue(value) {
+    if (!topUpAmountInputEl) return;
+
+    var normalized = roundCurrencyAmount(value);
+    topUpAmountInputEl.value = normalized > 0 ? formatAmountInputValue(normalized) : '';
   }
 
   function applyLocalizedDomTexts() {
@@ -1220,15 +1245,52 @@
     if (ticketPurchaseScreenStatusEl) ticketPurchaseScreenStatusEl.textContent = text || '';
   }
 
-  function showCenterPopup(message) {
+  function showCenterPopup(message, options) {
     if (!centerPopupEl || !centerPopupMessageEl) return;
 
+    var popupOptions = options && typeof options === 'object' ? options : null;
+    centerPopupTopUpAction = popupOptions && typeof popupOptions.topUpAction === 'function'
+      ? popupOptions.topUpAction
+      : null;
+
     centerPopupMessageEl.textContent = String(message || '').trim() || t('client.popup.defaultError', 'Action cannot be completed.');
+
+    if (centerPopupConfirmBtn) {
+      centerPopupConfirmBtn.textContent = popupOptions && popupOptions.confirmText
+        ? String(popupOptions.confirmText)
+        : t('client.popup.confirm', 'Confirm');
+    }
+
+    if (centerPopupTopUpBtn) {
+      var hasTopUpAction = !!centerPopupTopUpAction;
+      centerPopupTopUpBtn.hidden = !hasTopUpAction;
+      centerPopupTopUpBtn.textContent = popupOptions && popupOptions.topUpText
+        ? String(popupOptions.topUpText)
+        : t('client.popup.topUp', 'Top up');
+    }
+
+    if (centerPopupActionsEl) {
+      centerPopupActionsEl.classList.toggle('center-popup-actions-single', !centerPopupTopUpAction);
+    }
+
     centerPopupEl.hidden = false;
   }
 
   function hideCenterPopup() {
     if (!centerPopupEl) return;
+
+    centerPopupTopUpAction = null;
+    if (centerPopupTopUpBtn) {
+      centerPopupTopUpBtn.hidden = true;
+      centerPopupTopUpBtn.textContent = t('client.popup.topUp', 'Top up');
+    }
+    if (centerPopupConfirmBtn) {
+      centerPopupConfirmBtn.textContent = t('client.popup.confirm', 'Confirm');
+    }
+    if (centerPopupActionsEl) {
+      centerPopupActionsEl.classList.add('center-popup-actions-single');
+    }
+
     centerPopupEl.hidden = true;
   }
 
@@ -1510,6 +1572,93 @@
     return t('client.purchaseScreen.purchasedPrefix', 'Purchased ')
       + count
       + t('client.purchaseScreen.purchasedSuffix', ' ticket(s).');
+  }
+
+  function getPurchaseScreenTotalCost(draw, validation) {
+    var selectedDraw = draw || getPurchaseScreenDraw();
+    if (!selectedDraw) return 0;
+
+    var nextValidation = validation || getPurchaseScreenValidation();
+    var completedCount = asFiniteNumber(nextValidation && nextValidation.completedCount, 0);
+    return roundCurrencyAmount(asFiniteNumber(selectedDraw.ticketCost, 0) * completedCount);
+  }
+
+  function getPurchaseShortfallAmount(draw, validation, balanceOverride) {
+    var totalCost = getPurchaseScreenTotalCost(draw, validation);
+    var balance = arguments.length >= 3
+      ? asFiniteNumber(balanceOverride, 0)
+      : asFiniteNumber(latestState && latestState.balance, 0);
+    var shortfall = roundCurrencyAmount(totalCost - balance);
+    return shortfall > 0 ? shortfall : 0;
+  }
+
+  function openTopUpScreenWithAmount(amount) {
+    var missingAmount = roundCurrencyAmount(amount);
+    hideCenterPopup();
+    setActiveTab('profile');
+    setProfileScreen('deposit');
+    setTopUpStatus('');
+    if (missingAmount > 0) {
+      setTopUpAmountValue(missingAmount);
+    }
+
+    if (topUpAmountInputEl) {
+      requestAnimationFrame(function () {
+        try {
+          topUpAmountInputEl.focus({ preventScroll: true });
+        } catch (e) {
+          try {
+            topUpAmountInputEl.focus();
+          } catch (focusError) {
+          }
+        }
+
+        try {
+          topUpAmountInputEl.select();
+        } catch (e) {
+        }
+      });
+    }
+  }
+
+  function showInsufficientBalancePopup(shortfallAmount) {
+    var missingAmount = roundCurrencyAmount(shortfallAmount);
+    if (!(missingAmount > 0)) return false;
+
+    var message = t('client.popup.purchaseInsufficientBalance', 'Top up the account to continue.');
+    setTicketPurchaseScreenStatus(message);
+    showCenterPopup(message, {
+      confirmText: t('client.popup.close', 'Close'),
+      topUpText: t('client.popup.topUp', 'Top up'),
+      topUpAction: function () {
+        openTopUpScreenWithAmount(missingAmount);
+      }
+    });
+    return true;
+  }
+
+  function isInsufficientBalanceError(err) {
+    var body = err && err.body && typeof err.body === 'object' ? err.body : null;
+    var errorCode = String(body && body.errorCode || '').trim().toLowerCase();
+    if (errorCode === 'insufficient_balance') return true;
+
+    var balance = asFiniteNumber(body && body.balance, NaN);
+    var totalCost = asFiniteNumber(body && body.totalCost, NaN);
+    if (Number.isFinite(balance) && Number.isFinite(totalCost) && totalCost > balance) return true;
+
+    var message = String((body && (body.error || body.message)) || (err && err.message) || '').toLowerCase();
+    return message.indexOf('insufficient balance') >= 0 || message.indexOf('not enough balance') >= 0;
+  }
+
+  function getInsufficientBalanceShortfall(err, draw, validation) {
+    var body = err && err.body && typeof err.body === 'object' ? err.body : null;
+    var balance = asFiniteNumber(body && body.balance, NaN);
+    var totalCost = asFiniteNumber(body && body.totalCost, NaN);
+    if (Number.isFinite(balance) && Number.isFinite(totalCost)) {
+      return Math.max(0, roundCurrencyAmount(totalCost - balance));
+    }
+
+    return getPurchaseShortfallAmount(draw, validation);
   }
 
   function setSheetOpenClass() {
@@ -3218,6 +3367,12 @@
       return;
     }
 
+    var shortfallAmount = getPurchaseShortfallAmount(draw, validation);
+    if (shortfallAmount > 0) {
+      showInsufficientBalancePopup(shortfallAmount);
+      return;
+    }
+
     var completedTickets = getCompletedPurchaseTickets().map(function (ticketState) {
       return normalizeTicketNumbers(ticketState.numbers);
     });
@@ -3249,6 +3404,13 @@
       })
       .catch(function (err) {
         var message = err && err.message ? err.message : t('client.status.purchaseFailed', 'Purchase failed.');
+        if (isInsufficientBalanceError(err)) {
+          if (!showInsufficientBalancePopup(getInsufficientBalanceShortfall(err, draw, validation))) {
+            setTicketPurchaseScreenStatus(t('client.popup.purchaseInsufficientBalance', 'Top up the account to continue.'));
+          }
+          return;
+        }
+
         setTicketPurchaseScreenStatus(message);
         if (shouldShowInvalidTicketPopup(message)) {
           showCenterPopup(message);
@@ -4036,6 +4198,13 @@
   if (profileTabBtn) profileTabBtn.addEventListener('click', function () { setActiveTab('profile'); });
   if (closeTicketPurchaseScreenBtn) closeTicketPurchaseScreenBtn.addEventListener('click', closeTicketPurchaseScreen);
   if (submitTicketPurchaseBtn) submitTicketPurchaseBtn.addEventListener('click', submitTicketPurchase);
+  if (centerPopupTopUpBtn) centerPopupTopUpBtn.addEventListener('click', function () {
+    var action = centerPopupTopUpAction;
+    hideCenterPopup();
+    if (typeof action === 'function') {
+      action();
+    }
+  });
   if (centerPopupConfirmBtn) centerPopupConfirmBtn.addEventListener('click', hideCenterPopup);
   if (centerPopupBackdropEl) centerPopupBackdropEl.addEventListener('click', hideCenterPopup);
   // active draw selection handled via per-banner buy buttons
@@ -4102,7 +4271,7 @@
   renderHistory();
   renderBalance(0);
   if (topUpAmountInputEl && !String(topUpAmountInputEl.value || '').trim()) {
-    topUpAmountInputEl.value = '10';
+    setTopUpAmountValue(10);
   }
 
   var hasTelegramInitData = false;
