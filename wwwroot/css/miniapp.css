@@ -481,10 +481,23 @@ body.app-loading .loading-shell {
   overscroll-behavior-x: contain;
   touch-action: pan-x;
   scrollbar-width: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
 }
 
 .draw-sort-tabs::-webkit-scrollbar {
   display: none;
+}
+
+.draw-sort-tabs-dragging {
+  cursor: grabbing;
+}
+
+.draw-sort-tabs-dragging,
+.draw-sort-tabs-dragging * {
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .draw-sort-tab {

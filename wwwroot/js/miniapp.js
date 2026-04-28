@@ -97,6 +97,7 @@
   var featuredJackpotCardEl = document.getElementById('featuredJackpotCard');
   var jackpotCardsContainerEl = document.getElementById('jackpotCardsContainer');
   var drawSortTabsSectionEl = document.getElementById('drawSortTabsSection');
+  var drawSortTabsEl = drawSortTabsSectionEl ? drawSortTabsSectionEl.querySelector('.draw-sort-tabs') : null;
   var sortClosestDrawBtn = document.getElementById('sortClosestDrawBtn');
   var sortBiggestJackpotBtn = document.getElementById('sortBiggestJackpotBtn');
   var sortCheaperTicketsBtn = document.getElementById('sortCheaperTicketsBtn');
@@ -159,6 +160,13 @@
   var drawCardListDragActive = false;
   var drawCardListDragMoved = false;
   var drawCardListSuppressClickUntil = 0;
+  var drawSortTabsGestureBound = false;
+  var drawSortTabsDragPointerId = null;
+  var drawSortTabsDragStartX = 0;
+  var drawSortTabsDragStartScrollLeft = 0;
+  var drawSortTabsDragActive = false;
+  var drawSortTabsDragMoved = false;
+  var drawSortTabsSuppressClickUntil = 0;
   var purchaseDrawStripGestureBound = false;
   var purchaseDrawStripDragPointerId = null;
   var purchaseDrawStripDragStartX = 0;
@@ -304,16 +312,8 @@
       }
     });
 
-    if (activeButton && typeof activeButton.scrollIntoView === 'function') {
-      try {
-        activeButton.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
-      } catch (e) {
-        try {
-          activeButton.scrollIntoView(false);
-        } catch (e) {
-        }
-      }
-    }
+    // Intentionally avoid auto-scrolling here so manual scrolling/dragging
+    // on desktop and mobile is not pulled back to the active tab.
   }
 
   function setDrawSortMode(mode) {
@@ -815,6 +815,26 @@
     }
   }
 
+  function endDrawSortTabsDrag(pointerId) {
+    if (!drawSortTabsGestureBound || !drawSortTabsDragActive || (pointerId != null && drawSortTabsDragPointerId !== pointerId)) return;
+
+    var shouldSuppressClick = drawSortTabsDragMoved;
+
+    drawSortTabsDragPointerId = null;
+    drawSortTabsDragStartX = 0;
+    drawSortTabsDragStartScrollLeft = 0;
+    drawSortTabsDragActive = false;
+    drawSortTabsDragMoved = false;
+
+    if (drawSortTabsSectionEl) {
+      drawSortTabsSectionEl.classList.remove('draw-sort-tabs-dragging');
+    }
+
+    if (shouldSuppressClick) {
+      drawSortTabsSuppressClickUntil = Date.now() + 250;
+    }
+  }
+
   function endPurchaseDrawStripDrag(pointerId) {
     if (!purchaseDrawStripDragActive || (pointerId != null && purchaseDrawStripDragPointerId !== pointerId)) return;
 
@@ -920,10 +940,6 @@
       drawCardListDragMoved = false;
       jackpotCardsContainerEl.classList.add('draw-card-list-dragging');
 
-      if (event.cancelable) {
-        event.preventDefault();
-      }
-
       try {
         if (typeof jackpotCardsContainerEl.setPointerCapture === 'function') {
           jackpotCardsContainerEl.setPointerCapture(event.pointerId);
@@ -967,6 +983,68 @@
 
     jackpotCardsContainerEl.addEventListener('click', function (event) {
       if (Date.now() >= drawCardListSuppressClickUntil) return;
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }, true);
+  }
+
+  function bindDrawSortTabsGestures() {
+    if (!drawSortTabsEl || drawSortTabsGestureBound) return;
+
+    drawSortTabsGestureBound = true;
+
+    drawSortTabsEl.addEventListener('pointerdown', function (event) {
+      if (!event) return;
+      if (event.pointerType === 'touch') return;
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      if (drawSortTabsEl.scrollWidth <= drawSortTabsEl.clientWidth) return;
+
+      drawSortTabsDragPointerId = event.pointerId;
+      drawSortTabsDragStartX = Number(event.clientX || 0);
+      drawSortTabsDragStartScrollLeft = Number(drawSortTabsEl.scrollLeft || 0);
+      drawSortTabsDragActive = true;
+      drawSortTabsDragMoved = false;
+      drawSortTabsEl.classList.add('draw-sort-tabs-dragging');
+
+      try {
+        if (typeof drawSortTabsEl.setPointerCapture === 'function') {
+          drawSortTabsEl.setPointerCapture(event.pointerId);
+        }
+      } catch (e) {
+      }
+    });
+
+    drawSortTabsEl.addEventListener('pointermove', function (event) {
+      if (!drawSortTabsDragActive || !event || drawSortTabsDragPointerId !== event.pointerId || !drawSortTabsEl) return;
+
+      var deltaX = Number(event.clientX || 0) - drawSortTabsDragStartX;
+      if (Math.abs(deltaX) > 6) {
+        drawSortTabsDragMoved = true;
+      }
+
+      if (drawSortTabsDragMoved && event.cancelable) {
+        event.preventDefault();
+      }
+
+      drawSortTabsEl.scrollLeft = drawSortTabsDragStartScrollLeft - deltaX;
+    });
+
+    drawSortTabsEl.addEventListener('pointerup', function (event) {
+      endDrawSortTabsDrag(event && event.pointerId);
+    });
+
+    drawSortTabsEl.addEventListener('pointercancel', function (event) {
+      endDrawSortTabsDrag(event && event.pointerId);
+    });
+
+    drawSortTabsEl.addEventListener('lostpointercapture', function (event) {
+      endDrawSortTabsDrag(event && event.pointerId);
+    });
+
+    drawSortTabsEl.addEventListener('click', function (event) {
+      if (Date.now() >= drawSortTabsSuppressClickUntil) return;
       if (event) {
         event.preventDefault();
         event.stopPropagation();
@@ -1795,8 +1873,6 @@
       purchaseDrawStripDragActive = true;
       purchaseDrawStripDragMoved = false;
       ticketPurchaseDrawsStripEl.classList.add('draw-card-list-dragging');
-
-      if (event.cancelable) event.preventDefault();
 
       try {
         if (typeof ticketPurchaseDrawsStripEl.setPointerCapture === 'function') {
@@ -4177,6 +4253,7 @@
   if (sortClosestDrawBtn) sortClosestDrawBtn.addEventListener('click', function () { setDrawSortMode('closest'); });
   if (sortBiggestJackpotBtn) sortBiggestJackpotBtn.addEventListener('click', function () { setDrawSortMode('jackpot'); });
   if (sortCheaperTicketsBtn) sortCheaperTicketsBtn.addEventListener('click', function () { setDrawSortMode('cheap'); });
+  bindDrawSortTabsGestures();
   if (featuredJackpotCardEl) {
     featuredJackpotCardEl.addEventListener('click', function (event) {
       if (purchaseBtn && (event.target === purchaseBtn || purchaseBtn.contains(event.target))) {
