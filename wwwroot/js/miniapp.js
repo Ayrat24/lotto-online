@@ -1779,7 +1779,9 @@
   // outline for unselected numbers and filled background for selected numbers.
 
   function centerPurchaseDrawStripSelection(draw, behavior) {
-    if (!ticketPurchaseDrawsStripEl || !draw) return;
+    // If user is actively dragging the purchase draw strip, avoid programmatic
+    // centering to prevent fighting the user's input which causes jitter.
+    if (!ticketPurchaseDrawsStripEl || !draw || purchaseDrawStripDragActive) return;
 
     var selectedCard = ticketPurchaseDrawsStripEl.querySelector('[data-purchase-draw-id="' + draw.id + '"]');
     if (!selectedCard) return;
@@ -2415,6 +2417,7 @@
     draws.forEach(function (draw) {
       var card = document.createElement('article');
       card.className = 'card draw-card draw-card-compact duplicate-jackpot-card';
+      try { card.setAttribute('data-draw-id', String(draw.id)); } catch (e) {}
       card.setAttribute('role', 'button');
       card.setAttribute('tabindex', '0');
       card.setAttribute('aria-haspopup', 'dialog');
@@ -2489,6 +2492,25 @@
         }
 
         tryOpenTicketPurchaseScreen(draw, setPurchaseStatus);
+      });
+
+      // Fallback for environments where click may be suppressed (Telegram Desktop
+      // webview peculiarities). Use pointerup to trigger opening when there was no
+      // drag and the purchase screen is not already visible. This avoids relying
+      // exclusively on click synthesis which can be flaky in some embedded
+      // browsers.
+      card.addEventListener('pointerup', function (event) {
+        try {
+          if (!event) return;
+          // Only handle main button mouse/pen or non-touch pointers here.
+          if (event.pointerType === 'touch') return;
+          if (event.button !== 0) return;
+
+          if (Date.now() < drawCardListSuppressClickUntil) return;
+          if (ticketPurchaseScreenEl && !ticketPurchaseScreenEl.hidden) return;
+
+          tryOpenTicketPurchaseScreen(draw, setPurchaseStatus);
+        } catch (e) {}
       });
 
       card.addEventListener('keydown', function (event) {
@@ -4312,6 +4334,43 @@
   if (openHistoryScreenBtn) openHistoryScreenBtn.addEventListener('click', function () { setProfileScreen('history'); });
   if (backFromDepositBtn) backFromDepositBtn.addEventListener('click', function () { setProfileScreen('home'); });
   if (backFromTonDepositBtn) backFromTonDepositBtn.addEventListener('click', function () { setProfileScreen('deposit'); });
+  
+  // Delegated capture-phase click handler for .draw-card elements. This runs
+  // early in the capture phase and attempts to open the purchase screen using
+  // the draw id stored on the card. It helps in environments (Telegram Desktop
+  // embedded webview) where card-local click handlers may be suppressed.
+  try {
+    document.addEventListener('click', function (event) {
+      try {
+        if (!event || !event.target || !event.target.closest) return;
+        var cardEl = event.target.closest('.draw-card');
+        if (!cardEl) return;
+        // ignore featured card (it is handled separately) unless it has data-draw-id
+        var drawIdAttr = cardEl.getAttribute('data-draw-id');
+        if (!drawIdAttr) return;
+        var drawId = Number(drawIdAttr || 0);
+        if (!drawId) return;
+
+        if (Date.now() < drawCardListSuppressClickUntil) {
+          // a drag just finished — swallow this click
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          return;
+        }
+
+        var active = getActiveDraws(latestState) || [];
+        var found = null;
+        for (var i = 0; i < active.length; i++) {
+          if (active[i] && active[i].id === drawId) { found = active[i]; break; }
+        }
+        if (!found) return;
+
+        tryOpenTicketPurchaseScreen(found, setPurchaseStatus);
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      } catch (e) {}
+    }, true);
+  } catch (e) {}
   if (backFromInviteBtn) backFromInviteBtn.addEventListener('click', function () { setProfileScreen('home'); });
   if (backFromWithdrawBtn) backFromWithdrawBtn.addEventListener('click', function () { setProfileScreen('home'); });
   if (closeHistoryBtn) closeHistoryBtn.addEventListener('click', function () { setProfileScreen('home'); });

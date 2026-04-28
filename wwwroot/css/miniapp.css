@@ -1758,7 +1758,9 @@ body.app-loading .loading-shell {
 
 .purchase-screen-draw-switch-card {
   flex: 0 0 180px;
-  min-height: 118px;
+  /* reduce height so the ticket list is more visible when the purchase panel
+     is open while preserving visual proportions */
+  min-height: 94px;
   text-align: left;
   transform: scale(0.92);
   opacity: 0.86;
@@ -1767,7 +1769,7 @@ body.app-loading .loading-shell {
 
 .purchase-screen-draw-switch-card-selected {
   flex-basis: 236px;
-  min-height: 138px;
+  min-height: 118px;
   transform: rotate(0deg) scale(1);
   opacity: 1;
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.16), 0 18px 32px rgba(0, 0, 0, 0.28);
