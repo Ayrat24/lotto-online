@@ -2483,15 +2483,21 @@
       card.appendChild(footer);
 
       card.addEventListener('click', function (event) {
-        if (event && event.cancelable) {
-          event.preventDefault();
-        }
+        try {
+          if (event && event.cancelable) {
+            event.preventDefault();
+          }
 
-        if (Date.now() < drawCardListSuppressClickUntil) {
-          return;
-        }
+          console.log('[miniapp-debug] card.click', { drawId: draw && draw.id, time: Date.now(), suppressUntil: drawCardListSuppressClickUntil });
 
-        tryOpenTicketPurchaseScreen(draw, setPurchaseStatus);
+          if (Date.now() < drawCardListSuppressClickUntil) {
+            return;
+          }
+
+          tryOpenTicketPurchaseScreen(draw, setPurchaseStatus);
+        } catch (e) {
+          console.error('[miniapp-debug] card.click error', e);
+        }
       });
 
       // Fallback for environments where click may be suppressed (Telegram Desktop
@@ -2505,6 +2511,8 @@
           // Only handle main button mouse/pen or non-touch pointers here.
           if (event.pointerType === 'touch') return;
           if (event.button !== 0) return;
+
+          console.log('[miniapp-debug] card.pointerup', { drawId: draw && draw.id, pointerType: event.pointerType, button: event.button, time: Date.now(), suppress: Date.now() < drawCardListSuppressClickUntil });
 
           if (Date.now() < drawCardListSuppressClickUntil) return;
           if (ticketPurchaseScreenEl && !ticketPurchaseScreenEl.hidden) return;
@@ -4351,6 +4359,8 @@
         var drawId = Number(drawIdAttr || 0);
         if (!drawId) return;
 
+        console.log('[miniapp-debug] delegated.click', { drawId: drawId, targetTag: event.target && event.target.tagName, time: Date.now(), suppressUntil: drawCardListSuppressClickUntil });
+
         if (Date.now() < drawCardListSuppressClickUntil) {
           // a drag just finished — swallow this click
           event.preventDefault();
@@ -4368,7 +4378,9 @@
         tryOpenTicketPurchaseScreen(found, setPurchaseStatus);
         event.preventDefault();
         event.stopImmediatePropagation();
-      } catch (e) {}
+      } catch (e) {
+        console.error('[miniapp-debug] delegated.click error', e);
+      }
     }, true);
   } catch (e) {}
   if (backFromInviteBtn) backFromInviteBtn.addEventListener('click', function () { setProfileScreen('home'); });
