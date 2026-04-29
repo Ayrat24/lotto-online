@@ -250,6 +250,7 @@
   var newsBannerAutoplayTimerId = null;
   var newsBannerGestureBound = false;
   var newsBannerDragPointerId = null;
+  var newsBannerDragPointerType = '';
   var newsBannerDragStartX = 0;
   var newsBannerDragDeltaX = 0;
   var newsBannerDragActive = false;
@@ -940,6 +941,7 @@
     }
 
     newsBannerDragPointerId = null;
+    newsBannerDragPointerType = '';
     newsBannerDragActive = false;
     newsBannerDragStartX = 0;
     newsBannerDragDeltaX = 0;
@@ -1027,11 +1029,8 @@
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       if (newsBanners.length <= 1) return;
 
-      if ((event.pointerType === 'mouse' || event.pointerType === 'pen') && event.cancelable) {
-        event.preventDefault();
-      }
-
       newsBannerDragPointerId = event.pointerId;
+      newsBannerDragPointerType = String(event.pointerType || '');
       newsBannerDragActive = true;
       newsBannerDragMoved = false;
       newsBannerDragStartX = Number(event.clientX || 0);
@@ -1043,7 +1042,7 @@
       }
 
       try {
-        if (typeof newsBannerCarouselEl.setPointerCapture === 'function') {
+        if (typeof newsBannerCarouselEl.setPointerCapture === 'function' && event.pointerType === 'touch') {
           newsBannerCarouselEl.setPointerCapture(event.pointerId);
         }
       } catch (e) {
@@ -1054,7 +1053,8 @@
       if (!newsBannerDragActive || !event || newsBannerDragPointerId !== event.pointerId) return;
 
       newsBannerDragDeltaX = Number(event.clientX || 0) - newsBannerDragStartX;
-      if (Math.abs(newsBannerDragDeltaX) > 8) {
+      var dragThreshold = newsBannerDragPointerType === 'touch' ? 8 : 12;
+      if (Math.abs(newsBannerDragDeltaX) > dragThreshold) {
         newsBannerDragMoved = true;
       }
 
@@ -1082,6 +1082,14 @@
         event.preventDefault();
       }
     });
+
+    newsBannerCarouselEl.addEventListener('click', function (event) {
+      if (Date.now() >= newsBannerSuppressClickUntil) return;
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }, true);
   }
 
   function bindDrawCardListGestures() {
