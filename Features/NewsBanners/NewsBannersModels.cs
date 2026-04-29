@@ -2,6 +2,8 @@ using MiniApp.Features.Offers;
 
 namespace MiniApp.Features.NewsBanners;
 
+public sealed record NewsBannersRequest(string InitData, string? Locale);
+
 public sealed record NewsBannerDto(long Id, string ImageUrl, string ActionType, string? ActionValue, DiscountedTicketOfferDto? Offer = null);
 
 public sealed record NewsBannersListResult(bool Ok, IReadOnlyList<NewsBannerDto> Banners);

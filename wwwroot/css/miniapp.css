@@ -2044,7 +2044,7 @@ body.app-loading .loading-shell {
   left: 0;
   right: 0;
   /* sit just above the tabbar; increased safe offset for taller tabbars */
-  bottom: calc(0px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(5px + env(safe-area-inset-bottom, 0px));
   z-index: 50; /* above tabbar and most app chrome */
   display: grid;
   place-items: center;

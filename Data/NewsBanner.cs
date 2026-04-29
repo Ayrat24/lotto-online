@@ -4,6 +4,9 @@ public sealed class NewsBanner
 {
     public long Id { get; set; }
     public string ImagePath { get; set; } = string.Empty;
+    public string? ImagePathEn { get; set; }
+    public string? ImagePathRu { get; set; }
+    public string? ImagePathUz { get; set; }
     public string ActionType { get; set; } = string.Empty;
     public string? ActionValue { get; set; }
     public int DisplayOrder { get; set; }

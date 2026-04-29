@@ -47,8 +47,9 @@ public static class NewsBannerManagement
         "image/pjpeg"
     };
 
-    public static NewsBannerDto ToDto(NewsBanner banner, DiscountedTicketOfferDto? offer = null)
+    public static NewsBannerDto ToDto(NewsBanner banner, string? locale = null, DiscountedTicketOfferDto? offer = null)
     {
+        var resolvedImagePath = ResolveImagePath(banner, locale);
         var normalizedType = NormalizeStoredActionType(banner.ActionType);
         if (normalizedType == ActionTypeDiscountedOffer)
         {
@@ -56,14 +57,14 @@ public static class NewsBannerManagement
             {
                 return new NewsBannerDto(
                     banner.Id,
-                    banner.ImagePath,
+                    resolvedImagePath,
                     ActionTypeNone,
                     null);
             }
 
             return new NewsBannerDto(
                 banner.Id,
-                banner.ImagePath,
+                resolvedImagePath,
                 ActionTypeDiscountedOffer,
                 offer.Id.ToString(),
                 offer);
@@ -71,10 +72,38 @@ public static class NewsBannerManagement
 
         return new NewsBannerDto(
             banner.Id,
-            banner.ImagePath,
+            resolvedImagePath,
             normalizedType,
             NormalizeStoredActionValue(banner.ActionType, banner.ActionValue));
     }
+
+    public static string ResolveImagePath(NewsBanner banner, string? locale)
+    {
+        var localizedPath = NormalizeImageLocale(locale) switch
+        {
+            "ru" => banner.ImagePathRu,
+            "uz" => banner.ImagePathUz,
+            "en" => banner.ImagePathEn,
+            _ => null
+        };
+
+        return string.IsNullOrWhiteSpace(localizedPath)
+            ? banner.ImagePath
+            : localizedPath;
+    }
+
+    public static IReadOnlyList<string> GetAllImagePaths(NewsBanner banner)
+        => new[]
+        {
+            banner.ImagePath,
+            banner.ImagePathEn,
+            banner.ImagePathRu,
+            banner.ImagePathUz
+        }
+        .Where(x => !string.IsNullOrWhiteSpace(x))
+        .Select(x => x!)
+        .Distinct(StringComparer.Ordinal)
+        .ToArray();
 
     public static IReadOnlyList<string> GetSupportedAppSections()
         => SupportedAppSections.OrderBy(x => x, StringComparer.Ordinal).ToArray();
@@ -239,8 +268,27 @@ public static class NewsBannerManagement
         }
     }
 
+    public static void DeleteImagesIfExists(IWebHostEnvironment env, IEnumerable<string?> publicImagePaths)
+    {
+        foreach (var publicImagePath in publicImagePaths
+                     .Where(x => !string.IsNullOrWhiteSpace(x))
+                     .Distinct(StringComparer.Ordinal))
+        {
+            DeleteImageIfExists(env, publicImagePath);
+        }
+    }
+
     private static string GetPublicImagePath(string fileName)
         => $"/uploads/news-banners/{fileName}";
+
+    private static string? NormalizeImageLocale(string? locale)
+    {
+        var value = (locale ?? string.Empty).Trim().ToLowerInvariant();
+        if (value.StartsWith("ru", StringComparison.Ordinal)) return "ru";
+        if (value.StartsWith("uz", StringComparison.Ordinal)) return "uz";
+        if (value.StartsWith("en", StringComparison.Ordinal)) return "en";
+        return null;
+    }
 
     private static bool TryReadJpegDimensions(Stream stream, out int width, out int height)
     {

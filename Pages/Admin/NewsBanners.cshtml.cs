@@ -15,6 +15,9 @@ public sealed class NewsBannersModel : LocalizedAdminPageModel
     public sealed record AdminNewsBannerRow(
         long Id,
         string ImagePath,
+        string? ImagePathEn,
+        string? ImagePathRu,
+        string? ImagePathUz,
         string ActionType,
         string? ActionValue,
         int DisplayOrder,
@@ -24,6 +27,23 @@ public sealed class NewsBannersModel : LocalizedAdminPageModel
 
     public sealed record ActionTypeOption(string Value, string LabelKey, string FallbackLabel);
     public sealed record DiscountedOfferOption(long Id, long DrawId, int NumberOfDiscountedTickets, decimal Cost);
+    public sealed record BannerImageSlot(string Code, string FieldName, string LabelKey, string FallbackLabel, bool IsRequiredOnCreate);
+
+    private sealed record BannerImagePaths(string? DefaultImagePath, string? EnglishImagePath, string? RussianImagePath, string? UzbekImagePath)
+    {
+        public IReadOnlyList<string> GetAllPaths()
+            => new[] { DefaultImagePath, EnglishImagePath, RussianImagePath, UzbekImagePath }
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x!)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+    }
+
+    private sealed record BannerImageUploadFailure(BannerImageSlot Slot, NewsBannerImageSaveResult SaveResult);
+
+    private sealed record BannerImageSlotUploadResult(bool Ok, string? PublicImagePath, BannerImageUploadFailure? Failure);
+
+    private sealed record BannerImageUploadSetResult(bool Ok, BannerImagePaths? Paths, BannerImageUploadFailure? Failure);
 
     private readonly AppDbContext _db;
     private readonly IWebHostEnvironment _env;
@@ -46,6 +66,13 @@ public sealed class NewsBannersModel : LocalizedAdminPageModel
 
     public IReadOnlyList<string> AppSectionOptions { get; } = NewsBannerManagement.GetSupportedAppSections();
     public IReadOnlyList<DiscountedOfferOption> AvailableOffers { get; private set; } = Array.Empty<DiscountedOfferOption>();
+    public IReadOnlyList<BannerImageSlot> ImageSlots { get; } =
+    [
+        new("default", "imageFile", "admin.newsBanners.create.image", "Default / fallback image", true),
+        new("en", "imageFileEn", "admin.newsBanners.create.imageEn", "English image", false),
+        new("ru", "imageFileRu", "admin.newsBanners.create.imageRu", "Russian image", false),
+        new("uz", "imageFileUz", "admin.newsBanners.create.imageUz", "Uzbek image", false)
+    ];
     public string? StatusMessage { get; private set; }
     public bool StatusIsError { get; private set; }
     public int RequiredWidth => NewsBannerManagement.RequiredImageWidth;
@@ -65,7 +92,7 @@ public sealed class NewsBannersModel : LocalizedAdminPageModel
         await LoadAsync(ct);
     }
 
-    public async Task<IActionResult> OnPostCreateAsync(IFormFile? imageFile, int displayOrder, bool isPublished, string actionType, string? actionAppSection, string? actionExternalUrl, long? actionOfferId, CancellationToken ct)
+    public async Task<IActionResult> OnPostCreateAsync(IFormFile? imageFile, IFormFile? imageFileEn, IFormFile? imageFileRu, IFormFile? imageFileUz, int displayOrder, bool isPublished, string actionType, string? actionAppSection, string? actionExternalUrl, long? actionOfferId, CancellationToken ct)
     {
         await LoadUiTextAsync(ct);
 
@@ -82,17 +109,26 @@ public sealed class NewsBannersModel : LocalizedAdminPageModel
             return RedirectToPage();
         }
 
-        var saveResult = await NewsBannerManagement.SaveImageAsync(imageFile, _env, ct);
-        if (!saveResult.Ok)
+        var uploadResult = await SaveBannerImagesAsync(imageFile, imageFileEn, imageFileRu, imageFileUz, requireDefaultImage: true, ct);
+        if (!uploadResult.Ok || uploadResult.Paths is null || string.IsNullOrWhiteSpace(uploadResult.Paths.DefaultImagePath))
         {
-            await SetFlashAsync(await GetUploadErrorMessageAsync(saveResult, ct), isError: true);
+            var failure = uploadResult.Failure;
+            await SetFlashAsync(await GetUploadErrorMessageAsync(
+                failure?.SaveResult ?? new NewsBannerImageSaveResult(false, null, NewsBannerImageError.MissingFile),
+                failure?.Slot,
+                ct), isError: true);
             return RedirectToPage();
         }
+
+        var imagePaths = uploadResult.Paths;
 
         var now = DateTimeOffset.UtcNow;
         var banner = new NewsBanner
         {
-            ImagePath = saveResult.PublicImagePath!,
+            ImagePath = imagePaths.DefaultImagePath!,
+            ImagePathEn = imagePaths.EnglishImagePath,
+            ImagePathRu = imagePaths.RussianImagePath,
+            ImagePathUz = imagePaths.UzbekImagePath,
             ActionType = normalizedActionType,
             ActionValue = normalizedActionValue,
             DisplayOrder = Math.Max(0, displayOrder),
@@ -111,14 +147,14 @@ public sealed class NewsBannersModel : LocalizedAdminPageModel
         }
         catch
         {
-            NewsBannerManagement.DeleteImageIfExists(_env, saveResult.PublicImagePath);
+            NewsBannerManagement.DeleteImagesIfExists(_env, imagePaths.GetAllPaths());
             await SetFlashAsync(await GetTextAsync("admin.newsBanners.flash.uploadFailed", "Banner upload failed.", ct), isError: true);
         }
 
         return RedirectToPage();
     }
 
-    public async Task<IActionResult> OnPostUpdateAsync(long id, int displayOrder, bool isPublished, string actionType, string? actionAppSection, string? actionExternalUrl, long? actionOfferId, CancellationToken ct)
+    public async Task<IActionResult> OnPostUpdateAsync(long id, int displayOrder, bool isPublished, string actionType, string? actionAppSection, string? actionExternalUrl, long? actionOfferId, IFormFile? imageFile, IFormFile? imageFileEn, IFormFile? imageFileRu, IFormFile? imageFileUz, CancellationToken ct)
     {
         await LoadUiTextAsync(ct);
 
@@ -143,12 +179,48 @@ public sealed class NewsBannersModel : LocalizedAdminPageModel
             return RedirectToPage();
         }
 
+        var uploadResult = await SaveBannerImagesAsync(imageFile, imageFileEn, imageFileRu, imageFileUz, requireDefaultImage: false, ct);
+        if (!uploadResult.Ok)
+        {
+            await SetFlashAsync(await GetUploadErrorMessageAsync(uploadResult.Failure!.SaveResult, uploadResult.Failure.Slot, ct), isError: true);
+            return RedirectToPage();
+        }
+
+        var replacementPaths = uploadResult.Paths!;
+        var previousImagePaths = NewsBannerManagement.GetAllImagePaths(banner).ToHashSet(StringComparer.Ordinal);
+
+        if (!string.IsNullOrWhiteSpace(replacementPaths.DefaultImagePath))
+            banner.ImagePath = replacementPaths.DefaultImagePath!;
+
+        if (!string.IsNullOrWhiteSpace(replacementPaths.EnglishImagePath))
+            banner.ImagePathEn = replacementPaths.EnglishImagePath;
+
+        if (!string.IsNullOrWhiteSpace(replacementPaths.RussianImagePath))
+            banner.ImagePathRu = replacementPaths.RussianImagePath;
+
+        if (!string.IsNullOrWhiteSpace(replacementPaths.UzbekImagePath))
+            banner.ImagePathUz = replacementPaths.UzbekImagePath;
+
         banner.DisplayOrder = Math.Max(0, displayOrder);
         banner.IsPublished = isPublished;
         banner.ActionType = normalizedActionType;
         banner.ActionValue = normalizedActionValue;
         banner.UpdatedAtUtc = DateTimeOffset.UtcNow;
-        await _db.SaveChangesAsync(ct);
+
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch
+        {
+            NewsBannerManagement.DeleteImagesIfExists(_env, replacementPaths.GetAllPaths());
+            await SetFlashAsync(await GetTextAsync("admin.newsBanners.flash.uploadFailed", "Banner upload failed.", ct), isError: true);
+            return RedirectToPage();
+        }
+
+        var activeImagePaths = NewsBannerManagement.GetAllImagePaths(banner).ToHashSet(StringComparer.Ordinal);
+        var obsoleteImagePaths = previousImagePaths.Where(x => !activeImagePaths.Contains(x)).ToArray();
+        NewsBannerManagement.DeleteImagesIfExists(_env, obsoleteImagePaths);
 
         var template = await GetTextAsync("admin.newsBanners.flash.updated", "Banner #{0} updated.", ct);
         await SetFlashAsync(string.Format(template, banner.Id), isError: false);
@@ -167,10 +239,10 @@ public sealed class NewsBannersModel : LocalizedAdminPageModel
             return RedirectToPage();
         }
 
-        var imagePath = banner.ImagePath;
+        var imagePaths = NewsBannerManagement.GetAllImagePaths(banner);
         _db.NewsBanners.Remove(banner);
         await _db.SaveChangesAsync(ct);
-        NewsBannerManagement.DeleteImageIfExists(_env, imagePath);
+        NewsBannerManagement.DeleteImagesIfExists(_env, imagePaths);
 
         var template = await GetTextAsync("admin.newsBanners.flash.deleted", "Banner #{0} deleted.", ct);
         await SetFlashAsync(string.Format(template, id), isError: false);
@@ -197,6 +269,9 @@ public sealed class NewsBannersModel : LocalizedAdminPageModel
             .Select(x => new AdminNewsBannerRow(
                 x.Id,
                 x.ImagePath,
+                x.ImagePathEn,
+                x.ImagePathRu,
+                x.ImagePathUz,
                 NewsBannerManagement.NormalizeStoredActionType(x.ActionType),
                 NewsBannerManagement.NormalizeStoredActionValue(x.ActionType, x.ActionValue),
                 x.DisplayOrder,
@@ -213,9 +288,22 @@ public sealed class NewsBannersModel : LocalizedAdminPageModel
         await Task.CompletedTask;
     }
 
-    private async Task<string> GetUploadErrorMessageAsync(NewsBannerImageSaveResult result, CancellationToken ct)
+    public string? GetImagePath(AdminNewsBannerRow row, string code)
     {
-        return result.Error switch
+        ArgumentNullException.ThrowIfNull(row);
+
+        return code switch
+        {
+            "en" => row.ImagePathEn,
+            "ru" => row.ImagePathRu,
+            "uz" => row.ImagePathUz,
+            _ => row.ImagePath
+        };
+    }
+
+    private async Task<string> GetUploadErrorMessageAsync(NewsBannerImageSaveResult result, BannerImageSlot? slot, CancellationToken ct)
+    {
+        var message = result.Error switch
         {
             NewsBannerImageError.MissingFile => await GetTextAsync("admin.newsBanners.flash.uploadMissing", "Select a JPEG image to upload.", ct),
             NewsBannerImageError.InvalidType => await GetTextAsync("admin.newsBanners.flash.uploadInvalidType", "Only .jpg or .jpeg images are allowed.", ct),
@@ -231,6 +319,13 @@ public sealed class NewsBannersModel : LocalizedAdminPageModel
                 result.ActualHeight),
             _ => await GetTextAsync("admin.newsBanners.flash.uploadFailed", "Banner upload failed.", ct)
         };
+
+        if (slot is null)
+            return message;
+
+        var label = await GetTextAsync(slot.LabelKey, slot.FallbackLabel, ct);
+        var prefixTemplate = await GetTextAsync("admin.newsBanners.flash.uploadPrefixed", "{0}: {1}", ct);
+        return string.Format(prefixTemplate, label, message);
     }
 
     private async Task<string> GetActionValidationMessageAsync(string validationErrorCode, CancellationToken ct)
@@ -291,6 +386,54 @@ public sealed class NewsBannersModel : LocalizedAdminPageModel
             .Where(x => DiscountedTicketOfferManagement.IsAvailable(x, x.Draw, nowUtc))
             .Select(x => new DiscountedOfferOption(x.Id, x.DrawId, x.NumberOfDiscountedTickets, x.Cost))
             .ToArray();
+    }
+
+    private async Task<BannerImageUploadSetResult> SaveBannerImagesAsync(IFormFile? imageFile, IFormFile? imageFileEn, IFormFile? imageFileRu, IFormFile? imageFileUz, bool requireDefaultImage, CancellationToken ct)
+    {
+        var savedPaths = new List<string>();
+
+        var defaultResult = await SaveBannerImageSlotAsync(imageFile, ImageSlots[0], requireDefaultImage, savedPaths, ct);
+        if (!defaultResult.Ok)
+            return new BannerImageUploadSetResult(false, null, defaultResult.Failure);
+
+        var englishResult = await SaveBannerImageSlotAsync(imageFileEn, ImageSlots[1], required: false, savedPaths, ct);
+        if (!englishResult.Ok)
+            return new BannerImageUploadSetResult(false, null, englishResult.Failure);
+
+        var russianResult = await SaveBannerImageSlotAsync(imageFileRu, ImageSlots[2], required: false, savedPaths, ct);
+        if (!russianResult.Ok)
+            return new BannerImageUploadSetResult(false, null, russianResult.Failure);
+
+        var uzbekResult = await SaveBannerImageSlotAsync(imageFileUz, ImageSlots[3], required: false, savedPaths, ct);
+        if (!uzbekResult.Ok)
+            return new BannerImageUploadSetResult(false, null, uzbekResult.Failure);
+
+        return new BannerImageUploadSetResult(
+            true,
+            new BannerImagePaths(
+                defaultResult.PublicImagePath,
+                englishResult.PublicImagePath,
+                russianResult.PublicImagePath,
+                uzbekResult.PublicImagePath),
+            null);
+    }
+
+    private async Task<BannerImageSlotUploadResult> SaveBannerImageSlotAsync(IFormFile? imageFile, BannerImageSlot slot, bool required, List<string> savedPaths, CancellationToken ct)
+    {
+        if (!required && (imageFile is null || imageFile.Length <= 0))
+            return new BannerImageSlotUploadResult(true, null, null);
+
+        var saveResult = await NewsBannerManagement.SaveImageAsync(imageFile, _env, ct);
+        if (!saveResult.Ok)
+        {
+            NewsBannerManagement.DeleteImagesIfExists(_env, savedPaths);
+            return new BannerImageSlotUploadResult(false, null, new BannerImageUploadFailure(slot, saveResult));
+        }
+
+        if (!string.IsNullOrWhiteSpace(saveResult.PublicImagePath))
+            savedPaths.Add(saveResult.PublicImagePath);
+
+        return new BannerImageSlotUploadResult(true, saveResult.PublicImagePath, null);
     }
 }
 

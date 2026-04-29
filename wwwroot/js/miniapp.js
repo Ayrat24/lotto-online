@@ -1408,7 +1408,10 @@
   }
 
   function loadNewsBanners() {
-    return getJson('/api/news-banners')
+    return postJson('/api/news-banners', {
+      initData: initData || '',
+      locale: localeCode || 'en'
+    }, null)
       .then(function (res) {
         renderNewsBanners(res && Array.isArray(res.banners) ? res.banners : []);
       })

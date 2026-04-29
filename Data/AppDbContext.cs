@@ -144,6 +144,9 @@ public sealed class AppDbContext : DbContext
             b.HasIndex(x => x.UpdatedAtUtc);
 
             b.Property(x => x.ImagePath).HasMaxLength(512).IsRequired();
+            b.Property(x => x.ImagePathEn).HasMaxLength(512);
+            b.Property(x => x.ImagePathRu).HasMaxLength(512);
+            b.Property(x => x.ImagePathUz).HasMaxLength(512);
             b.Property(x => x.ActionType).HasMaxLength(32).IsRequired().HasDefaultValue("none");
             b.Property(x => x.ActionValue).HasMaxLength(1024);
             b.Property(x => x.DisplayOrder).IsRequired();

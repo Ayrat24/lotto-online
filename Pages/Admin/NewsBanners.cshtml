@@ -19,10 +19,18 @@
         <p class="text-muted mb-3">@string.Format(Model.T("admin.newsBanners.create.requirements", "Upload a .jpg/.jpeg image sized exactly {0}×{1}px. Keep file size under {2} MB for fast mobile loading."), Model.RequiredWidth, Model.RequiredHeight, Model.MaxUploadMegabytes)</p>
 
         <form method="post" asp-page-handler="Create" enctype="multipart/form-data" class="row g-3 align-items-end">
-            <div class="col-12 col-lg-6">
-                <label for="newsBannerImageFile" class="form-label">@Model.T("admin.newsBanners.create.image", "JPEG image")</label>
-                <input id="newsBannerImageFile" name="imageFile" type="file" accept=".jpg,.jpeg,image/jpeg" class="form-control" required />
-            </div>
+            @foreach (var slot in Model.ImageSlots)
+            {
+                <div class="col-12 col-md-6 col-xl-3">
+                    <label for="newsBannerImage_@slot.Code" class="form-label">@Model.T(slot.LabelKey, slot.FallbackLabel)</label>
+                    <input id="newsBannerImage_@slot.Code"
+                           name="@slot.FieldName"
+                           type="file"
+                           accept=".jpg,.jpeg,image/jpeg"
+                           class="form-control"
+                           @(slot.IsRequiredOnCreate ? "required" : null) />
+                </div>
+            }
             <div class="col-6 col-lg-2">
                 <label for="newsBannerDisplayOrder" class="form-label">@Model.T("admin.newsBanners.create.order", "Display order")</label>
                 <input id="newsBannerDisplayOrder" name="displayOrder" type="number" min="0" step="1" value="0" class="form-control" />
@@ -88,7 +96,7 @@ else
                     <thead>
                     <tr>
                         <th>@Model.T("admin.newsBanners.table.preview", "Preview")</th>
-                        <th>@Model.T("admin.newsBanners.table.path", "Path")</th>
+                        <th>@Model.T("admin.newsBanners.table.path", "Images")</th>
                         <th>@Model.T("admin.newsBanners.table.actionType", "Tap action")</th>
                         <th>@Model.T("admin.newsBanners.table.actionValue", "Action target")</th>
                         <th>@Model.T("admin.newsBanners.table.order", "Order")</th>
@@ -102,12 +110,54 @@ else
                     @foreach (var item in Model.Items)
                     {
                         <tr>
-                            <form method="post" asp-page-handler="Update">
+                            <form method="post" asp-page-handler="Update" enctype="multipart/form-data">
                                 <input type="hidden" name="id" value="@item.Id" />
                                 <td>
-                                    <img src="@Url.Content(item.ImagePath)" alt="" style="width: 180px; max-width: 100%; aspect-ratio: 2 / 1; object-fit: cover; border-radius: 12px; border: 1px solid rgba(0,0,0,.08);" />
+                                    <div class="d-grid gap-2" style="min-width: 180px;">
+                                        @foreach (var slot in Model.ImageSlots)
+                                        {
+                                            var imagePath = Model.GetImagePath(item, slot.Code);
+                                            if (!string.IsNullOrWhiteSpace(imagePath))
+                                            {
+                                                <div class="d-grid gap-1">
+                                                    <span class="badge bg-light text-dark border align-self-start">@Model.T(slot.LabelKey, slot.FallbackLabel)</span>
+                                                    <img src="@Url.Content(imagePath)" alt="" style="width: 180px; max-width: 100%; aspect-ratio: 2 / 1; object-fit: cover; border-radius: 12px; border: 1px solid rgba(0,0,0,.08);" />
+                                                </div>
+                                            }
+                                        }
+                                    </div>
                                 </td>
-                                <td><code>@item.ImagePath</code></td>
+                                <td style="min-width: 260px;">
+                                    <div class="d-grid gap-2">
+                                        @foreach (var slot in Model.ImageSlots)
+                                        {
+                                            var imagePath = Model.GetImagePath(item, slot.Code);
+                                            if (!string.IsNullOrWhiteSpace(imagePath))
+                                            {
+                                                <div class="small">
+                                                    <div class="fw-semibold">@Model.T(slot.LabelKey, slot.FallbackLabel)</div>
+                                                    <code>@imagePath</code>
+                                                </div>
+                                            }
+                                        }
+
+                                        <hr class="my-1" />
+
+                                        @foreach (var slot in Model.ImageSlots)
+                                        {
+                                            <div>
+                                                <label for="@($"update_{item.Id}_{slot.Code}")" class="form-label form-label-sm">@Model.T(slot.LabelKey, slot.FallbackLabel)</label>
+                                                <input id="@($"update_{item.Id}_{slot.Code}")"
+                                                       name="@slot.FieldName"
+                                                       type="file"
+                                                       accept=".jpg,.jpeg,image/jpeg"
+                                                       class="form-control form-control-sm" />
+                                            </div>
+                                        }
+
+                                        <div class="form-text">@Model.T("admin.newsBanners.table.imageHelp", "Leave any image input empty to keep the current file.")</div>
+                                    </div>
+                                </td>
                                 <td style="min-width: 180px;">
                                     <select name="actionType" class="form-select form-select-sm">
                                         @foreach (var option in Model.ActionTypeOptions)
