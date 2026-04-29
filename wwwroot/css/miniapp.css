@@ -989,44 +989,54 @@ body.app-loading .loading-shell {
 }
 
 .payment-systems-list {
-  display: grid;
+  /* Place payment method icons inline, side-by-side. Removed card-like containers. */
+  display: flex;
   gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .payment-systems-icon-list {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .payment-system-icon-btn {
-  display: grid;
-  place-items: center;
-  min-height: 88px;
-  padding: 12px;
-  border-radius: 18px;
-  border: 1px solid var(--button-border);
-  background: var(--button-bg);
+  /* Compact icon-only button: no large container, inline sizing */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: auto;
+  padding: 0;
+  border-radius: 8px;
+  border: 0;
+  background: transparent;
   color: var(--text);
   text-transform: none;
   letter-spacing: 0;
   box-shadow: none;
+  width: auto;
 }
 
 .payment-system-card-selected {
-  border-color: rgba(51, 144, 236, 0.72);
-  box-shadow: 0 0 0 1px rgba(51, 144, 236, 0.18) inset;
-  background: var(--button-bg-strong);
+  /* Selected payment method: blue outline */
+  outline: 2px solid #2d77ff;
+  outline-offset: 2px;
+  border-radius: 10px;
 }
 
 .payment-system-icon {
-  width: 46px;
-  height: 46px;
-  border-radius: 14px;
-  display: grid;
+  /* Icon-only visual: remove heavy background so icons sit side-by-side */
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: inline-grid;
   place-items: center;
-  background: rgba(255, 255, 255, 0.08);
+  background: transparent;
   color: #ffffff;
-  font-size: 1.7rem;
+  font-size: 1.6rem;
   font-weight: 900;
 }
 

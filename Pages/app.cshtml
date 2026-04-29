@@ -162,15 +162,11 @@
       <div id="profileHomeScreen" class="card stack profile-screen profile-home-screen">
         <div class="profile-page-header">
           <div class="profile-page-heading">
-            <div class="section-title" data-loc="client.profile.title">Profile</div>
-            <div class="section-subtitle" data-loc="client.profile.subtitle">Manage your wallet balance.</div>
+                <div class="section-title" data-loc="client.profile.title">Profile</div>
           </div>
         </div>
 
-        <section class="profile-balance-card">
-          <div class="profile-balance-label" data-loc="client.profile.currentBalance">Current balance:</div>
-          <div id="profileBalanceText" class="profile-balance-value">$0.00</div>
-        </section>
+        <!-- Profile header subtitle and current balance removed from UI -->
 
         <button id="openDepositScreenBtn" type="button" class="profile-menu-item">
           <span class="profile-menu-icon profile-menu-icon-accent">+</span>
@@ -210,7 +206,6 @@
           <button id="backFromDepositBtn" type="button" class="profile-back-btn" data-loc-aria-label="client.button.back">←</button>
           <div class="profile-screen-heading">
             <div class="section-title" data-loc="client.profile.menuDeposit">Deposit Money</div>
-            <div class="section-subtitle" data-loc="client.topup.methodHint">Use Telegram Wallet for native TON transfers or BTCPay for external crypto checkout.</div>
           </div>
         </div>
 
@@ -224,7 +219,6 @@
 
         <div class="profile-field-label" data-loc="client.topup.methodTitle">Choose payment method</div>
         <div id="paymentSystemsList" class="payment-systems-list payment-systems-icon-list"></div>
-        <div id="paymentSystemsHint" class="muted profile-status" data-loc="client.topup.methodHint">Use Telegram Wallet for native TON transfers or BTCPay for external crypto checkout.</div>
 
         <div id="topUpStatus" class="muted profile-status"></div>
         <button id="topUpBtn" type="button" class="profile-primary-cta" data-loc="client.button.continue">Continue</button>
