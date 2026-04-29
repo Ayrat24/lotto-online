@@ -989,11 +989,16 @@ body.app-loading .loading-shell {
 }
 
 .payment-systems-list {
-  /* Place payment method icons inline, side-by-side. Removed card-like containers. */
+  /* Place payment method icons inline, side-by-side in a single horizontal row.
+     On narrow screens the list becomes horizontally scrollable instead of wrapping
+     to multiple lines (keeps a compact single-row picker similar to native mobile UIs). */
   display: flex;
   gap: 10px;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap; /* keep items on one row */
+  overflow-x: auto; /* allow horizontal scrolling when space is constrained */
+  -webkit-overflow-scrolling: touch; /* smooth scrolling on iOS */
+  padding-bottom: 6px; /* ensure touch target isn't clipped by container */
 }
 
 .payment-systems-icon-list {
@@ -1008,6 +1013,7 @@ body.app-loading .loading-shell {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto; /* don't grow or shrink — keep intrinsic size for horizontal row */
   min-height: auto;
   padding: 0;
   border-radius: 8px;
