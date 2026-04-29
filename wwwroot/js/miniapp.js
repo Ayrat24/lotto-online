@@ -185,6 +185,8 @@
   var referralIsBound = false;
   var paymentSystemsOptions = null;
   var selectedPaymentMethod = null;
+  var debugPaymentVariant = 'default';
+
   var activeDeposit = null;
   var tonConnectUi = null;
   var tonConnectWallet = null;
@@ -3348,6 +3350,9 @@
     var selected = getSelectedPaymentMethod();
     paymentSystemsListEl.innerHTML = '';
 
+    // Render debug controls early so they're visible even when no payment systems are available.
+    try { renderLocalDebugPaymentControls(); } catch (e) { }
+
     if (paymentSystemsHintEl) paymentSystemsHintEl.hidden = systems.length === 0;
     if (topUpBtn) topUpBtn.disabled = systems.length === 0;
     syncTopUpButtonLabel();
@@ -3383,6 +3388,117 @@
 
       paymentSystemsListEl.appendChild(button);
     });
+    // render debug selector (if applicable)
+    try { renderLocalDebugPaymentControls(); } catch (e) { }
+  }
+
+  function getLocalDebugPaymentVariants() {
+    return [
+      { key: 'default', label: t('client.debug.payments.default', 'Default (server)') },
+      { key: 'all', label: t('client.debug.payments.all', 'All methods') },
+      { key: 'telegram_only', label: t('client.debug.payments.telegramOnly', 'Telegram (TON) only') },
+      { key: 'btcpay_only', label: t('client.debug.payments.btcpayOnly', 'BTCPay only') },
+      { key: 'none', label: t('client.debug.payments.none', 'None (disabled)') }
+    ];
+  }
+
+  function renderLocalDebugPaymentControls() {
+    // Render the debug selector when running in local-debug mode OR when the URL explicitly forces debug.
+    var forcedDebugFromQuery = false;
+    var hostIsLocal = false;
+    try {
+      var qs = window.location && window.location.search ? window.location.search : '';
+      forcedDebugFromQuery = qs.indexOf('debug=1') >= 0 || qs.indexOf('mode=local-debug') >= 0;
+      var host = window.location && window.location.hostname ? String(window.location.hostname).toLowerCase() : '';
+      hostIsLocal = host === 'localhost' || host === '127.0.0.1' || host === '::1' || /^127\./.test(host);
+    } catch (e) { forcedDebugFromQuery = false; hostIsLocal = false; }
+
+    var serverLocalDebug = false;
+    try { serverLocalDebug = !!(window.__serverLocalDebug === true || String(window.__serverLocalDebug) === 'true'); } catch (e) { serverLocalDebug = false; }
+    if (!((clientIsLocalDebug || initData === 'local-debug' || forcedDebugFromQuery || hostIsLocal) || serverLocalDebug) || !paymentSystemsListEl || !paymentSystemsListEl.parentNode) return;
+    var containerId = 'debugPaymentVariantContainer';
+    var existing = document.getElementById(containerId);
+    if (existing) {
+      var sel = document.getElementById('debugPaymentVariantSelect');
+      if (sel) sel.value = debugPaymentVariant || 'default';
+      return;
+    }
+
+    var wrapper = document.createElement('div');
+    wrapper.id = containerId;
+    wrapper.style.marginBottom = '8px';
+    wrapper.style.display = 'flex';
+    wrapper.style.gap = '8px';
+    wrapper.style.alignItems = 'center';
+
+    var label = document.createElement('div');
+    label.className = 'muted';
+    label.style.fontSize = '0.85rem';
+    label.textContent = t('client.debug.payments.label', 'Debug payment variant:');
+    wrapper.appendChild(label);
+
+    var select = document.createElement('select');
+    select.id = 'debugPaymentVariantSelect';
+    select.style.padding = '6px';
+    select.style.fontSize = '0.9rem';
+
+    var variants = getLocalDebugPaymentVariants();
+    variants.forEach(function (v) {
+      var opt = document.createElement('option');
+      opt.value = v.key;
+      opt.textContent = v.label;
+      select.appendChild(opt);
+    });
+
+    select.value = debugPaymentVariant || 'default';
+    select.addEventListener('change', function () {
+      debugPaymentVariant = String(select.value || 'default');
+      applyLocalDebugPaymentVariant(debugPaymentVariant);
+    });
+
+    wrapper.appendChild(select);
+
+    // insert wrapper before the payment systems list
+    paymentSystemsListEl.parentNode.insertBefore(wrapper, paymentSystemsListEl);
+  }
+
+  function applyLocalDebugPaymentVariant(variantKey) {
+    if (!clientIsLocalDebug) {
+      try {
+        var host = window.location && window.location.hostname ? String(window.location.hostname).toLowerCase() : '';
+        var hostIsLocal = host === 'localhost' || host === '127.0.0.1' || host === '::1' || /^127\./.test(host);
+        var qs = window.location && window.location.search ? window.location.search : '';
+        var forcedDebugFromQuery = qs.indexOf('debug=1') >= 0 || qs.indexOf('mode=local-debug') >= 0;
+        var serverLocalDebug = false;
+        try { serverLocalDebug = !!(window.__serverLocalDebug === true || String(window.__serverLocalDebug) === 'true'); } catch (e) { serverLocalDebug = false; }
+        if (!hostIsLocal && !forcedDebugFromQuery && !serverLocalDebug) return;
+      } catch (e) { return; }
+    }
+    if (variantKey === 'default') {
+      loadPaymentSystems();
+      return;
+    }
+
+    var systems = [];
+    if (variantKey === 'all') {
+      systems = [ { key: 'telegram_ton' }, { key: 'btcpay_crypto' } ];
+    } else if (variantKey === 'telegram_only') {
+      systems = [ { key: 'telegram_ton' } ];
+    } else if (variantKey === 'btcpay_only') {
+      systems = [ { key: 'btcpay_crypto' } ];
+    } else if (variantKey === 'none') {
+      systems = [];
+    }
+
+    paymentSystemsOptions = {
+      enabled: systems.length > 0,
+      defaultPaymentMethod: systems.length > 0 ? systems[0].key : null,
+      systems: systems
+    };
+
+    selectedPaymentMethod = null;
+    renderPaymentSystems();
+    syncTopUpButtonLabel();
   }
 
   function updateDepositDetails(deposit) {

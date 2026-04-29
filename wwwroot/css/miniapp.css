@@ -1031,6 +1031,23 @@ body.app-loading .loading-shell {
   box-shadow: none;
 }
 
+/* Override generic .app-shell button rules for the compact payment method icons so
+   they keep a fixed square size instead of expanding to full width. This increases
+   specificity so the global button styles don't affect these icon buttons. */
+.app-shell .payment-system-icon-btn,
+.purchase-screen .payment-system-icon-btn,
+.center-popup .payment-system-icon-btn {
+  width: 56px; /* fixed square */
+  height: 56px;
+  min-height: 0;
+  padding: 4px;
+  box-sizing: border-box;
+  text-transform: none;
+  font-weight: 700;
+  border-radius: 8px;
+  background: transparent;
+}
+
 .payment-system-card-selected {
   /* Selected payment method: blue outline */
   outline: 2px solid #2d77ff;

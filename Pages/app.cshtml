@@ -1,4 +1,7 @@
 @page
+@using MiniApp.Features.Auth
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment Environment
 @{ Layout = null; }
 <!doctype html>
 <html lang="en">
@@ -16,6 +19,12 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://unpkg.com/%40tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
   <script src="https://unpkg.com/tonweb/dist/tonweb.js"></script>
+  <script>
+    // Expose server-side local debug flag to client so debug controls can render reliably
+    try {
+      window.__serverLocalDebug = @(LocalDebugMode.IsEnabled(Configuration, Environment) ? "true" : "false");
+    } catch (e) { window.__serverLocalDebug = false; }
+  </script>
   <link rel="stylesheet" href="~/css/miniapp.css" asp-append-version="true" />
 </head>
 <body class="app-loading">
