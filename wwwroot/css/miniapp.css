@@ -989,23 +989,27 @@ body.app-loading .loading-shell {
 }
 
 .payment-systems-list {
-  /* Place payment method icons inline, side-by-side in a single horizontal row.
-     On narrow screens the list becomes horizontally scrollable instead of wrapping
-     to multiple lines (keeps a compact single-row picker similar to native mobile UIs). */
+  /* Horizontal single-row picker for payment method icons.
+     Keeps icons in a single row, horizontally scrollable on narrow screens.
+     Provides consistent vertical alignment and touch-friendly spacing. */
   display: flex;
   gap: 10px;
   align-items: center;
   flex-wrap: nowrap; /* keep items on one row */
   overflow-x: auto; /* allow horizontal scrolling when space is constrained */
   -webkit-overflow-scrolling: touch; /* smooth scrolling on iOS */
-  padding-bottom: 6px; /* ensure touch target isn't clipped by container */
+  padding: 8px 6px; /* comfortable touch padding */
+  box-sizing: border-box;
 }
 
 .payment-systems-icon-list {
+  /* Alias class used in markup — keep same single-row behavior to avoid conflicts */
   display: flex;
-  gap: 8px;
+  gap: 10px;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .payment-system-icon-btn {
@@ -1014,8 +1018,10 @@ body.app-loading .loading-shell {
   align-items: center;
   justify-content: center;
   flex: 0 0 auto; /* don't grow or shrink — keep intrinsic size for horizontal row */
-  min-height: auto;
-  padding: 0;
+  width: 56px; /* fixed square container */
+  height: 56px;
+  box-sizing: border-box;
+  padding: 4px; /* small inner padding so icon has breathing room */
   border-radius: 8px;
   border: 0;
   background: transparent;
@@ -1023,7 +1029,6 @@ body.app-loading .loading-shell {
   text-transform: none;
   letter-spacing: 0;
   box-shadow: none;
-  width: auto;
 }
 
 .payment-system-card-selected {
@@ -1034,9 +1039,11 @@ body.app-loading .loading-shell {
 }
 
 .payment-system-icon {
-  /* Icon-only visual: remove heavy background so icons sit side-by-side */
-  width: 40px;
-  height: 40px;
+  /* Icon visual inside the square button: keep consistent square icon area */
+  width: 100%;
+  height: 100%;
+  max-width: 48px;
+  max-height: 48px;
   border-radius: 8px;
   display: inline-grid;
   place-items: center;
