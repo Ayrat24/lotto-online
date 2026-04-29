@@ -2599,7 +2599,6 @@
           var topInfo = topEl ? (topEl.tagName + (topEl.id ? '#' + topEl.id : '') + (topEl.className ? '.' + String(topEl.className).replace(/\s+/g, '.') : '')) : 'none';
           var rect = null;
           try { rect = card.getBoundingClientRect(); } catch (e) { rect = null; }
-          console.log('[miniapp-debug] card.click', { drawId: draw && draw.id, time: Date.now(), windowWidth: window && window.innerWidth, suppressUntil: drawCardListSuppressClickUntil, topElement: topInfo, cardRect: rect });
 
           if (Date.now() < drawCardListSuppressClickUntil) {
             return;
@@ -2607,7 +2606,6 @@
 
           tryOpenTicketPurchaseScreen(draw, setPurchaseStatus);
         } catch (e) {
-          console.error('[miniapp-debug] card.click error', e);
         }
       });
 
@@ -2628,7 +2626,6 @@
           var topEl2 = null;
           try { topEl2 = document.elementFromPoint(cx2, cy2); } catch (e) { topEl2 = null; }
           var topInfo2 = topEl2 ? (topEl2.tagName + (topEl2.id ? '#' + topEl2.id : '') + (topEl2.className ? '.' + String(topEl2.className).replace(/\s+/g, '.') : '')) : 'none';
-          console.log('[miniapp-debug] card.pointerup', { drawId: draw && draw.id, pointerType: event.pointerType, button: event.button, time: Date.now(), windowWidth: window && window.innerWidth, suppress: Date.now() < drawCardListSuppressClickUntil, topElement: topInfo2 });
 
           if (Date.now() < drawCardListSuppressClickUntil) return;
           if (ticketPurchaseScreenEl && !ticketPurchaseScreenEl.hidden) return;
@@ -4480,7 +4477,6 @@
         var dTop = null;
         try { dTop = document.elementFromPoint(dcx, dcy); } catch (e) { dTop = null; }
         var dTopInfo = dTop ? (dTop.tagName + (dTop.id ? '#' + dTop.id : '') + (dTop.className ? '.' + String(dTop.className).replace(/\s+/g, '.') : '')) : 'none';
-        console.log('[miniapp-debug] delegated.click', { drawId: drawId, targetTag: event.target && event.target.tagName, time: Date.now(), windowWidth: window && window.innerWidth, suppressUntil: drawCardListSuppressClickUntil, topElement: dTopInfo });
 
         if (Date.now() < drawCardListSuppressClickUntil) {
           // a drag just finished — swallow this click
@@ -4500,7 +4496,6 @@
         event.preventDefault();
         event.stopImmediatePropagation();
       } catch (e) {
-        console.error('[miniapp-debug] delegated.click error', e);
       }
     }, true);
   } catch (e) {}
