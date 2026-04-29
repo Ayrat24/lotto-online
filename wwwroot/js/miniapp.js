@@ -1139,6 +1139,10 @@
 
     jackpotCardsContainerEl.addEventListener('pointerup', function (event) {
       endDrawCardListDrag(event && event.pointerId);
+    }, true);
+
+    jackpotCardsContainerEl.addEventListener('pointerup', function (event) {
+      endDrawCardListDrag(event && event.pointerId);
     });
 
     jackpotCardsContainerEl.addEventListener('pointercancel', function (event) {
