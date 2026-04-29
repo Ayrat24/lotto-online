@@ -5,6 +5,7 @@ using MiniApp.Admin;
 using MiniApp.Data;
 using MiniApp.Features.Localization;
 using MiniApp.Features.NewsBanners;
+using MiniApp.Features.Offers;
 
 namespace MiniApp.Pages.Admin;
 
@@ -22,6 +23,7 @@ public sealed class NewsBannersModel : LocalizedAdminPageModel
         DateTimeOffset UpdatedAtUtc);
 
     public sealed record ActionTypeOption(string Value, string LabelKey, string FallbackLabel);
+    public sealed record DiscountedOfferOption(long Id, long DrawId, int NumberOfDiscountedTickets, decimal Cost);
 
     private readonly AppDbContext _db;
     private readonly IWebHostEnvironment _env;
@@ -38,10 +40,12 @@ public sealed class NewsBannersModel : LocalizedAdminPageModel
     [
         new(NewsBannerManagement.ActionTypeNone, "admin.newsBanners.actionType.none", "No action"),
         new(NewsBannerManagement.ActionTypeAppSection, "admin.newsBanners.actionType.appSection", "Open app section"),
-        new(NewsBannerManagement.ActionTypeExternalUrl, "admin.newsBanners.actionType.externalUrl", "Open external link")
+        new(NewsBannerManagement.ActionTypeExternalUrl, "admin.newsBanners.actionType.externalUrl", "Open external link"),
+        new(NewsBannerManagement.ActionTypeDiscountedOffer, "admin.newsBanners.actionType.discountedOffer", "Open discounted offer")
     ];
 
     public IReadOnlyList<string> AppSectionOptions { get; } = NewsBannerManagement.GetSupportedAppSections();
+    public IReadOnlyList<DiscountedOfferOption> AvailableOffers { get; private set; } = Array.Empty<DiscountedOfferOption>();
     public string? StatusMessage { get; private set; }
     public bool StatusIsError { get; private set; }
     public int RequiredWidth => NewsBannerManagement.RequiredImageWidth;
@@ -61,13 +65,20 @@ public sealed class NewsBannersModel : LocalizedAdminPageModel
         await LoadAsync(ct);
     }
 
-    public async Task<IActionResult> OnPostCreateAsync(IFormFile? imageFile, int displayOrder, bool isPublished, string actionType, string? actionValue, CancellationToken ct)
+    public async Task<IActionResult> OnPostCreateAsync(IFormFile? imageFile, int displayOrder, bool isPublished, string actionType, string? actionAppSection, string? actionExternalUrl, long? actionOfferId, CancellationToken ct)
     {
         await LoadUiTextAsync(ct);
 
-        if (!NewsBannerManagement.TryNormalizeAction(actionType, actionValue, out var normalizedActionType, out var normalizedActionValue, out var actionValidationError))
+        var actionInputValue = GetActionInputValue(actionType, actionAppSection, actionExternalUrl, actionOfferId);
+        if (!NewsBannerManagement.TryNormalizeAction(actionType, actionInputValue, out var normalizedActionType, out var normalizedActionValue, out var actionValidationError))
         {
             await SetFlashAsync(await GetActionValidationMessageAsync(actionValidationError, ct), isError: true);
+            return RedirectToPage();
+        }
+
+        if (!await ValidateDiscountedOfferSelectionAsync(normalizedActionType, normalizedActionValue, ct))
+        {
+            await SetFlashAsync(await GetActionValidationMessageAsync("invalid_discounted_offer", ct), isError: true);
             return RedirectToPage();
         }
 
@@ -107,13 +118,20 @@ public sealed class NewsBannersModel : LocalizedAdminPageModel
         return RedirectToPage();
     }
 
-    public async Task<IActionResult> OnPostUpdateAsync(long id, int displayOrder, bool isPublished, string actionType, string? actionValue, CancellationToken ct)
+    public async Task<IActionResult> OnPostUpdateAsync(long id, int displayOrder, bool isPublished, string actionType, string? actionAppSection, string? actionExternalUrl, long? actionOfferId, CancellationToken ct)
     {
         await LoadUiTextAsync(ct);
 
-        if (!NewsBannerManagement.TryNormalizeAction(actionType, actionValue, out var normalizedActionType, out var normalizedActionValue, out var actionValidationError))
+        var actionInputValue = GetActionInputValue(actionType, actionAppSection, actionExternalUrl, actionOfferId);
+        if (!NewsBannerManagement.TryNormalizeAction(actionType, actionInputValue, out var normalizedActionType, out var normalizedActionValue, out var actionValidationError))
         {
             await SetFlashAsync(await GetActionValidationMessageAsync(actionValidationError, ct), isError: true);
+            return RedirectToPage();
+        }
+
+        if (!await ValidateDiscountedOfferSelectionAsync(normalizedActionType, normalizedActionValue, ct))
+        {
+            await SetFlashAsync(await GetActionValidationMessageAsync("invalid_discounted_offer", ct), isError: true);
             return RedirectToPage();
         }
 
@@ -170,6 +188,8 @@ public sealed class NewsBannersModel : LocalizedAdminPageModel
 
     private async Task LoadAsync(CancellationToken ct)
     {
+        AvailableOffers = await LoadAvailableOffersAsync(ct);
+
         Items = await _db.NewsBanners
             .AsNoTracking()
             .OrderBy(x => x.DisplayOrder)
@@ -220,9 +240,57 @@ public sealed class NewsBannersModel : LocalizedAdminPageModel
             "invalid_type" => await GetTextAsync("admin.newsBanners.flash.actionTypeInvalid", "Select a valid banner action.", ct),
             "missing_value" => await GetTextAsync("admin.newsBanners.flash.actionValueRequired", "Enter the action target for this banner.", ct),
             "invalid_app_section" => await GetTextAsync("admin.newsBanners.flash.actionAppSectionInvalid", "Choose a valid app section target.", ct),
+            "invalid_discounted_offer" => await GetTextAsync("admin.newsBanners.flash.actionDiscountedOfferInvalid", "Choose a valid active discounted offer.", ct),
             "invalid_external_url" => await GetTextAsync("admin.newsBanners.flash.actionUrlInvalid", "Enter a valid absolute HTTPS URL.", ct),
             _ => await GetTextAsync("admin.newsBanners.flash.actionTypeInvalid", "Select a valid banner action.", ct)
         };
+    }
+
+    private static string? GetActionInputValue(string? actionType, string? actionAppSection, string? actionExternalUrl, long? actionOfferId)
+    {
+        var normalizedActionType = NewsBannerManagement.NormalizeStoredActionType(actionType);
+        return normalizedActionType switch
+        {
+            NewsBannerManagement.ActionTypeAppSection => actionAppSection,
+            NewsBannerManagement.ActionTypeExternalUrl => actionExternalUrl,
+            NewsBannerManagement.ActionTypeDiscountedOffer => actionOfferId?.ToString(),
+            _ => null
+        };
+    }
+
+    private async Task<bool> ValidateDiscountedOfferSelectionAsync(string normalizedActionType, string? normalizedActionValue, CancellationToken ct)
+    {
+        if (!string.Equals(normalizedActionType, NewsBannerManagement.ActionTypeDiscountedOffer, StringComparison.Ordinal))
+            return true;
+
+        if (!long.TryParse(normalizedActionValue, out var offerId) || offerId <= 0)
+            return false;
+
+        var nowUtc = DateTimeOffset.UtcNow;
+        var offer = await _db.DiscountedTicketOffers
+            .AsNoTracking()
+            .Include(x => x.Draw)
+            .SingleOrDefaultAsync(x => x.Id == offerId, ct);
+
+        return offer is not null && DiscountedTicketOfferManagement.IsAvailable(offer, offer.Draw, nowUtc);
+    }
+
+    private async Task<IReadOnlyList<DiscountedOfferOption>> LoadAvailableOffersAsync(CancellationToken ct)
+    {
+        var nowUtc = DateTimeOffset.UtcNow;
+        var offers = await _db.DiscountedTicketOffers
+            .AsNoTracking()
+            .Include(x => x.Draw)
+            .Where(x => x.IsActive && x.Draw.State == DrawState.Active)
+            .OrderByDescending(x => x.DrawId)
+            .ThenByDescending(x => x.UpdatedAtUtc)
+            .ThenByDescending(x => x.Id)
+            .ToListAsync(ct);
+
+        return offers
+            .Where(x => DiscountedTicketOfferManagement.IsAvailable(x, x.Draw, nowUtc))
+            .Select(x => new DiscountedOfferOption(x.Id, x.DrawId, x.NumberOfDiscountedTickets, x.Cost))
+            .ToArray();
     }
 }
 

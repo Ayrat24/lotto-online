@@ -1,5 +1,6 @@
 @page
 @model MiniApp.Pages.Admin.NewsBannersModel
+@using MiniApp.Features.NewsBanners
 @{
     ViewData["Title"] = Model.T("admin.newsBanners.title", "News banners");
 }
@@ -35,9 +36,29 @@
                     }
                 </select>
             </div>
-            <div class="col-12 col-lg-8">
-                <label for="newsBannerActionValue" class="form-label">@Model.T("admin.newsBanners.create.actionValue", "Action target")</label>
-                <input id="newsBannerActionValue" name="actionValue" type="text" maxlength="1024" class="form-control" placeholder="https://example.com or profile/deposit" />
+            <div class="col-12 col-lg-4">
+                <label for="newsBannerActionAppSection" class="form-label">@Model.T("admin.newsBanners.create.actionAppSection", "App section")</label>
+                <select id="newsBannerActionAppSection" name="actionAppSection" class="form-select">
+                    <option value="">@Model.T("admin.newsBanners.create.actionSectionEmpty", "Select app section")</option>
+                    @foreach (var appSection in Model.AppSectionOptions)
+                    {
+                        <option value="@appSection">@appSection</option>
+                    }
+                </select>
+            </div>
+            <div class="col-12 col-lg-4">
+                <label for="newsBannerActionOfferId" class="form-label">@Model.T("admin.newsBanners.create.actionOffer", "Discounted offer")</label>
+                <select id="newsBannerActionOfferId" name="actionOfferId" class="form-select">
+                    <option value="">@Model.T("admin.newsBanners.create.actionOfferEmpty", "Select active offer")</option>
+                    @foreach (var offer in Model.AvailableOffers)
+                    {
+                        <option value="@offer.Id">@string.Format(Model.T("admin.newsBanners.offer.option", "Offer #{0} · Draw #{1} · {2} tickets · {3}"), offer.Id, offer.DrawId, offer.NumberOfDiscountedTickets, offer.Cost.ToString("0.00"))</option>
+                    }
+                </select>
+            </div>
+            <div class="col-12 col-lg-4">
+                <label for="newsBannerActionExternalUrl" class="form-label">@Model.T("admin.newsBanners.create.actionExternalUrl", "External URL")</label>
+                <input id="newsBannerActionExternalUrl" name="actionExternalUrl" type="url" maxlength="1024" class="form-control" placeholder="https://example.com" />
                 <div class="form-text">@string.Format(Model.T("admin.newsBanners.create.actionHelp", "Use one of these app targets: {0}. External links must be absolute HTTPS URLs."), string.Join(", ", Model.AppSectionOptions))</div>
             </div>
             <div class="col-6 col-lg-2">
@@ -102,8 +123,41 @@ else
                                         }
                                     </select>
                                 </td>
-                                <td style="min-width: 250px;">
-                                    <input name="actionValue" type="text" maxlength="1024" value="@item.ActionValue" class="form-control form-control-sm" placeholder="https://example.com or profile/deposit" />
+                                <td style="min-width: 320px;">
+                                    <div class="d-grid gap-2">
+                                        <select name="actionAppSection" class="form-select form-select-sm">
+                                            <option value="">@Model.T("admin.newsBanners.create.actionSectionEmpty", "Select app section")</option>
+                                            @foreach (var appSection in Model.AppSectionOptions)
+                                            {
+                                                if (string.Equals(item.ActionType, NewsBannerManagement.ActionTypeAppSection, StringComparison.Ordinal)
+                                                    && string.Equals(item.ActionValue, appSection, StringComparison.Ordinal))
+                                                {
+                                                    <option value="@appSection" selected>@appSection</option>
+                                                }
+                                                else
+                                                {
+                                                    <option value="@appSection">@appSection</option>
+                                                }
+                                            }
+                                        </select>
+                                        <select name="actionOfferId" class="form-select form-select-sm">
+                                            <option value="">@Model.T("admin.newsBanners.create.actionOfferEmpty", "Select active offer")</option>
+                                            @foreach (var offer in Model.AvailableOffers)
+                                            {
+                                                var offerValue = offer.Id.ToString();
+                                                if (string.Equals(item.ActionType, NewsBannerManagement.ActionTypeDiscountedOffer, StringComparison.Ordinal)
+                                                    && string.Equals(item.ActionValue, offerValue, StringComparison.Ordinal))
+                                                {
+                                                    <option value="@offer.Id" selected>@string.Format(Model.T("admin.newsBanners.offer.option", "Offer #{0} · Draw #{1} · {2} tickets · {3}"), offer.Id, offer.DrawId, offer.NumberOfDiscountedTickets, offer.Cost.ToString("0.00"))</option>
+                                                }
+                                                else
+                                                {
+                                                    <option value="@offer.Id">@string.Format(Model.T("admin.newsBanners.offer.option", "Offer #{0} · Draw #{1} · {2} tickets · {3}"), offer.Id, offer.DrawId, offer.NumberOfDiscountedTickets, offer.Cost.ToString("0.00"))</option>
+                                                }
+                                            }
+                                        </select>
+                                        <input name="actionExternalUrl" type="url" maxlength="1024" value="@(string.Equals(item.ActionType, NewsBannerManagement.ActionTypeExternalUrl, StringComparison.Ordinal) ? item.ActionValue : null)" class="form-control form-control-sm" placeholder="https://example.com" />
+                                    </div>
                                 </td>
                                 <td style="max-width: 110px;">
                                     <input name="displayOrder" type="number" min="0" step="1" value="@item.DisplayOrder" class="form-control form-control-sm" />

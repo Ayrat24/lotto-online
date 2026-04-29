@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using MiniApp.Features.Offers;
 using MiniApp.Features.Payments;
 
 namespace MiniApp.Data;
@@ -66,7 +67,7 @@ public sealed class WalletService : IWalletService
         return user.Balance;
     }
 
-    public async Task<WalletBatchPurchaseResult> TryPurchaseTicketsAsync(long userId, long drawId, IReadOnlyList<string> numbersByTicket, CancellationToken ct)
+    public async Task<WalletBatchPurchaseResult> TryPurchaseTicketsAsync(long userId, long drawId, IReadOnlyList<string> numbersByTicket, long? offerId, CancellationToken ct)
     {
         if (numbersByTicket.Count == 0)
             return new WalletBatchPurchaseResult(false, 0m, 0m, "Select at least one ticket first.");
@@ -80,6 +81,32 @@ public sealed class WalletService : IWalletService
 
         if (draw.TicketCost <= 0)
             return new WalletBatchPurchaseResult(false, 0m, 0m, "Ticket cost is not configured for this draw.");
+
+        DiscountedTicketOffer? offer = null;
+        if (offerId.HasValue)
+        {
+            offer = await _db.DiscountedTicketOffers
+                .Include(x => x.Draw)
+                .SingleOrDefaultAsync(x => x.Id == offerId.Value, ct);
+
+            if (offer is null)
+                return new WalletBatchPurchaseResult(false, 0m, 0m, "Discounted offer was not found.");
+
+            if (offer.DrawId != draw.Id)
+                return new WalletBatchPurchaseResult(false, 0m, 0m, "Discounted offer does not belong to the selected draw.");
+
+            if (!DiscountedTicketOfferManagement.IsAvailable(offer, draw, DateTimeOffset.UtcNow))
+                return new WalletBatchPurchaseResult(false, 0m, 0m, "Discounted offer is not available right now.");
+
+            if (numbersByTicket.Count != offer.NumberOfDiscountedTickets)
+            {
+                return new WalletBatchPurchaseResult(
+                    false,
+                    0m,
+                    DiscountedTicketOfferManagement.RoundMoney(offer.Cost),
+                    $"Discounted offer requires exactly {offer.NumberOfDiscountedTickets} tickets.");
+            }
+        }
 
         var user = await _db.Users.SingleOrDefaultAsync(x => x.Id == userId, ct);
         if (user is null)
@@ -114,7 +141,9 @@ public sealed class WalletService : IWalletService
             return new WalletBatchPurchaseResult(false, user.Balance, 0m, "One of the selected tickets was already purchased for the selected draw.");
 
         var costPerTicket = RoundAmount(draw.TicketCost);
-        var totalCost = RoundAmount(costPerTicket * requestedNumbers.Length);
+        var totalCost = offer is null
+            ? RoundAmount(costPerTicket * requestedNumbers.Length)
+            : DiscountedTicketOfferManagement.RoundMoney(offer.Cost);
         if (user.Balance < totalCost)
             return new WalletBatchPurchaseResult(false, user.Balance, totalCost, "Insufficient balance.");
 
@@ -129,9 +158,6 @@ public sealed class WalletService : IWalletService
 
         foreach (var (numbers, signature) in requestedNumbers.Zip(requestedSignatures))
         {
-            userBalance = RoundAmount(userBalance - costPerTicket);
-            serverBalance = RoundAmount(serverBalance + costPerTicket);
-
             var ticket = new Ticket
             {
                 UserId = user.Id,
@@ -144,18 +170,24 @@ public sealed class WalletService : IWalletService
 
             createdTickets.Add(ticket);
             _db.Tickets.Add(ticket);
-            _db.WalletTransactions.Add(new WalletTransaction
-            {
-                UserId = user.Id,
-                Type = WalletTransactionType.TicketPurchase,
-                UserDelta = -costPerTicket,
-                UserBalanceAfter = userBalance,
-                ServerDelta = costPerTicket,
-                ServerBalanceAfter = serverBalance,
-                Reference = $"draw:{draw.Id}",
-                CreatedAtUtc = now
-            });
         }
+
+        userBalance = RoundAmount(userBalance - totalCost);
+        serverBalance = RoundAmount(serverBalance + totalCost);
+
+        _db.WalletTransactions.Add(new WalletTransaction
+        {
+            UserId = user.Id,
+            Type = WalletTransactionType.TicketPurchase,
+            UserDelta = -totalCost,
+            UserBalanceAfter = userBalance,
+            ServerDelta = totalCost,
+            ServerBalanceAfter = serverBalance,
+            Reference = offer is null
+                ? $"draw:{draw.Id}"
+                : $"draw:{draw.Id}:offer:{offer.Id}",
+            CreatedAtUtc = now
+        });
 
         user.Balance = userBalance;
         serverWallet.Balance = serverBalance;

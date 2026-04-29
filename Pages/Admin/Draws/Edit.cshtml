@@ -78,6 +78,89 @@ else if (Model.CanEdit)
 
     <div class="card mt-4">
         <div class="card-body">
+            <h5 class="card-title">@Model.T("admin.draws.edit.offers.title", "Discounted ticket offers")</h5>
+            <p class="text-muted mb-3">@Model.T("admin.draws.edit.offers.subtitle", "Create limited bundle pricing for this draw and connect it to news banners.")</p>
+
+            <form method="post" asp-page-handler="CreateOffer" class="row g-3 align-items-end">
+                <input type="hidden" name="ticketPage" value="@Model.TicketsPage" />
+                <input type="hidden" name="ticketNumbers" value="@Model.SelectedTicketNumbers" />
+                <div class="col-md-4">
+                    <label asp-for="OfferNumberOfDiscountedTickets" class="form-label">@Model.T("admin.draws.edit.offers.ticketCount", "Tickets in offer")</label>
+                    <input asp-for="OfferNumberOfDiscountedTickets" type="number" min="1" max="50" step="1" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="OfferCost" class="form-label">@Model.T("admin.draws.edit.offers.cost", "Offer cost")</label>
+                    <input asp-for="OfferCost" type="number" min="0.01" step="0.01" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-outline-primary w-100">@Model.T("admin.draws.edit.offers.create", "Create discounted offer")</button>
+                </div>
+            </form>
+
+            <div class="form-text mt-2">@string.Format(Model.T("admin.draws.edit.offers.hint", "Offer cost must be greater than zero and not exceed the regular total of {0} ticket(s) for this draw."), Model.OfferNumberOfDiscountedTickets)</div>
+
+            @if (Model.Offers.Count == 0)
+            {
+                <div class="alert alert-secondary mt-3 mb-0">@Model.T("admin.draws.edit.offers.empty", "No discounted offers for this draw yet.")</div>
+            }
+            else
+            {
+                <div class="table-responsive mt-3">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                        <tr>
+                            <th>@Model.T("admin.draws.edit.offers.table.id", "Offer Id")</th>
+                            <th>@Model.T("admin.draws.edit.offers.table.ticketCount", "Tickets")</th>
+                            <th>@Model.T("admin.draws.edit.offers.table.cost", "Offer cost")</th>
+                            <th>@Model.T("admin.draws.edit.offers.table.regularTotal", "Regular total")</th>
+                            <th>@Model.T("admin.draws.edit.offers.table.savings", "Savings")</th>
+                            <th>@Model.T("admin.draws.edit.offers.table.status", "Status")</th>
+                            <th>@Model.T("admin.draws.edit.offers.table.updatedUtc", "Updated (UTC)")</th>
+                            <th>@Model.T("admin.draws.edit.offers.table.actions", "Actions")</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var offer in Model.Offers)
+                        {
+                            <tr>
+                                <td><code>@offer.Id</code></td>
+                                <td>@offer.NumberOfDiscountedTickets</td>
+                                <td><code>@offer.Cost.ToString("0.00")</code></td>
+                                <td><code>@offer.RegularTotalCost.ToString("0.00")</code></td>
+                                <td>@offer.Savings.ToString("0.00")</td>
+                                <td>
+                                    <div class="d-flex flex-column gap-1">
+                                        <span class="badge @(offer.IsActive ? "bg-success-subtle text-dark border border-success-subtle" : "bg-secondary-subtle text-dark border border-secondary-subtle")">
+                                            @(offer.IsActive ? Model.T("admin.draws.edit.offers.status.active", "Active") : Model.T("admin.draws.edit.offers.status.inactive", "Inactive"))
+                                        </span>
+                                        <span class="badge @(offer.IsAvailableNow ? "bg-primary-subtle text-dark border border-primary-subtle" : "bg-warning-subtle text-dark border border-warning-subtle")">
+                                            @(offer.IsAvailableNow ? Model.T("admin.draws.edit.offers.status.availableNow", "Available in Mini App") : Model.T("admin.draws.edit.offers.status.unavailableNow", "Not currently available"))
+                                        </span>
+                                    </div>
+                                </td>
+                                <td>@offer.UpdatedAtUtc.ToString("u")</td>
+                                <td>
+                                    <form method="post" asp-page-handler="ToggleOffer" class="d-inline">
+                                        <input type="hidden" name="offerId" value="@offer.Id" />
+                                        <input type="hidden" name="isActive" value="@(!offer.IsActive)" />
+                                        <input type="hidden" name="ticketPage" value="@Model.TicketsPage" />
+                                        <input type="hidden" name="ticketNumbers" value="@Model.SelectedTicketNumbers" />
+                                        <button type="submit" class="btn btn-sm @(offer.IsActive ? "btn-outline-secondary" : "btn-outline-success")">
+                                            @(offer.IsActive ? Model.T("admin.draws.edit.offers.action.deactivate", "Deactivate") : Model.T("admin.draws.edit.offers.action.activate", "Activate"))
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-body">
             <h5 class="card-title">@Model.T("admin.draws.edit.execute.title", "Execute draw")</h5>
             <p class="text-muted mb-3">@Model.T("admin.draws.edit.execute.subtitle", "You can execute using manual numbers or execute with randomized numbers.")</p>
 

@@ -6,7 +6,7 @@ public interface IWalletService
 
     Task<decimal> TopUpUserAsync(long userId, CancellationToken ct);
 
-    Task<WalletBatchPurchaseResult> TryPurchaseTicketsAsync(long userId, long drawId, IReadOnlyList<string> numbersByTicket, CancellationToken ct);
+    Task<WalletBatchPurchaseResult> TryPurchaseTicketsAsync(long userId, long drawId, IReadOnlyList<string> numbersByTicket, long? offerId, CancellationToken ct);
 
     Task<WalletClaimResult> ClaimTicketWinningsAsync(long userId, long ticketId, CancellationToken ct);
 

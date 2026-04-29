@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using MiniApp.Data;
 using MiniApp.Features.Auth;
 using MiniApp.Features.Draws;
+using MiniApp.Features.Offers;
 using MiniApp.TelegramLogin;
 
 namespace MiniApp.Features.Timeline;
@@ -93,6 +94,20 @@ public static class TimelineEndpoints
                 .Select(x => DrawManagement.ToDto(x, nowUtc))
                 .ToArray();
 
+            var activeDrawsById = activeDrawEntities.ToDictionary(x => x.Id);
+            var activeOffers = await db.DiscountedTicketOffers
+                .AsNoTracking()
+                .Where(x => x.IsActive && activeDrawsById.Keys.Contains(x.DrawId))
+                .OrderByDescending(x => x.UpdatedAtUtc)
+                .ThenByDescending(x => x.Id)
+                .ToListAsync(ct);
+
+            var availableOffers = activeOffers
+                .Where(x => activeDrawsById.TryGetValue(x.DrawId, out var offerDraw)
+                    && DiscountedTicketOfferManagement.IsAvailable(x, offerDraw, nowUtc))
+                .Select(DiscountedTicketOfferManagement.ToDto)
+                .ToArray();
+
             var ticketRows = user is null
                 ? new List<Ticket>()
                 : await db.Tickets
@@ -174,7 +189,7 @@ public static class TimelineEndpoints
                 DrawManagement.MinNumber,
                 DrawManagement.MaxNumber);
 
-            var state = new MiniAppStateDto(user?.Balance ?? 0m, nowUtc, currentDraw, activeDraws, activeTicketGroups, currentTickets, history, ticketPurchase);
+            var state = new MiniAppStateDto(user?.Balance ?? 0m, nowUtc, currentDraw, activeDraws, availableOffers, activeTicketGroups, currentTickets, history, ticketPurchase);
             return Results.Ok(new { ok = true, state });
         });
 

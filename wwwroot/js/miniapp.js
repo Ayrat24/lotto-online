@@ -129,7 +129,7 @@
 
   var highlightTicketId = null;
   var lastStateSig = null;
-  var latestState = { balance: 0, serverNowUtc: null, currentDraw: null, activeDraws: [], activeTicketGroups: [], currentTickets: [], history: [], ticketPurchase: null };
+  var latestState = { balance: 0, serverNowUtc: null, currentDraw: null, activeDraws: [], activeOffers: [], activeTicketGroups: [], currentTickets: [], history: [], ticketPurchase: null };
   var selectedActiveDrawId = null;
   var appHasLoadedState = false;
   var initData = null;
@@ -293,6 +293,8 @@
   var ticketSlotsPerPurchaseScreen = 10;
   var purchaseScreenDrawId = null;
   var purchaseScreenDrawSnapshot = null;
+  var purchaseScreenOfferId = null;
+  var purchaseScreenOfferSnapshot = null;
   var purchaseScreenTicketStates = [];
   var activePurchaseScreenTicketIndex = 0;
   var purchaseScreenSubmitting = false;
@@ -345,6 +347,54 @@
 
   function getActiveTicketGroups(state) {
     return (state && Array.isArray(state.activeTicketGroups)) ? state.activeTicketGroups : [];
+  }
+
+  function getActiveOffers(state) {
+    return (state && Array.isArray(state.activeOffers))
+      ? state.activeOffers.filter(function (x) { return !!x; })
+      : [];
+  }
+
+  function findActiveOfferById(state, offerId) {
+    var targetId = Number(offerId || 0);
+    if (!(targetId > 0)) return null;
+
+    var offers = getActiveOffers(state);
+    for (var i = 0; i < offers.length; i++) {
+      if (offers[i] && Number(offers[i].id) === targetId) return offers[i];
+    }
+
+    return null;
+  }
+
+  function getPurchaseScreenOffer() {
+    if (purchaseScreenOfferId == null) return null;
+
+    var offer = findActiveOfferById(latestState, purchaseScreenOfferId);
+    if (offer) {
+      purchaseScreenOfferSnapshot = offer;
+      return offer;
+    }
+
+    if (purchaseScreenOfferSnapshot && Number(purchaseScreenOfferSnapshot.id) === Number(purchaseScreenOfferId) && getActiveOffers(latestState).length === 0) {
+      return purchaseScreenOfferSnapshot;
+    }
+
+    purchaseScreenOfferSnapshot = null;
+    return null;
+  }
+
+  function isOfferPurchaseMode() {
+    return purchaseScreenOfferId != null;
+  }
+
+  function getPurchaseScreenTicketTargetCount() {
+    var offer = getPurchaseScreenOffer() || purchaseScreenOfferSnapshot;
+    if (offer) {
+      return Math.max(1, parseInt(offer.numberOfDiscountedTickets, 10) || 1);
+    }
+
+    return Math.max(1, parseInt(ticketSlotsPerPurchaseScreen, 10) || 10);
   }
 
   function getTicketPurchaseConfig(state) {
@@ -541,6 +591,15 @@
 
     if (value == null || String(value).trim().length === 0) return String(fallback || '');
     return String(value);
+  }
+
+  function formatLocalized(key, fallback) {
+    var template = t(key, fallback);
+    var formatted = String(template || '');
+    for (var i = 2; i < arguments.length; i++) {
+      formatted = formatted.replace(new RegExp('\\{' + (i - 2) + '\\}', 'g'), String(arguments[i]));
+    }
+    return formatted;
   }
 
   function asFiniteNumber(value, fallback) {
@@ -1173,7 +1232,7 @@
 
   function normalizeNewsBannerActionType(actionType) {
     var value = String(actionType || '').trim().toLowerCase();
-    if (value === 'app_section' || value === 'external_url') return value;
+    if (value === 'app_section' || value === 'external_url' || value === 'discounted_offer') return value;
     return 'none';
   }
 
@@ -1191,6 +1250,12 @@
     var actionType = normalizeNewsBannerActionType(banner && banner.actionType);
     var actionValue = getNewsBannerActionValue(banner);
     if (actionType === 'none' || !actionValue) return;
+
+    if (actionType === 'discounted_offer') {
+      var offer = banner && banner.offer ? banner.offer : findActiveOfferById(latestState, actionValue);
+      tryOpenDiscountedOfferPurchaseScreen(offer || actionValue, setTimelineStatus);
+      return;
+    }
 
     if (actionType === 'external_url') {
       openCheckoutLink(actionValue);
@@ -1505,7 +1570,7 @@
   }
 
   function ensurePurchaseScreenTicketStates() {
-    var targetCount = Math.max(1, parseInt(ticketSlotsPerPurchaseScreen, 10) || 10);
+    var targetCount = getPurchaseScreenTicketTargetCount();
     var next = [];
 
     for (var i = 0; i < targetCount; i++) {
@@ -1567,7 +1632,22 @@
   }
 
   function getPurchaseScreenDraw() {
+    var offer = getPurchaseScreenOffer() || purchaseScreenOfferSnapshot;
     var activeDraws = getActiveDraws(latestState);
+
+    if (offer) {
+      for (var offerIndex = 0; offerIndex < activeDraws.length; offerIndex++) {
+        if (activeDraws[offerIndex] && Number(activeDraws[offerIndex].id) === Number(offer.drawId)) {
+          purchaseScreenDrawId = activeDraws[offerIndex].id;
+          purchaseScreenDrawSnapshot = activeDraws[offerIndex];
+          return activeDraws[offerIndex];
+        }
+      }
+
+      purchaseScreenDrawSnapshot = null;
+      return null;
+    }
+
     if (purchaseScreenDrawSnapshot && purchaseScreenDrawId != null && purchaseScreenDrawSnapshot.id === purchaseScreenDrawId) {
       if (isDrawPurchasable(purchaseScreenDrawSnapshot)) {
         return purchaseScreenDrawSnapshot;
@@ -1596,6 +1676,15 @@
     currentDisplayedDrawId = draw.id;
     purchaseScreenDrawId = draw.id;
     purchaseScreenDrawSnapshot = draw;
+  }
+
+  function resolveOfferForPurchase(offerOrId) {
+    if (offerOrId && typeof offerOrId === 'object') {
+      var offerIdFromObject = Number(offerOrId.id || 0);
+      return findActiveOfferById(latestState, offerIdFromObject) || offerOrId;
+    }
+
+    return findActiveOfferById(latestState, offerOrId);
   }
 
   function resolveDrawForPurchase(drawOrId) {
@@ -1644,7 +1733,19 @@
   }
 
   function getPurchaseScreenValidation() {
+    var offer = getPurchaseScreenOffer() || purchaseScreenOfferSnapshot;
     var completed = getCompletedPurchaseTickets();
+    if (offer) {
+      var requiredCount = Math.max(1, parseInt(offer.numberOfDiscountedTickets, 10) || 1);
+      if (completed.length !== requiredCount) {
+        return {
+          ok: false,
+          message: formatLocalized('client.purchaseScreen.offerIncomplete', 'Fill all {0} discounted tickets to unlock this offer.', requiredCount),
+          completedCount: completed.length
+        };
+      }
+    }
+
     if (completed.length === 0) {
       return {
         ok: false,
@@ -1757,6 +1858,11 @@
   }
 
   function getPurchaseScreenTotalCost(draw, validation) {
+    var offer = getPurchaseScreenOffer() || purchaseScreenOfferSnapshot;
+    if (offer) {
+      return roundCurrencyAmount(offer.cost);
+    }
+
     var selectedDraw = draw || getPurchaseScreenDraw();
     if (!selectedDraw) return 0;
 
@@ -1923,10 +2029,18 @@
   }
 
   function syncTicketPurchaseScreenState(draw) {
+    var offer = getPurchaseScreenOffer() || purchaseScreenOfferSnapshot;
+    var offerAvailable = !isOfferPurchaseMode()
+      || !!findActiveOfferById(latestState, purchaseScreenOfferId)
+      || (!!purchaseScreenOfferSnapshot && getActiveOffers(latestState).length === 0);
     var validation = getPurchaseScreenValidation();
     var purchasable = isDrawPurchasable(draw);
     if (!purchaseScreenSubmitting) {
-      if (!draw || !purchasable) {
+      if (isOfferPurchaseMode() && !offerAvailable) {
+        setTicketPurchaseScreenStatus(t('client.purchaseScreen.offerUnavailable', 'This discounted offer is no longer available.'));
+      } else if (offer && !draw) {
+        setTicketPurchaseScreenStatus(t('client.purchaseScreen.offerUnavailable', 'This discounted offer is no longer available.'));
+      } else if (!draw || !purchasable) {
         setTicketPurchaseScreenStatus(getDrawUnavailableMessage(draw));
       } else {
         setTicketPurchaseScreenStatus(validation.ok ? '' : validation.message);
@@ -1934,17 +2048,24 @@
     }
 
     var completedCount = validation.completedCount || 0;
-    var totalCost = draw ? Number(draw.ticketCost || 0) * completedCount : 0;
-    syncTicketPurchaseFooterVisibility(completedCount > 0);
-    if (submitTicketPurchaseLabelEl) submitTicketPurchaseLabelEl.textContent = formatPurchaseTicketsButtonLabel(completedCount);
+    var totalCost = getPurchaseScreenTotalCost(draw, validation);
+    syncTicketPurchaseFooterVisibility(offer ? (validation.ok && offerAvailable) : completedCount > 0);
+    if (submitTicketPurchaseLabelEl) {
+      submitTicketPurchaseLabelEl.textContent = offer
+        ? t('client.purchaseScreen.offerPurchase', 'Purchase offer')
+        : formatPurchaseTicketsButtonLabel(completedCount);
+    }
     if (submitTicketPurchaseCostEl) submitTicketPurchaseCostEl.textContent = formatCurrency(totalCost);
     if (submitTicketPurchaseBtn) {
-      submitTicketPurchaseBtn.disabled = purchaseScreenSubmitting || !validation.ok || !draw || !purchasable;
+      submitTicketPurchaseBtn.disabled = purchaseScreenSubmitting || !validation.ok || !draw || !purchasable || (offer && !offerAvailable);
     }
   }
 
   function setPurchaseScreenSelectedDraw(draw, options) {
     if (!draw) return;
+
+    var offer = getPurchaseScreenOffer();
+    if (offer && Number(draw.id) !== Number(offer.drawId)) return;
 
     var previousDrawId = purchaseScreenDrawId;
     selectDrawForPurchase(draw);
@@ -2165,6 +2286,13 @@
   function renderPurchaseScreenDrawSwitcher(activeDraws, selectedDraw) {
     if (!ticketPurchaseDrawsStripEl) return;
 
+    if (isOfferPurchaseMode()) {
+      ticketPurchaseDrawsStripEl.hidden = true;
+      ticketPurchaseDrawsStripEl.innerHTML = '';
+      purchaseDrawStripRenderSig = '';
+      return;
+    }
+
     var draws = Array.isArray(activeDraws) ? activeDraws.filter(function (x) { return !!x; }) : [];
     ticketPurchaseDrawsStripEl.hidden = draws.length <= 1;
     if (draws.length <= 1) {
@@ -2304,8 +2432,11 @@
     ensurePurchaseScreenTicketStates();
 
     var draw = getPurchaseScreenDraw();
+    var offer = getPurchaseScreenOffer() || purchaseScreenOfferSnapshot;
     if (ticketPurchaseSubtitleEl) {
-      ticketPurchaseSubtitleEl.textContent = t('client.purchaseScreen.subtitle', 'Complete one or more tickets to buy them together.');
+      ticketPurchaseSubtitleEl.textContent = offer && draw
+        ? formatLocalized('client.purchaseScreen.offerSubtitle', 'Complete all {0} discounted tickets for {1} in Draw #{2}.', offer.numberOfDiscountedTickets, formatCurrency(offer.cost), draw.id)
+        : t('client.purchaseScreen.subtitle', 'Complete one or more tickets to buy them together.');
     }
 
     applyPurchaseScreenTheme(draw);
@@ -3508,17 +3639,32 @@
       });
   }
 
-  function openTicketPurchaseScreen(drawOrId) {
+  function openTicketPurchaseScreen(drawOrId, options) {
     if (!ticketPurchaseScreenEl) return;
 
-    var draw = resolveDrawForPurchase(drawOrId != null ? drawOrId : currentDisplayedDrawId);
+    var offer = options && options.offer ? resolveOfferForPurchase(options.offer) : null;
+    if (options && options.offer && !offer) {
+      setPurchaseStatus(t('client.purchaseScreen.offerUnavailable', 'This discounted offer is no longer available.'));
+      return;
+    }
+
+    purchaseScreenOfferId = offer ? Number(offer.id) : null;
+    purchaseScreenOfferSnapshot = offer || null;
+
+    var drawTarget = offer ? offer.drawId : (drawOrId != null ? drawOrId : currentDisplayedDrawId);
+    var draw = resolveDrawForPurchase(drawTarget);
     if (!draw || !isDrawPurchasable(draw)) {
-      setPurchaseStatus(getDrawUnavailableMessage(draw));
+      setPurchaseStatus(offer
+        ? t('client.purchaseScreen.offerUnavailable', 'This discounted offer is no longer available.')
+        : getDrawUnavailableMessage(draw));
+      purchaseScreenOfferId = null;
+      purchaseScreenOfferSnapshot = null;
       return;
     }
 
     selectDrawForPurchase(draw);
     purchaseScreenSubmitting = false;
+    purchaseScreenTicketStates = [];
     ensurePurchaseScreenTicketStates();
     setActivePurchaseScreenTicket(0);
     setTicketPurchaseScreenStatus('');
@@ -3542,12 +3688,29 @@
     return true;
   }
 
+  function tryOpenDiscountedOfferPurchaseScreen(offerOrId, statusSetter) {
+    var setStatus = typeof statusSetter === 'function' ? statusSetter : setPurchaseStatus;
+    if (!ensureSessionReadyForPurchase(setStatus)) return false;
+
+    var offer = resolveOfferForPurchase(offerOrId);
+    if (!offer) {
+      setStatus(t('client.purchaseScreen.offerUnavailable', 'This discounted offer is no longer available.'));
+      return false;
+    }
+
+    setStatus('');
+    openTicketPurchaseScreen(offer.drawId, { offer: offer });
+    return true;
+  }
+
   function closeTicketPurchaseScreen() {
     if (!ticketPurchaseScreenEl) return;
 
     ticketPurchaseScreenEl.hidden = true;
     purchaseScreenDrawId = null;
     purchaseScreenDrawSnapshot = null;
+    purchaseScreenOfferId = null;
+    purchaseScreenOfferSnapshot = null;
     activePurchaseScreenTicketIndex = 0;
     purchaseScreenSubmitting = false;
     setTicketPurchaseScreenStatus('');
@@ -3573,9 +3736,16 @@
   function submitTicketPurchase() {
     if (!ensureSessionReadyForPurchase(setTicketPurchaseScreenStatus)) return;
 
+    var offer = getPurchaseScreenOffer();
     var draw = getPurchaseScreenDraw();
+    if (isOfferPurchaseMode() && !offer) {
+      setTicketPurchaseScreenStatus(t('client.purchaseScreen.offerUnavailable', 'This discounted offer is no longer available.'));
+      return;
+    }
     if (!draw || !isDrawPurchasable(draw)) {
-      setTicketPurchaseScreenStatus(getDrawUnavailableMessage(draw));
+      setTicketPurchaseScreenStatus(offer
+        ? t('client.purchaseScreen.offerUnavailable', 'This discounted offer is no longer available.')
+        : getDrawUnavailableMessage(draw));
       return;
     }
 
@@ -3604,7 +3774,8 @@
     postJson('/api/tickets/purchase', {
       initData: initData || '',
       drawId: draw.id,
-      tickets: completedTickets
+      tickets: completedTickets,
+      offerId: isOfferPurchaseMode() ? purchaseScreenOfferId : null
     }, null)
       .then(function (res) {
         if (!(res && res.ok && Array.isArray(res.tickets))) {
@@ -3755,6 +3926,14 @@
             canPurchase: !!draw.canPurchase
           };
         }),
+        activeOffers: (state && state.activeOffers || []).map(function (offer) {
+          return {
+            id: offer.id,
+            drawId: offer.drawId,
+            numberOfDiscountedTickets: Number(offer.numberOfDiscountedTickets || 0),
+            cost: Number(offer.cost || 0)
+          };
+        }),
         activeTicketGroups: (state && state.activeTicketGroups || []).map(function (group) {
           return {
             drawId: group.drawId,
@@ -3819,7 +3998,7 @@
   }
 
   function applyState(state) {
-    latestState = state || { balance: 0, serverNowUtc: null, currentDraw: null, activeDraws: [], activeTicketGroups: [], currentTickets: [], history: [], ticketPurchase: null };
+    latestState = state || { balance: 0, serverNowUtc: null, currentDraw: null, activeDraws: [], activeOffers: [], activeTicketGroups: [], currentTickets: [], history: [], ticketPurchase: null };
     syncServerClock(latestState.serverNowUtc);
 
     var purchaseConfig = getTicketPurchaseConfig(latestState);

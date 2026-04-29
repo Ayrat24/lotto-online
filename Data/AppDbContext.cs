@@ -20,6 +20,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<ReferralProgramSettings> ReferralProgramSettings => Set<ReferralProgramSettings>();
     public DbSet<ReferralReward> ReferralRewards => Set<ReferralReward>();
     public DbSet<NewsBanner> NewsBanners => Set<NewsBanner>();
+    public DbSet<DiscountedTicketOffer> DiscountedTicketOffers => Set<DiscountedTicketOffer>();
     public DbSet<WinnerEntry> WinnerEntries => Set<WinnerEntry>();
     public DbSet<TicketPurchaseSettings> TicketPurchaseSettings => Set<TicketPurchaseSettings>();
 
@@ -195,6 +196,26 @@ public sealed class AppDbContext : DbContext
             b.Property(x => x.PurchaseClosesAtUtc).IsRequired();
             b.Property(x => x.Numbers).HasMaxLength(64);
             b.Property(x => x.CreatedAtUtc).IsRequired();
+        });
+
+        modelBuilder.Entity<DiscountedTicketOffer>(b =>
+        {
+            b.ToTable("discounted_ticket_offers");
+            b.HasKey(x => x.Id);
+
+            b.HasOne(x => x.Draw)
+                .WithMany()
+                .HasForeignKey(x => x.DrawId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasIndex(x => new { x.DrawId, x.IsActive, x.UpdatedAtUtc });
+            b.HasIndex(x => new { x.IsActive, x.UpdatedAtUtc });
+
+            b.Property(x => x.NumberOfDiscountedTickets).IsRequired();
+            b.Property(x => x.Cost).HasPrecision(18, 2).IsRequired();
+            b.Property(x => x.IsActive).IsRequired().HasDefaultValue(true);
+            b.Property(x => x.CreatedAtUtc).IsRequired();
+            b.Property(x => x.UpdatedAtUtc).IsRequired();
         });
 
         modelBuilder.Entity<Ticket>(b =>

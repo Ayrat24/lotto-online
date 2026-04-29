@@ -1,4 +1,5 @@
 using MiniApp.Features.Draws;
+using MiniApp.Features.Offers;
 
 namespace MiniApp.Features.Timeline;
 
@@ -9,6 +10,7 @@ public sealed record MiniAppStateDto(
     DateTimeOffset ServerNowUtc,
     DrawDto? CurrentDraw,
     IReadOnlyList<DrawDto> ActiveDraws,
+    IReadOnlyList<DiscountedTicketOfferDto> ActiveOffers,
     IReadOnlyList<DrawGroupDto> ActiveTicketGroups,
     IReadOnlyList<TicketForDrawDto> CurrentTickets,
     IReadOnlyList<DrawGroupDto> History,

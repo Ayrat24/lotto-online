@@ -6,6 +6,7 @@ using MiniApp.Data;
 using MiniApp.Features.Auth;
 using MiniApp.Features.Draws;
 using MiniApp.Features.Localization;
+using MiniApp.Features.Offers;
 
 namespace MiniApp.Pages.Admin.Draws;
 
@@ -14,6 +15,10 @@ public sealed class EditModel : LocalizedAdminPageModel
 {
     public sealed record DrawTicketRow(string Numbers, long SelectionCount);
     public sealed record DrawTicketUserRow(long UserId, long TelegramUserId, string? Number, long TicketCount, DateTimeOffset LastPurchasedAtUtc);
+    public sealed record DiscountedOfferRow(long Id, int NumberOfDiscountedTickets, decimal Cost, decimal RegularTotalCost, bool IsActive, bool IsAvailableNow, DateTimeOffset CreatedAtUtc, DateTimeOffset UpdatedAtUtc)
+    {
+        public decimal Savings => decimal.Round(Math.Max(0m, RegularTotalCost - Cost), 2, MidpointRounding.AwayFromZero);
+    }
 
     private readonly AppDbContext _db;
     private readonly IConfiguration _config;
@@ -34,6 +39,7 @@ public sealed class EditModel : LocalizedAdminPageModel
 
     public IReadOnlyList<DrawTicketRow> Tickets { get; private set; } = Array.Empty<DrawTicketRow>();
     public IReadOnlyList<DrawTicketUserRow> TicketUsers { get; private set; } = Array.Empty<DrawTicketUserRow>();
+    public IReadOnlyList<DiscountedOfferRow> Offers { get; private set; } = Array.Empty<DiscountedOfferRow>();
     public string? SelectedTicketNumbers { get; private set; }
     public int TicketsPage { get; private set; } = 1;
     public int TicketsTotalPages { get; private set; }
@@ -65,6 +71,12 @@ public sealed class EditModel : LocalizedAdminPageModel
     [BindProperty]
     public string? ExecuteNumbers { get; set; }
 
+    [BindProperty]
+    public int OfferNumberOfDiscountedTickets { get; set; } = 1;
+
+    [BindProperty]
+    public decimal OfferCost { get; set; }
+
     public string? StatusMessage { get; private set; }
     public bool StatusIsError { get; private set; }
 
@@ -79,6 +91,12 @@ public sealed class EditModel : LocalizedAdminPageModel
         await LoadUiTextAsync(ct);
         await EnsureDebugSeedAsync(ct);
 
+        if (!string.IsNullOrWhiteSpace(FlashMessage))
+        {
+            StatusMessage = FlashMessage;
+            StatusIsError = FlashIsError ?? false;
+        }
+
         SelectedDraw = await _db.Draws
             .AsNoTracking()
             .SingleOrDefaultAsync(x => x.Id == id, ct);
@@ -86,13 +104,7 @@ public sealed class EditModel : LocalizedAdminPageModel
         if (SelectedDraw is null)
             return;
 
-        PrizePoolMatch3 = SelectedDraw.PrizePoolMatch3;
-        PrizePoolMatch4 = SelectedDraw.PrizePoolMatch4;
-        PrizePoolMatch5 = SelectedDraw.PrizePoolMatch5;
-        TicketCost = SelectedDraw.TicketCost;
-        CardColor = DrawManagement.NormalizeCardColor(SelectedDraw.CardColor);
-        PurchaseClosesAtUtc = DrawManagement.FormatAdminUtcInput(SelectedDraw.PurchaseClosesAtUtc);
-        State = DrawManagement.ToStateValue(SelectedDraw.State);
+        ApplyDrawValues(SelectedDraw);
 
         if (SelectedDraw.State == DrawState.Finished)
         {
@@ -101,6 +113,7 @@ public sealed class EditModel : LocalizedAdminPageModel
         }
 
         await SafeLoadTicketsAsync(id, ticketPage, ticketNumbers, ct);
+        await LoadOffersAsync(id, ct);
     }
 
     public async Task<IActionResult> OnPostAsync(long id, int ticketPage = 1, string? ticketNumbers = null, CancellationToken ct = default)
@@ -118,6 +131,7 @@ public sealed class EditModel : LocalizedAdminPageModel
             StatusIsError = true;
             SelectedDraw = draw;
             await SafeLoadTicketsAsync(id, ticketPage, ticketNumbers, ct);
+            await LoadOffersAsync(id, ct);
             return Page();
         }
 
@@ -127,6 +141,7 @@ public sealed class EditModel : LocalizedAdminPageModel
             StatusIsError = true;
             SelectedDraw = draw;
             await SafeLoadTicketsAsync(id, ticketPage, ticketNumbers, ct);
+            await LoadOffersAsync(id, ct);
             return Page();
         }
 
@@ -144,6 +159,93 @@ public sealed class EditModel : LocalizedAdminPageModel
             StatusIsError = true;
             SelectedDraw = draw;
             await SafeLoadTicketsAsync(id, ticketPage, ticketNumbers, ct);
+            await LoadOffersAsync(id, ct);
+            return Page();
+        }
+    }
+
+    public async Task<IActionResult> OnPostCreateOfferAsync(long id, int ticketPage = 1, string? ticketNumbers = null, CancellationToken ct = default)
+    {
+        await LoadUiTextAsync(ct);
+        await EnsureDebugSeedAsync(ct);
+
+        var draw = await _db.Draws.SingleOrDefaultAsync(x => x.Id == id, ct);
+        if (draw is null)
+            return NotFound();
+
+        try
+        {
+            DiscountedTicketOfferManagement.ValidateForDraw(draw, OfferNumberOfDiscountedTickets, OfferCost);
+
+            var nowUtc = DateTimeOffset.UtcNow;
+            _db.DiscountedTicketOffers.Add(new DiscountedTicketOffer
+            {
+                DrawId = draw.Id,
+                NumberOfDiscountedTickets = OfferNumberOfDiscountedTickets,
+                Cost = DiscountedTicketOfferManagement.RoundMoney(OfferCost),
+                IsActive = true,
+                CreatedAtUtc = nowUtc,
+                UpdatedAtUtc = nowUtc
+            });
+
+            await _db.SaveChangesAsync(ct);
+            FlashMessage = await GetTextAsync("admin.draws.edit.offers.flash.created", "Discounted offer created.", ct);
+            FlashIsError = false;
+            return RedirectToPage(new { id, ticketPage, ticketNumbers });
+        }
+        catch (InvalidOperationException ex)
+        {
+            StatusMessage = ex.Message;
+            StatusIsError = true;
+            SelectedDraw = draw;
+            ApplyDrawValues(draw);
+            await SafeLoadTicketsAsync(id, ticketPage, ticketNumbers, ct);
+            await LoadOffersAsync(id, ct);
+            return Page();
+        }
+    }
+
+    public async Task<IActionResult> OnPostToggleOfferAsync(long id, long offerId, bool isActive, int ticketPage = 1, string? ticketNumbers = null, CancellationToken ct = default)
+    {
+        await LoadUiTextAsync(ct);
+        await EnsureDebugSeedAsync(ct);
+
+        var draw = await _db.Draws.SingleOrDefaultAsync(x => x.Id == id, ct);
+        if (draw is null)
+            return NotFound();
+
+        var offer = await _db.DiscountedTicketOffers.SingleOrDefaultAsync(x => x.Id == offerId && x.DrawId == id, ct);
+        if (offer is null)
+        {
+            FlashMessage = await GetTextAsync("admin.draws.edit.offers.flash.notFound", "Discounted offer was not found.", ct);
+            FlashIsError = true;
+            return RedirectToPage(new { id, ticketPage, ticketNumbers });
+        }
+
+        try
+        {
+            if (isActive)
+                DiscountedTicketOfferManagement.ValidateForDraw(draw, offer.NumberOfDiscountedTickets, offer.Cost);
+
+            offer.IsActive = isActive;
+            offer.UpdatedAtUtc = DateTimeOffset.UtcNow;
+            await _db.SaveChangesAsync(ct);
+
+            FlashMessage = await GetTextAsync(
+                isActive ? "admin.draws.edit.offers.flash.activated" : "admin.draws.edit.offers.flash.deactivated",
+                isActive ? "Discounted offer activated." : "Discounted offer deactivated.",
+                ct);
+            FlashIsError = false;
+            return RedirectToPage(new { id, ticketPage, ticketNumbers });
+        }
+        catch (InvalidOperationException ex)
+        {
+            StatusMessage = ex.Message;
+            StatusIsError = true;
+            SelectedDraw = draw;
+            ApplyDrawValues(draw);
+            await SafeLoadTicketsAsync(id, ticketPage, ticketNumbers, ct);
+            await LoadOffersAsync(id, ct);
             return Page();
         }
     }
@@ -171,16 +273,58 @@ public sealed class EditModel : LocalizedAdminPageModel
             StatusMessage = ex.Message;
             StatusIsError = true;
             SelectedDraw = draw;
-            PrizePoolMatch3 = draw.PrizePoolMatch3;
-            PrizePoolMatch4 = draw.PrizePoolMatch4;
-            PrizePoolMatch5 = draw.PrizePoolMatch5;
-            TicketCost = draw.TicketCost;
-            CardColor = DrawManagement.NormalizeCardColor(draw.CardColor);
-            PurchaseClosesAtUtc = DrawManagement.FormatAdminUtcInput(draw.PurchaseClosesAtUtc);
-            State = DrawManagement.ToStateValue(draw.State);
+            ApplyDrawValues(draw);
             await SafeLoadTicketsAsync(id, ticketPage, ticketNumbers, ct);
+            await LoadOffersAsync(id, ct);
             return Page();
         }
+    }
+
+    private void ApplyDrawValues(Draw draw)
+    {
+        PrizePoolMatch3 = draw.PrizePoolMatch3;
+        PrizePoolMatch4 = draw.PrizePoolMatch4;
+        PrizePoolMatch5 = draw.PrizePoolMatch5;
+        TicketCost = draw.TicketCost;
+        CardColor = DrawManagement.NormalizeCardColor(draw.CardColor);
+        PurchaseClosesAtUtc = DrawManagement.FormatAdminUtcInput(draw.PurchaseClosesAtUtc);
+        State = DrawManagement.ToStateValue(draw.State);
+
+        if (OfferNumberOfDiscountedTickets < 1)
+            OfferNumberOfDiscountedTickets = 1;
+        if (OfferCost <= 0)
+            OfferCost = draw.TicketCost;
+    }
+
+    private async Task LoadOffersAsync(long drawId, CancellationToken ct)
+    {
+        var nowUtc = DateTimeOffset.UtcNow;
+        var draw = SelectedDraw ?? await _db.Draws.AsNoTracking().SingleOrDefaultAsync(x => x.Id == drawId, ct);
+        if (draw is null)
+        {
+            Offers = Array.Empty<DiscountedOfferRow>();
+            return;
+        }
+
+        var offers = await _db.DiscountedTicketOffers
+            .AsNoTracking()
+            .Where(x => x.DrawId == drawId)
+            .OrderByDescending(x => x.IsActive)
+            .ThenByDescending(x => x.UpdatedAtUtc)
+            .ThenByDescending(x => x.Id)
+            .ToListAsync(ct);
+
+        Offers = offers
+            .Select(x => new DiscountedOfferRow(
+                x.Id,
+                x.NumberOfDiscountedTickets,
+                x.Cost,
+                DiscountedTicketOfferManagement.GetRegularTotal(draw.TicketCost, x.NumberOfDiscountedTickets),
+                x.IsActive,
+                DiscountedTicketOfferManagement.IsAvailable(x, draw, nowUtc),
+                x.CreatedAtUtc,
+                x.UpdatedAtUtc))
+            .ToArray();
     }
 
     private async Task SafeLoadTicketsAsync(long drawId, int requestedPage, string? ticketNumbers, CancellationToken ct)

@@ -140,7 +140,7 @@ public static class TicketsEndpoints
             if (!TryNormalizeSelectedTickets(req.Tickets, out var normalizedTickets, out var validationError))
                 return Results.BadRequest(new { ok = false, error = validationError });
 
-            var purchaseResult = await wallet.TryPurchaseTicketsAsync(u.Id, req.DrawId, normalizedTickets, ct);
+            var purchaseResult = await wallet.TryPurchaseTicketsAsync(u.Id, req.DrawId, normalizedTickets, req.OfferId, ct);
             if (!purchaseResult.Success || purchaseResult.Tickets is null)
                 return Results.BadRequest(new
                 {

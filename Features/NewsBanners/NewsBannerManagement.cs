@@ -1,5 +1,6 @@
 using System.Text;
 using MiniApp.Data;
+using MiniApp.Features.Offers;
 
 namespace MiniApp.Features.NewsBanners;
 
@@ -11,12 +12,14 @@ public static class NewsBannerManagement
     public const string ActionTypeNone = "none";
     public const string ActionTypeAppSection = "app_section";
     public const string ActionTypeExternalUrl = "external_url";
+    public const string ActionTypeDiscountedOffer = "discounted_offer";
 
     private static readonly HashSet<string> SupportedActionTypes = new(StringComparer.Ordinal)
     {
         ActionTypeNone,
         ActionTypeAppSection,
-        ActionTypeExternalUrl
+        ActionTypeExternalUrl,
+        ActionTypeDiscountedOffer
     };
 
     private static readonly HashSet<string> SupportedAppSections = new(StringComparer.Ordinal)
@@ -44,12 +47,34 @@ public static class NewsBannerManagement
         "image/pjpeg"
     };
 
-    public static NewsBannerDto ToDto(NewsBanner banner)
-        => new(
+    public static NewsBannerDto ToDto(NewsBanner banner, DiscountedTicketOfferDto? offer = null)
+    {
+        var normalizedType = NormalizeStoredActionType(banner.ActionType);
+        if (normalizedType == ActionTypeDiscountedOffer)
+        {
+            if (offer is null)
+            {
+                return new NewsBannerDto(
+                    banner.Id,
+                    banner.ImagePath,
+                    ActionTypeNone,
+                    null);
+            }
+
+            return new NewsBannerDto(
+                banner.Id,
+                banner.ImagePath,
+                ActionTypeDiscountedOffer,
+                offer.Id.ToString(),
+                offer);
+        }
+
+        return new NewsBannerDto(
             banner.Id,
             banner.ImagePath,
-            NormalizeStoredActionType(banner.ActionType),
+            normalizedType,
             NormalizeStoredActionValue(banner.ActionType, banner.ActionValue));
+    }
 
     public static IReadOnlyList<string> GetSupportedAppSections()
         => SupportedAppSections.OrderBy(x => x, StringComparer.Ordinal).ToArray();
@@ -113,6 +138,18 @@ public static class NewsBannerManagement
             return true;
         }
 
+        if (normalizedActionType == ActionTypeDiscountedOffer)
+        {
+            if (!long.TryParse(trimmedValue, out var offerId) || offerId <= 0)
+            {
+                validationErrorCode = "invalid_discounted_offer";
+                return false;
+            }
+
+            normalizedActionValue = offerId.ToString();
+            return true;
+        }
+
         if (!Uri.TryCreate(trimmedValue, UriKind.Absolute, out var absoluteUri)
             || !string.Equals(absoluteUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
         {
@@ -141,11 +178,11 @@ public static class NewsBannerManagement
         if (imageFile.Length > MaxUploadBytes)
             return new NewsBannerImageSaveResult(false, null, NewsBannerImageError.FileTooLarge);
 
-        var extension = Path.GetExtension(imageFile.FileName ?? string.Empty);
+        var extension = Path.GetExtension(imageFile.FileName);
         if (!AllowedExtensions.Contains(extension))
             return new NewsBannerImageSaveResult(false, null, NewsBannerImageError.InvalidType);
 
-        var contentType = imageFile.ContentType?.Trim() ?? string.Empty;
+        var contentType = imageFile.ContentType.Trim();
         if (contentType.Length > 0 && !AllowedContentTypes.Contains(contentType))
             return new NewsBannerImageSaveResult(false, null, NewsBannerImageError.InvalidType);
 
@@ -210,7 +247,7 @@ public static class NewsBannerManagement
         width = 0;
         height = 0;
 
-        if (stream is null || !stream.CanRead)
+        if (!stream.CanRead)
             return false;
 
         if (stream.CanSeek)

@@ -2,7 +2,7 @@ namespace MiniApp.Features.Tickets;
 
 public sealed record InitDataRequest(string InitData);
 
-public sealed record PurchaseTicketsRequest(string InitData, long DrawId, IReadOnlyList<IReadOnlyList<int>>? Tickets);
+public sealed record PurchaseTicketsRequest(string InitData, long DrawId, IReadOnlyList<IReadOnlyList<int>>? Tickets, long? OfferId = null);
 
 public sealed record ClaimTicketRequest(string InitData, long TicketId);
 
