@@ -1324,10 +1324,28 @@ body.app-loading .loading-shell {
 }
 
 .ticket {
+  position: relative;
   background: linear-gradient(180deg, #121a29, #0f1725);
   border: 1px solid var(--line);
   border-radius: 16px;
   padding: 14px;
+}
+
+.ticket-new-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+  min-width: 44px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ff587d, #df234f);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  box-shadow: 0 8px 18px rgba(223, 35, 79, 0.34);
 }
 
 .jackpot-buy-row,
@@ -1723,6 +1741,25 @@ body.app-loading .loading-shell {
 .purchase-screen-subtitle {
   font-size: 0.92rem;
   line-height: 1.4;
+}
+
+.purchase-screen-bulk-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.purchase-screen-bulk-btn {
+  width: auto;
+  min-height: 38px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #fff6c8;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 .purchase-screen-close-btn {

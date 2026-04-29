@@ -113,6 +113,8 @@
   var ticketPurchasePanelEl = document.getElementById('ticketPurchasePanel');
   var closeTicketPurchaseScreenBtn = document.getElementById('closeTicketPurchaseScreenBtn');
   var ticketPurchaseSubtitleEl = document.getElementById('ticketPurchaseSubtitle');
+  var ticketPurchaseBulkActionsEl = document.getElementById('ticketPurchaseBulkActions');
+  var randomizeAllOfferTicketsBtn = document.getElementById('randomizeAllOfferTicketsBtn');
   var ticketPurchaseDrawsStripEl = document.getElementById('ticketPurchaseDrawsStrip');
   var ticketPurchaseScreenStatusEl = document.getElementById('ticketPurchaseScreenStatus');
   var ticketPurchaseTicketsListEl = document.getElementById('ticketPurchaseTicketsList');
@@ -298,6 +300,7 @@
   var purchaseScreenTicketStates = [];
   var activePurchaseScreenTicketIndex = 0;
   var purchaseScreenSubmitting = false;
+  var newTicketIds = {};
   var pollingIntervalId = null;
   var countdownIntervalId = null;
   var serverClockOffsetMs = 0;
@@ -1789,6 +1792,45 @@
     setPurchaseScreenTicketNumbers(index, getRandomTicketNumbers());
   }
 
+  function randomizeAllPurchaseScreenTickets() {
+    ensurePurchaseScreenTicketStates();
+    if (purchaseScreenTicketStates.length === 0) return;
+
+    var usedSignatures = {};
+    for (var i = 0; i < purchaseScreenTicketStates.length; i++) {
+      var numbers = getRandomTicketNumbers();
+      var signature = numbers.join(',');
+      while (usedSignatures[signature]) {
+        numbers = getRandomTicketNumbers();
+        signature = numbers.join(',');
+      }
+
+      usedSignatures[signature] = true;
+      purchaseScreenTicketStates[i].numbers = numbers;
+    }
+
+    renderTicketPurchaseScreen();
+  }
+
+  function markPurchasedTicketsAsNew(ticketIds) {
+    newTicketIds = {};
+    (ticketIds || []).forEach(function (ticketId) {
+      var normalizedTicketId = Number(ticketId || 0);
+      if (normalizedTicketId > 0) {
+        newTicketIds[normalizedTicketId] = true;
+      }
+    });
+  }
+
+  function isNewTicket(ticketId) {
+    var normalizedTicketId = Number(ticketId || 0);
+    return normalizedTicketId > 0 && !!newTicketIds[normalizedTicketId];
+  }
+
+  function clearNewTicketBadges() {
+    newTicketIds = {};
+  }
+
   function togglePurchaseScreenNumber(index, number) {
     if (index < 0 || index >= purchaseScreenTicketStates.length) return;
 
@@ -2433,6 +2475,12 @@
 
     var draw = getPurchaseScreenDraw();
     var offer = getPurchaseScreenOffer() || purchaseScreenOfferSnapshot;
+    if (ticketPurchaseBulkActionsEl) {
+      ticketPurchaseBulkActionsEl.hidden = !offer;
+    }
+    if (randomizeAllOfferTicketsBtn) {
+      randomizeAllOfferTicketsBtn.disabled = purchaseScreenSubmitting || !offer;
+    }
     if (ticketPurchaseSubtitleEl) {
       ticketPurchaseSubtitleEl.textContent = offer && draw
         ? formatLocalized('client.purchaseScreen.offerSubtitle', 'Complete all {0} discounted tickets for {1} in Draw #{2}.', offer.numberOfDiscountedTickets, formatCurrency(offer.cost), draw.id)
@@ -2491,6 +2539,13 @@
   function createTicketEl(ticket, draw) {
     var el = document.createElement('div');
     el.className = 'ticket';
+
+    if (isNewTicket(ticket && ticket.id)) {
+      var newBadge = document.createElement('div');
+      newBadge.className = 'ticket-new-badge';
+      newBadge.textContent = t('client.ticket.newBadge', 'New');
+      el.appendChild(newBadge);
+    }
 
     if (highlightTicketId && ticket && ticket.id === highlightTicketId) {
       el.classList.add('enter');
@@ -3581,9 +3636,15 @@
 
   function setActiveTab(name) {
     var tab = name || 'lottery';
+    var previousTab = activeTabName;
     if (ticketPurchaseScreenEl && !ticketPurchaseScreenEl.hidden) {
       closeTicketPurchaseScreen();
     }
+
+    if (previousTab === 'tickets' && tab !== 'tickets') {
+      clearNewTicketBadges();
+    }
+
     activeTabName = tab;
     var isLottery = tab === 'lottery';
     var isTickets = tab === 'tickets';
@@ -3783,6 +3844,7 @@
           return;
         }
 
+        markPurchasedTicketsAsNew(res.tickets.map(function (ticket) { return ticket && ticket.id; }));
         if (res.tickets.length > 0) {
           highlightTicketId = res.tickets[0].id;
         }
@@ -3790,7 +3852,13 @@
         purchaseScreenTicketStates = [];
         ensurePurchaseScreenTicketStates();
         closeTicketPurchaseScreen();
-        return refreshState();
+        return Promise.resolve(refreshState())
+          .catch(function () {
+            return null;
+          })
+          .then(function () {
+            setActiveTab('tickets');
+          });
       })
       .catch(function (err) {
         var message = err && err.message ? err.message : t('client.status.purchaseFailed', 'Purchase failed.');
@@ -4596,6 +4664,7 @@
   if (winnersTabBtn) winnersTabBtn.addEventListener('click', function () { setActiveTab('winners'); });
   if (profileTabBtn) profileTabBtn.addEventListener('click', function () { setActiveTab('profile'); });
   if (closeTicketPurchaseScreenBtn) closeTicketPurchaseScreenBtn.addEventListener('click', closeTicketPurchaseScreen);
+  if (randomizeAllOfferTicketsBtn) randomizeAllOfferTicketsBtn.addEventListener('click', randomizeAllPurchaseScreenTickets);
   if (submitTicketPurchaseBtn) submitTicketPurchaseBtn.addEventListener('click', submitTicketPurchase);
   if (centerPopupTopUpBtn) centerPopupTopUpBtn.addEventListener('click', function () {
     var action = centerPopupTopUpAction;
