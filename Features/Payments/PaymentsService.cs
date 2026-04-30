@@ -883,7 +883,7 @@ public sealed class PaymentsService : IPaymentsService
         {
             recentTransfers = await _telegramTon.GetRecentIncomingTransfersAsync(new TelegramTonRecentTransfersRequest(
                 deposit.DestinationAddress!,
-                Math.Clamp(Math.Min(_options.TelegramTon.TransactionSearchLimit, TonDiagnosticsRecentTransferDisplayLimit), 1, 100),
+                Math.Clamp(Math.Max(_options.TelegramTon.TransactionSearchLimit, TonDiagnosticsRecentTransferDisplayLimit), 1, 100),
                 _options.TelegramTon.ExplorerBaseUrl), ct);
         }
 
@@ -936,6 +936,7 @@ public sealed class PaymentsService : IPaymentsService
             deposit.CreditedAtUtc,
             creditReference,
             walletTransactionExists,
+            lookup is not null,
             lookup?.Success ?? false,
             lookup?.TransferFound ?? false,
             lookup?.Error,
@@ -944,6 +945,8 @@ public sealed class PaymentsService : IPaymentsService
             lookup?.ObservedAtUtc,
             lookup?.ExplorerLink,
             lookup?.SenderAddress,
+            canInspectWalletTransfers,
+            recentTransfers?.RawTransactionCount ?? 0,
             recentTransfers is { Success: false } ? recentTransfers.Error : null,
             recentTransferViews);
     }

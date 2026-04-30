@@ -43,7 +43,8 @@ public sealed record TelegramTonIncomingTransferView(
 public sealed record TelegramTonRecentTransfersResult(
     bool Success,
     string? Error = null,
-    IReadOnlyList<TelegramTonIncomingTransferView>? Transfers = null);
+    IReadOnlyList<TelegramTonIncomingTransferView>? Transfers = null,
+    int RawTransactionCount = 0);
 
 public sealed record TelegramTonUsdRateQuote(
     decimal UsdPerTon,

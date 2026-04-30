@@ -28,12 +28,7 @@ public sealed class TelegramTonClient : ITelegramTonClient
 
 		var expectedNanotons = ToNanotons(request.ExpectedTonAmount);
 		var toleranceNanotons = ToNanotons(GetDepositMatchToleranceTon());
-
-		var baseUrl = _options.TelegramTon.ApiBaseUrl.Trim();
-		if (baseUrl.Length == 0)
-			baseUrl = "https://toncenter.com/api/v2/";
-		if (!baseUrl.EndsWith("/", StringComparison.Ordinal))
-			baseUrl += "/";
+		var baseUrl = GetNormalizedApiBaseUrl();
 
 		var limit = Math.Clamp(request.SearchLimit, 1, 100);
 
@@ -88,11 +83,7 @@ public sealed class TelegramTonClient : ITelegramTonClient
 		if (walletAddress.Length == 0)
 			return new TelegramTonRecentTransfersResult(false, "TON wallet address is required.");
 
-		var baseUrl = _options.TelegramTon.ApiBaseUrl.Trim();
-		if (baseUrl.Length == 0)
-			baseUrl = "https://toncenter.com/api/v2/";
-		if (!baseUrl.EndsWith("/", StringComparison.Ordinal))
-			baseUrl += "/";
+		var baseUrl = GetNormalizedApiBaseUrl();
 
 		var limit = Math.Clamp(request.SearchLimit, 1, 100);
 
@@ -103,6 +94,7 @@ public sealed class TelegramTonClient : ITelegramTonClient
 				return new TelegramTonRecentTransfersResult(false, batch.Error ?? "TON lookup failed.");
 
 			var transfers = batch.Transactions
+				.OrderByDescending(tx => tx.ObservedAtUtc ?? DateTimeOffset.MinValue)
 				.Select(tx => new TelegramTonIncomingTransferView(
 					tx.TransactionId,
 					tx.ValueNanotons is null ? null : decimal.Round(tx.ValueNanotons.Value / 1_000_000_000m, 8, MidpointRounding.AwayFromZero),
@@ -112,7 +104,7 @@ public sealed class TelegramTonClient : ITelegramTonClient
 					tx.Memo))
 				.ToArray();
 
-			return new TelegramTonRecentTransfersResult(true, null, transfers);
+			return new TelegramTonRecentTransfersResult(true, null, transfers, batch.RawTransactionCount);
 		}
 		catch (OperationCanceledException) when (!ct.IsCancellationRequested)
 		{
@@ -130,10 +122,21 @@ public sealed class TelegramTonClient : ITelegramTonClient
 			0m,
 			TelegramTonOptions.MaxDepositMatchToleranceTon);
 
+	private string GetNormalizedApiBaseUrl()
+	{
+		var baseUrl = _options.TelegramTon.ApiBaseUrl.Trim();
+		if (baseUrl.Length == 0)
+			baseUrl = "https://toncenter.com/api/v2/";
+		if (!baseUrl.EndsWith("/", StringComparison.Ordinal))
+			baseUrl += "/";
+
+		return baseUrl;
+	}
+
 	private async Task<CachedTransactionBatch> GetTransactionsAsync(string walletAddress, string baseUrl, int limit, CancellationToken ct)
 	{
 		var now = DateTimeOffset.UtcNow;
-		var cacheKey = walletAddress.Trim();
+		var cacheKey = string.Create(CultureInfo.InvariantCulture, $"{baseUrl}|{walletAddress.Trim()}|{limit}");
 		if (TransactionCache.TryGetValue(cacheKey, out var cached) && cached.ExpiresAtUtc > now)
 			return cached;
 
@@ -154,6 +157,7 @@ public sealed class TelegramTonClient : ITelegramTonClient
 				false,
 				Array.Empty<TelegramTonTransactionCandidate>(),
 				$"TON lookup failed ({(int)response.StatusCode}).",
+				0,
 				now.Add(ttl));
 			TransactionCache[cacheKey] = failure;
 			return failure;
@@ -173,6 +177,7 @@ public sealed class TelegramTonClient : ITelegramTonClient
 		if (!root.TryGetProperty("result", out var resultProp) || resultProp.ValueKind != JsonValueKind.Array)
 			return CacheFailure(cacheKey, now, "TON API response does not contain transactions.");
 
+		var rawTransactionCount = resultProp.GetArrayLength();
 		var transactions = new List<TelegramTonTransactionCandidate>();
 		foreach (var tx in resultProp.EnumerateArray())
 		{
@@ -190,14 +195,14 @@ public sealed class TelegramTonClient : ITelegramTonClient
 				TryGetString(inMsg, "source")));
 		}
 
-		var success = new CachedTransactionBatch(true, transactions, null, now.AddSeconds(5));
+		var success = new CachedTransactionBatch(true, transactions, null, rawTransactionCount, now.AddSeconds(5));
 		TransactionCache[cacheKey] = success;
 		return success;
 	}
 
 	private static CachedTransactionBatch CacheFailure(string cacheKey, DateTimeOffset now, string error)
 	{
-		var failure = new CachedTransactionBatch(false, Array.Empty<TelegramTonTransactionCandidate>(), error, now.AddSeconds(5));
+		var failure = new CachedTransactionBatch(false, Array.Empty<TelegramTonTransactionCandidate>(), error, 0, now.AddSeconds(5));
 		TransactionCache[cacheKey] = failure;
 		return failure;
 	}
@@ -405,6 +410,7 @@ public sealed class TelegramTonClient : ITelegramTonClient
 		bool Success,
 		IReadOnlyList<TelegramTonTransactionCandidate> Transactions,
 		string? Error,
+		int RawTransactionCount,
 		DateTimeOffset ExpiresAtUtc);
 }
 
