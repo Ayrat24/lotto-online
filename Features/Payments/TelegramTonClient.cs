@@ -38,7 +38,7 @@ public sealed class TelegramTonClient : ITelegramTonClient
 		{
 			var batch = await GetTransactionsAsync(walletAddress, baseUrl, limit, ct);
 			if (!batch.Success)
-				return new TelegramTonLookupResult(false, false, batch.Error ?? "TON lookup failed.");
+				return new TelegramTonLookupResult(false, false, CoalesceError(batch.Error, "TON lookup failed."));
 
 			foreach (var tx in batch.Transactions)
 			{
@@ -75,7 +75,7 @@ public sealed class TelegramTonClient : ITelegramTonClient
 		}
 		catch (Exception ex)
 		{
-			return new TelegramTonLookupResult(false, false, ex.Message);
+			return new TelegramTonLookupResult(false, false, FormatTonException(ex));
 		}
 	}
 
@@ -93,7 +93,7 @@ public sealed class TelegramTonClient : ITelegramTonClient
 		{
 			var batch = await GetTransactionsAsync(walletAddress, baseUrl, limit, ct);
 			if (!batch.Success)
-				return new TelegramTonRecentTransfersResult(false, batch.Error ?? "TON lookup failed.");
+				return new TelegramTonRecentTransfersResult(false, CoalesceError(batch.Error, "TON lookup failed."));
 
 			var transfers = batch.Transactions
 				.OrderByDescending(tx => tx.ObservedAtUtc ?? DateTimeOffset.MinValue)
@@ -114,7 +114,7 @@ public sealed class TelegramTonClient : ITelegramTonClient
 		}
 		catch (Exception ex)
 		{
-			return new TelegramTonRecentTransfersResult(false, ex.Message);
+			return new TelegramTonRecentTransfersResult(false, FormatTonException(ex));
 		}
 	}
 
@@ -199,13 +199,13 @@ public sealed class TelegramTonClient : ITelegramTonClient
 		}
 		catch (Exception ex)
 		{
-			return CacheFailure(cacheKey, now, ex.Message);
+			return CacheFailure(cacheKey, now, FormatTonException(ex));
 		}
 	}
 
 	private static CachedTransactionBatch CacheFailure(string cacheKey, DateTimeOffset now, string error)
 	{
-		var failure = new CachedTransactionBatch(false, Array.Empty<TelegramTonTransactionCandidate>(), error, 0, now.AddSeconds(5));
+		var failure = new CachedTransactionBatch(false, Array.Empty<TelegramTonTransactionCandidate>(), CoalesceError(error, "TON lookup failed."), 0, now.AddSeconds(5));
 		TransactionCache[cacheKey] = failure;
 		return failure;
 	}
@@ -356,6 +356,33 @@ public sealed class TelegramTonClient : ITelegramTonClient
 	{
 		var timeoutSeconds = _options.TelegramTon.RequestTimeoutSeconds <= 0 ? 15 : _options.TelegramTon.RequestTimeoutSeconds;
 		return checked(timeoutSeconds * 1000);
+	}
+
+	private static string CoalesceError(string? error, string fallback)
+		=> string.IsNullOrWhiteSpace(error) ? fallback : error.Trim();
+
+	private static string FormatTonException(Exception ex)
+	{
+		var parts = new List<string>();
+
+		var cursor = ex;
+		while (cursor is not null)
+		{
+			var typeName = cursor.GetType().Name;
+			var message = string.IsNullOrWhiteSpace(cursor.Message)
+				? "No error message was provided by the TON SDK/provider."
+				: cursor.Message.Trim();
+
+			var formatted = $"{typeName}: {message}";
+			if (!parts.Contains(formatted, StringComparer.Ordinal))
+				parts.Add(formatted);
+
+			cursor = cursor.InnerException;
+		}
+
+		return parts.Count == 0
+			? "TON lookup failed with an unknown SDK error."
+			: string.Join(" | ", parts);
 	}
 
 	private sealed record TelegramTonTransactionCandidate(
