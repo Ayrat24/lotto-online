@@ -388,6 +388,12 @@ public sealed class PaymentsService : IPaymentsService
         if (string.Equals(deposit.PaymentMethod, PaymentMethodKeys.BtcPayCrypto, StringComparison.Ordinal))
         {
             await RefreshBtcPayDepositAsync(deposit, now, ct);
+            return;
+        }
+
+        if (string.Equals(deposit.PaymentMethod, PaymentMethodKeys.TelegramTon, StringComparison.Ordinal))
+        {
+            await RefreshTelegramTonDepositAsync(deposit, now, ct);
         }
     }
 
@@ -800,7 +806,8 @@ public sealed class PaymentsService : IPaymentsService
         => status is CryptoDepositStatus.Credited or CryptoDepositStatus.Expired or CryptoDepositStatus.Invalid;
 
     private static bool ShouldRefreshDepositOnStatusRequest(CryptoDepositIntent deposit)
-        => string.Equals(deposit.PaymentMethod, PaymentMethodKeys.BtcPayCrypto, StringComparison.Ordinal);
+        => string.Equals(deposit.PaymentMethod, PaymentMethodKeys.BtcPayCrypto, StringComparison.Ordinal)
+            || string.Equals(deposit.PaymentMethod, PaymentMethodKeys.TelegramTon, StringComparison.Ordinal);
 
     private static decimal RoundAmount(decimal amount)
         => decimal.Round(amount, 2, MidpointRounding.AwayFromZero);
