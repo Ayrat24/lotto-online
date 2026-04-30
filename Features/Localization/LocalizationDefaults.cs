@@ -599,6 +599,7 @@ internal static class LocalizationDefaults
             ["admin.tonDeposits.title"] = ("TON deposit diagnostics", "Диагностика TON-депозитов", "TON depozit diagnostikasi"),
             ["admin.tonDeposits.heading"] = ("TON deposit diagnostics", "Диагностика TON-депозитов", "TON depozit diagnostikasi"),
             ["admin.tonDeposits.subtitle"] = ("Inspect recent TON top-ups, view the latest lookup result, and manually rerun reconciliation for stuck deposits.", "Проверяйте последние TON-пополнения, смотрите результат последнего поиска и вручную запускайте сверку для зависших депозитов.", "So'nggi TON to'ldirishlarni tekshiring, oxirgi qidiruv natijasini ko'ring va tiqilib qolgan depozitlar uchun reconciliatsiyani qo'lda qayta ishga tushiring."),
+            ["admin.tonDeposits.liveLookupNotice"] = ("Live TON lookups are performed only when you click Reconcile now, so this page does not overload Toncenter.", "Живой TON-поиск выполняется только после нажатия «Сверить сейчас», чтобы эта страница не перегружала Toncenter.", "Jonli TON qidiruvi faqat Hozir reconcile qilish tugmasi bosilganda bajariladi, shuning uchun bu sahifa Toncenter xizmatini ortiqcha yuklamaydi."),
             ["admin.tonDeposits.limit"] = ("Deposits to show", "Показывать депозитов", "Ko'rsatiladigan depozitlar"),
             ["admin.tonDeposits.action.refresh"] = ("Refresh diagnostics", "Обновить диагностику", "Diagnostikani yangilash"),
             ["admin.tonDeposits.table.title"] = ("Recent TON deposit intents", "Последние TON-депозиты", "So'nggi TON depozit intentlari"),

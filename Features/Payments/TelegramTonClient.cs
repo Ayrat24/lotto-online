@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
@@ -8,6 +9,7 @@ namespace MiniApp.Features.Payments;
 public sealed class TelegramTonClient : ITelegramTonClient
 {
 	private const string TonRateCoinId = "the-open-network";
+	private static readonly ConcurrentDictionary<string, CachedTransactionBatch> TransactionCache = new(StringComparer.Ordinal);
 	private readonly HttpClient _http;
 	private readonly PaymentsOptions _options;
 
@@ -31,68 +33,38 @@ public sealed class TelegramTonClient : ITelegramTonClient
 			baseUrl += "/";
 
 		var limit = Math.Clamp(request.SearchLimit, 1, 100);
-		var requestUri = new Uri(baseUrl + "getTransactions?address=" + Uri.EscapeDataString(walletAddress) + "&limit=" + limit + "&archival=true", UriKind.Absolute);
 
 		try
 		{
-			using var message = new HttpRequestMessage(HttpMethod.Get, requestUri);
-			var apiKey = _options.TelegramTon.ApiKey.Trim();
-			if (apiKey.Length > 0)
-				message.Headers.Add("X-API-Key", apiKey);
+			var batch = await GetTransactionsAsync(walletAddress, baseUrl, limit, ct);
+			if (!batch.Success)
+				return new TelegramTonLookupResult(false, false, batch.Error ?? "TON lookup failed.");
 
-			using var response = await _http.SendAsync(message, ct);
-			var body = await response.Content.ReadAsStringAsync(ct);
-			if (!response.IsSuccessStatusCode)
-				return new TelegramTonLookupResult(false, false, $"TON lookup failed ({(int)response.StatusCode}).");
-
-			using var doc = JsonDocument.Parse(body);
-			var root = doc.RootElement;
-			if (root.ValueKind != JsonValueKind.Object)
-				return new TelegramTonLookupResult(false, false, "Unexpected TON response format.");
-
-			if (root.TryGetProperty("ok", out var okProp)
-				&& okProp.ValueKind == JsonValueKind.False)
+			foreach (var tx in batch.Transactions)
 			{
-				return new TelegramTonLookupResult(false, false, ExtractError(root) ?? "TON API returned an error.");
-			}
-
-			if (!root.TryGetProperty("result", out var resultProp) || resultProp.ValueKind != JsonValueKind.Array)
-				return new TelegramTonLookupResult(false, false, "TON API response does not contain transactions.");
-
-			foreach (var tx in resultProp.EnumerateArray())
-			{
-				if (tx.ValueKind != JsonValueKind.Object)
-					continue;
-
-				var observedAtUtc = TryGetTransactionTime(tx);
+				var observedAtUtc = tx.ObservedAtUtc;
 				if (observedAtUtc is not null && observedAtUtc.Value < request.CreatedAfterUtc.AddMinutes(-3))
 					continue;
 
-				if (!tx.TryGetProperty("in_msg", out var inMsg) || inMsg.ValueKind != JsonValueKind.Object)
+				if (!string.Equals(tx.Memo?.Trim(), referenceMemo, StringComparison.Ordinal))
 					continue;
 
-				var memo = ExtractMessageText(inMsg);
-				if (!string.Equals(memo?.Trim(), referenceMemo, StringComparison.Ordinal))
+				if (tx.ValueNanotons is null)
 					continue;
 
-				var valueNanotons = TryGetDecimal(inMsg, "value");
-				if (valueNanotons is null)
-					continue;
-
-				var valueTon = decimal.Round(valueNanotons.Value / 1_000_000_000m, 8, MidpointRounding.AwayFromZero);
+				var valueTon = decimal.Round(tx.ValueNanotons.Value / 1_000_000_000m, 8, MidpointRounding.AwayFromZero);
 				if (valueTon + 0.00000001m < request.ExpectedTonAmount)
 					continue;
 
-				var transactionId = ExtractTransactionId(tx);
 				return new TelegramTonLookupResult(
 					true,
 					true,
 					null,
-					transactionId,
+					tx.TransactionId,
 					valueTon,
 					observedAtUtc,
-					BuildExplorerLink(request.ExplorerBaseUrl, transactionId),
-					TryGetString(inMsg, "source"));
+					BuildExplorerLink(request.ExplorerBaseUrl, tx.TransactionId),
+					tx.SenderAddress);
 			}
 
 			return new TelegramTonLookupResult(true, false);
@@ -105,6 +77,78 @@ public sealed class TelegramTonClient : ITelegramTonClient
 		{
 			return new TelegramTonLookupResult(false, false, ex.Message);
 		}
+	}
+
+	private async Task<CachedTransactionBatch> GetTransactionsAsync(string walletAddress, string baseUrl, int limit, CancellationToken ct)
+	{
+		var now = DateTimeOffset.UtcNow;
+		var cacheKey = walletAddress.Trim();
+		if (TransactionCache.TryGetValue(cacheKey, out var cached) && cached.ExpiresAtUtc > now)
+			return cached;
+
+		var requestUri = new Uri(baseUrl + "getTransactions?address=" + Uri.EscapeDataString(walletAddress) + "&limit=" + limit + "&archival=true", UriKind.Absolute);
+		using var message = new HttpRequestMessage(HttpMethod.Get, requestUri);
+		var apiKey = _options.TelegramTon.ApiKey.Trim();
+		if (apiKey.Length > 0)
+			message.Headers.Add("X-API-Key", apiKey);
+
+		using var response = await _http.SendAsync(message, ct);
+		var body = await response.Content.ReadAsStringAsync(ct);
+		if (!response.IsSuccessStatusCode)
+		{
+			var ttl = response.StatusCode == System.Net.HttpStatusCode.TooManyRequests
+				? TimeSpan.FromSeconds(15)
+				: TimeSpan.FromSeconds(5);
+			var failure = new CachedTransactionBatch(
+				false,
+				Array.Empty<TelegramTonTransactionCandidate>(),
+				$"TON lookup failed ({(int)response.StatusCode}).",
+				now.Add(ttl));
+			TransactionCache[cacheKey] = failure;
+			return failure;
+		}
+
+		using var doc = JsonDocument.Parse(body);
+		var root = doc.RootElement;
+		if (root.ValueKind != JsonValueKind.Object)
+			return CacheFailure(cacheKey, now, "Unexpected TON response format.");
+
+		if (root.TryGetProperty("ok", out var okProp)
+			&& okProp.ValueKind == JsonValueKind.False)
+		{
+			return CacheFailure(cacheKey, now, ExtractError(root) ?? "TON API returned an error.");
+		}
+
+		if (!root.TryGetProperty("result", out var resultProp) || resultProp.ValueKind != JsonValueKind.Array)
+			return CacheFailure(cacheKey, now, "TON API response does not contain transactions.");
+
+		var transactions = new List<TelegramTonTransactionCandidate>();
+		foreach (var tx in resultProp.EnumerateArray())
+		{
+			if (tx.ValueKind != JsonValueKind.Object)
+				continue;
+
+			if (!tx.TryGetProperty("in_msg", out var inMsg) || inMsg.ValueKind != JsonValueKind.Object)
+				continue;
+
+			transactions.Add(new TelegramTonTransactionCandidate(
+				ExtractTransactionId(tx),
+				TryGetTransactionTime(tx),
+				ExtractMessageText(inMsg),
+				TryGetDecimal(inMsg, "value"),
+				TryGetString(inMsg, "source")));
+		}
+
+		var success = new CachedTransactionBatch(true, transactions, null, now.AddSeconds(5));
+		TransactionCache[cacheKey] = success;
+		return success;
+	}
+
+	private static CachedTransactionBatch CacheFailure(string cacheKey, DateTimeOffset now, string error)
+	{
+		var failure = new CachedTransactionBatch(false, Array.Empty<TelegramTonTransactionCandidate>(), error, now.AddSeconds(5));
+		TransactionCache[cacheKey] = failure;
+		return failure;
 	}
 
 	public async Task<TelegramTonUsdRateResult> GetUsdPerTonRateAsync(CancellationToken ct)
@@ -295,6 +339,19 @@ public sealed class TelegramTonClient : ITelegramTonClient
 
 		return null;
 	}
+
+	private sealed record TelegramTonTransactionCandidate(
+		string? TransactionId,
+		DateTimeOffset? ObservedAtUtc,
+		string? Memo,
+		decimal? ValueNanotons,
+		string? SenderAddress);
+
+	private sealed record CachedTransactionBatch(
+		bool Success,
+		IReadOnlyList<TelegramTonTransactionCandidate> Transactions,
+		string? Error,
+		DateTimeOffset ExpiresAtUtc);
 }
 
 

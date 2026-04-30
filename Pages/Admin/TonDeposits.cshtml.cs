@@ -26,21 +26,9 @@ public sealed class TonDepositsModel : LocalizedAdminPageModel
 
     public bool StatusIsError { get; private set; }
 
-    [TempData]
-    public string? FlashMessage { get; set; }
-
-    [TempData]
-    public bool? FlashIsError { get; set; }
-
     public async Task OnGetAsync(CancellationToken ct)
     {
         await LoadUiTextAsync(ct);
-        if (!string.IsNullOrWhiteSpace(FlashMessage))
-        {
-            StatusMessage = FlashMessage;
-            StatusIsError = FlashIsError ?? false;
-        }
-
         await LoadAsync(ct);
     }
 
@@ -52,9 +40,10 @@ public sealed class TonDepositsModel : LocalizedAdminPageModel
         var result = await _payments.ReconcileTelegramTonAdminDepositAsync(id, ct);
         if (!result.Success)
         {
-            FlashMessage = result.Error ?? await GetTextAsync("admin.tonDeposits.flash.reconcileFailed", "Failed to reconcile TON deposit.", ct);
-            FlashIsError = true;
-            return RedirectToPage(new { limit = Limit });
+            StatusMessage = result.Error ?? await GetTextAsync("admin.tonDeposits.flash.reconcileFailed", "Failed to reconcile TON deposit.", ct);
+            StatusIsError = true;
+            await LoadAsync(ct);
+            return Page();
         }
 
         var templateKey = result.Changed
@@ -64,9 +53,17 @@ public sealed class TonDepositsModel : LocalizedAdminPageModel
             ? "Reconciled TON deposit #{0}."
             : "TON deposit #{0} was checked but nothing changed.";
         var template = await GetTextAsync(templateKey, fallback, ct);
-        FlashMessage = string.Format(template, id);
-        FlashIsError = false;
-        return RedirectToPage(new { limit = Limit });
+        StatusMessage = string.Format(template, id);
+        StatusIsError = false;
+        await LoadAsync(ct);
+        if (result.Deposit is not null)
+        {
+            Deposits = Deposits
+                .Select(x => x.Id == result.Deposit.Id ? result.Deposit : x)
+                .ToArray();
+        }
+
+        return Page();
     }
 
     private async Task LoadAsync(CancellationToken ct)
@@ -84,4 +81,5 @@ public sealed class TonDepositsModel : LocalizedAdminPageModel
         Deposits = result.Deposits;
     }
 }
+
 

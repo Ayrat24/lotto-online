@@ -138,7 +138,7 @@ public sealed class PaymentsService : IPaymentsService
 
         var diagnostics = new List<TelegramTonAdminDepositDiagnosticView>(deposits.Count);
         foreach (var deposit in deposits)
-            diagnostics.Add(await BuildTelegramTonAdminDepositDiagnosticAsync(deposit, ct));
+            diagnostics.Add(await BuildTelegramTonAdminDepositDiagnosticAsync(deposit, includeLookup: false, ct));
 
         return new TelegramTonAdminDepositDiagnosticsResult(true, null, diagnostics);
     }
@@ -165,7 +165,7 @@ public sealed class PaymentsService : IPaymentsService
             || deposit.UpdatedAtUtc != beforeUpdatedAt
             || deposit.CreditedAtUtc != beforeCreditedAt;
 
-        var diagnostic = await BuildTelegramTonAdminDepositDiagnosticAsync(deposit, ct);
+        var diagnostic = await BuildTelegramTonAdminDepositDiagnosticAsync(deposit, includeLookup: true, ct);
         return new TelegramTonAdminDepositReconcileResult(true, null, diagnostic, changed);
     }
 
@@ -867,7 +867,7 @@ public sealed class PaymentsService : IPaymentsService
         => string.Equals(deposit.PaymentMethod, PaymentMethodKeys.BtcPayCrypto, StringComparison.Ordinal)
             || string.Equals(deposit.PaymentMethod, PaymentMethodKeys.TelegramTon, StringComparison.Ordinal);
 
-    private async Task<TelegramTonAdminDepositDiagnosticView> BuildTelegramTonAdminDepositDiagnosticAsync(CryptoDepositIntent deposit, CancellationToken ct)
+    private async Task<TelegramTonAdminDepositDiagnosticView> BuildTelegramTonAdminDepositDiagnosticAsync(CryptoDepositIntent deposit, bool includeLookup, CancellationToken ct)
     {
         var creditReference = BuildCreditReference(deposit.PaymentMethod, deposit.ProviderInvoiceId);
         var walletTransactionExists = await _db.WalletTransactions
@@ -875,7 +875,8 @@ public sealed class PaymentsService : IPaymentsService
             .AnyAsync(x => x.Type == WalletTransactionType.CryptoDepositCredited && x.Reference == creditReference, ct);
 
         TelegramTonLookupResult? lookup = null;
-        if (!string.IsNullOrWhiteSpace(deposit.DestinationAddress)
+        if (includeLookup
+            && !string.IsNullOrWhiteSpace(deposit.DestinationAddress)
             && !string.IsNullOrWhiteSpace(deposit.DestinationMemo)
             && deposit.AssetAmount is not null
             && deposit.AssetAmount.Value > 0m)
