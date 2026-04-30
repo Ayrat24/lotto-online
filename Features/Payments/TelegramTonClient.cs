@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using TonSdk.Core.Boc;
+using TonSdk.Core;
 
 namespace MiniApp.Features.Payments;
 
@@ -135,12 +136,43 @@ public sealed class TelegramTonClient : ITelegramTonClient
 
 	private async Task<CachedTransactionBatch> GetTransactionsAsync(string walletAddress, string baseUrl, int limit, CancellationToken ct)
 	{
+		CachedTransactionBatch? firstSuccess = null;
+		CachedTransactionBatch? lastFailure = null;
+
+		foreach (var addressCandidate in BuildWalletAddressCandidates(walletAddress))
+		{
+			foreach (var archival in GetArchivalModes())
+			{
+				var batch = await GetTransactionsForAddressVariantAsync(addressCandidate, baseUrl, limit, archival, ct);
+				if (!batch.Success)
+				{
+					lastFailure = batch;
+					continue;
+				}
+
+				firstSuccess ??= batch;
+				if (batch.RawTransactionCount > 0)
+					return batch;
+			}
+		}
+
+		return firstSuccess
+			?? lastFailure
+			?? new CachedTransactionBatch(false, Array.Empty<TelegramTonTransactionCandidate>(), "TON lookup failed.", 0, DateTimeOffset.UtcNow.AddSeconds(5));
+	}
+
+	private async Task<CachedTransactionBatch> GetTransactionsForAddressVariantAsync(string walletAddress, string baseUrl, int limit, bool archival, CancellationToken ct)
+	{
 		var now = DateTimeOffset.UtcNow;
-		var cacheKey = string.Create(CultureInfo.InvariantCulture, $"{baseUrl}|{walletAddress.Trim()}|{limit}");
+		var cacheKey = string.Create(CultureInfo.InvariantCulture, $"{baseUrl}|{walletAddress.Trim()}|{limit}|{archival}");
 		if (TransactionCache.TryGetValue(cacheKey, out var cached) && cached.ExpiresAtUtc > now)
 			return cached;
 
-		var requestUri = new Uri(baseUrl + "getTransactions?address=" + Uri.EscapeDataString(walletAddress) + "&limit=" + limit + "&archival=true", UriKind.Absolute);
+		var requestPath = baseUrl + "getTransactions?address=" + Uri.EscapeDataString(walletAddress) + "&limit=" + limit;
+		if (archival)
+			requestPath += "&archival=true";
+
+		var requestUri = new Uri(requestPath, UriKind.Absolute);
 		using var message = new HttpRequestMessage(HttpMethod.Get, requestUri);
 		var apiKey = _options.TelegramTon.ApiKey.Trim();
 		if (apiKey.Length > 0)
@@ -205,6 +237,36 @@ public sealed class TelegramTonClient : ITelegramTonClient
 		var failure = new CachedTransactionBatch(false, Array.Empty<TelegramTonTransactionCandidate>(), error, 0, now.AddSeconds(5));
 		TransactionCache[cacheKey] = failure;
 		return failure;
+	}
+
+	private static IReadOnlyList<string> BuildWalletAddressCandidates(string walletAddress)
+	{
+		var trimmed = walletAddress.Trim();
+		var candidates = new List<string>();
+
+		if (trimmed.Length == 0)
+			return candidates;
+
+		candidates.Add(trimmed);
+
+		try
+		{
+			var normalized = new Address(trimmed).ToString();
+			if (!string.Equals(normalized, trimmed, StringComparison.Ordinal))
+				candidates.Add(normalized);
+		}
+		catch
+		{
+			// Keep the original address candidate if normalization fails.
+		}
+
+		return candidates;
+	}
+
+	private static IEnumerable<bool> GetArchivalModes()
+	{
+		yield return false;
+		yield return true;
 	}
 
 	public async Task<TelegramTonUsdRateResult> GetUsdPerTonRateAsync(CancellationToken ct)

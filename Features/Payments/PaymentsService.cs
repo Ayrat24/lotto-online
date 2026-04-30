@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using MiniApp.Data;
 using Npgsql;
+using TonSdk.Core;
 
 namespace MiniApp.Features.Payments;
 
@@ -391,6 +392,8 @@ public sealed class PaymentsService : IPaymentsService
         var merchantAddress = (_options.TelegramTon.MerchantAddress ?? string.Empty).Trim();
         if (merchantAddress.Length == 0)
             return new CreateCryptoDepositResult(false, "Telegram TON wallet address is not configured.");
+
+        merchantAddress = NormalizeTonAddress(merchantAddress);
 
         var reference = BuildTelegramTonReference(userId);
         var tonLink = BuildTonTransferLink(merchantAddress, tonAmount, reference);
@@ -990,6 +993,22 @@ public sealed class PaymentsService : IPaymentsService
 
     private static decimal ToNanotons(decimal tonAmount)
         => decimal.Round(tonAmount * 1_000_000_000m, 0, MidpointRounding.AwayFromZero);
+
+    private static string NormalizeTonAddress(string address)
+    {
+        var trimmed = (address ?? string.Empty).Trim();
+        if (trimmed.Length == 0)
+            return trimmed;
+
+        try
+        {
+            return new Address(trimmed).ToString();
+        }
+        catch
+        {
+            return trimmed;
+        }
+    }
 
     private static bool IsDuplicateDeliveryId(DbUpdateException ex)
     {
