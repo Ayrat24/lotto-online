@@ -479,6 +479,20 @@
     if (withdrawStatusEl) withdrawStatusEl.textContent = text || '';
   }
 
+  function formatWithdrawErrorMessage(message) {
+    var normalized = String(message || '').trim();
+    if (!normalized) return t('client.withdraw.failed', 'Withdrawal request failed.');
+    if (normalized === 'wallet_update_in_progress') {
+      return t('client.withdraw.serverUpdating', 'Wallet update is still being applied. Please try again in a moment.');
+    }
+
+    if (/^<!doctype html>/i.test(normalized) || /<html/i.test(normalized)) {
+      return t('client.withdraw.serverUpdating', 'Wallet update is still being applied. Please try again in a moment.');
+    }
+
+    return normalized;
+  }
+
   function setHistoryStatus(text) {
     if (historyStatusEl) historyStatusEl.textContent = text || '';
   }
@@ -4729,7 +4743,7 @@
         loadHistory();
       })
       .catch(function (err) {
-        setWithdrawStatus(err.message || t('client.withdraw.failed', 'Withdrawal request failed.'));
+        setWithdrawStatus(formatWithdrawErrorMessage(err && err.message));
       })
       .finally(function () {
         if (withdrawBtn) withdrawBtn.disabled = false;

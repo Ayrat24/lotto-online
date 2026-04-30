@@ -241,6 +241,7 @@ internal static class LocalizationDefaults
             ["client.withdraw.enterAddressOrSave"] = ("Enter wallet address or save one first.", "Введите адрес кошелька или сначала сохраните его.", "Hamyon manzilini kiriting yoki avval saqlang."),
             ["client.withdraw.submitting"] = ("Submitting withdrawal request...", "Отправка запроса на вывод...", "Yechib olish so'rovi yuborilmoqda..."),
             ["client.withdraw.failed"] = ("Withdrawal request failed.", "Запрос на вывод не выполнен.", "Yechib olish so'rovi muvaffaqiyatsiz."),
+            ["client.withdraw.serverUpdating"] = ("Wallet update is still being applied. Please try again in a moment.", "Обновление кошелька все еще применяется. Пожалуйста, попробуйте еще раз через минуту.", "Hamyon yangilanishi hali qo'llanmoqda. Iltimos, birozdan so'ng yana urinib ko'ring."),
             ["client.withdraw.requestPrefix"] = ("Withdrawal request #", "Запрос на вывод #", "Yechib olish so'rovi #"),
             ["client.withdraw.submittedFor"] = ("submitted for ", "отправлен на сумму ", "summa uchun yuborildi "),
             ["client.withdraw.waitingApproval"] = ("Waiting for admin approval.", "Ожидает одобрения администратора.", "Admin tasdiqlashini kutmoqda."),

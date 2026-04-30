@@ -47,7 +47,22 @@ public static class WalletEndpoints
             var telegramUserId = authResult.TelegramUserId!.Value;
             var user = await users.TouchUserAsync(telegramUserId, ct);
 
-            var result = await wallet.CreateWithdrawalRequestAsync(user.Id, req.Amount, req.AssetCode, req.Address ?? req.Number, req.SaveAddress, ct);
+            WalletWithdrawRequestResult result;
+            try
+            {
+                result = await wallet.CreateWithdrawalRequestAsync(user.Id, req.Amount, req.AssetCode, req.Address ?? req.Number, req.SaveAddress, ct);
+            }
+            catch
+            {
+                return Results.Json(
+                    new
+                    {
+                        ok = false,
+                        error = "wallet_update_in_progress"
+                    },
+                    statusCode: StatusCodes.Status503ServiceUnavailable);
+            }
+
             if (!result.Success)
                 return Results.BadRequest(new { ok = false, error = result.Error ?? "Withdrawal request failed.", balance = result.UserBalance });
 

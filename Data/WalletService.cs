@@ -8,6 +8,7 @@ namespace MiniApp.Data;
 public sealed class WalletService : IWalletService
 {
     private const decimal DefaultTopUpAmount = 10m;
+    private const string TonWithdrawalSupportMigrationName = "20260430053832_AddTonWithdrawalSupport";
     private readonly AppDbContext _db;
     private readonly IBtcPayClient _btcPay;
     private readonly PaymentsOptions _payments;
@@ -258,6 +259,8 @@ public sealed class WalletService : IWalletService
 
     public async Task<WalletWithdrawRequestResult> CreateWithdrawalRequestAsync(long userId, decimal amount, string assetCode, string? address, bool saveAddress, CancellationToken ct)
     {
+        await EnsureTonWithdrawalSchemaAsync(ct);
+
         var normalizedAmount = RoundAmount(amount);
         if (normalizedAmount <= 0)
             return new WalletWithdrawRequestResult(false, 0m, "Withdrawal amount must be greater than zero.");
@@ -313,6 +316,8 @@ public sealed class WalletService : IWalletService
 
     public async Task<WalletSaveAddressResult> SaveWalletAddressAsync(long userId, string assetCode, string address, CancellationToken ct)
     {
+        await EnsureTonWithdrawalSchemaAsync(ct);
+
         var normalizedAssetCode = WithdrawalAssetCodes.Normalize(assetCode, defaultToBitcoin: false);
         if (normalizedAssetCode is null)
             return new WalletSaveAddressResult(false, "Unsupported withdrawal asset.");
@@ -332,6 +337,8 @@ public sealed class WalletService : IWalletService
 
     public async Task<WalletSavedAddresses> GetWalletAddressesAsync(long userId, CancellationToken ct)
     {
+        await EnsureTonWithdrawalSchemaAsync(ct);
+
         var addresses = await _db.Users
             .AsNoTracking()
             .Where(x => x.Id == userId)
@@ -343,6 +350,8 @@ public sealed class WalletService : IWalletService
 
     public async Task<IReadOnlyList<WalletHistoryEntry>> GetHistoryAsync(long userId, int limit, CancellationToken ct)
     {
+        await EnsureTonWithdrawalSchemaAsync(ct);
+
         var take = Math.Clamp(limit, 1, 200);
 
         var deposits = await _db.CryptoDepositIntents
@@ -390,6 +399,8 @@ public sealed class WalletService : IWalletService
 
     public async Task<WalletReviewWithdrawalResult> ConfirmWithdrawalAsync(long withdrawalRequestId, string adminUsername, CancellationToken ct)
     {
+        await EnsureTonWithdrawalSchemaAsync(ct);
+
         var request = await _db.WithdrawalRequests
             .Include(x => x.User)
             .SingleOrDefaultAsync(x => x.Id == withdrawalRequestId, ct);
@@ -462,6 +473,8 @@ public sealed class WalletService : IWalletService
 
     public async Task<WalletReviewWithdrawalResult> DenyWithdrawalAsync(long withdrawalRequestId, string adminUsername, string? note, CancellationToken ct)
     {
+        await EnsureTonWithdrawalSchemaAsync(ct);
+
         var request = await _db.WithdrawalRequests
             .Include(x => x.User)
             .SingleOrDefaultAsync(x => x.Id == withdrawalRequestId, ct);
@@ -506,6 +519,18 @@ public sealed class WalletService : IWalletService
             return null;
 
         return trimmed;
+    }
+
+    private async Task EnsureTonWithdrawalSchemaAsync(CancellationToken ct)
+    {
+        if (!_db.Database.IsRelational())
+            return;
+
+        var pendingMigrations = await _db.Database.GetPendingMigrationsAsync(ct);
+        if (!pendingMigrations.Any(x => string.Equals(x, TonWithdrawalSupportMigrationName, StringComparison.OrdinalIgnoreCase)))
+            return;
+
+        await _db.Database.MigrateAsync(ct);
     }
 
     private static string? GetSavedPayoutAddress(MiniAppUser user, string assetCode)
