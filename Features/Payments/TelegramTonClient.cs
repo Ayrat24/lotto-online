@@ -2,8 +2,9 @@ using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
-using TonSdk.Core.Boc;
+using TonSdk.Client;
 using TonSdk.Core;
+using TonSdk.Core.Boc;
 
 namespace MiniApp.Features.Payments;
 
@@ -168,68 +169,38 @@ public sealed class TelegramTonClient : ITelegramTonClient
 		if (TransactionCache.TryGetValue(cacheKey, out var cached) && cached.ExpiresAtUtc > now)
 			return cached;
 
-		var requestPath = baseUrl + "getTransactions?address=" + Uri.EscapeDataString(walletAddress) + "&limit=" + limit;
-		if (archival)
-			requestPath += "&archival=true";
-
-		var requestUri = new Uri(requestPath, UriKind.Absolute);
-		using var message = new HttpRequestMessage(HttpMethod.Get, requestUri);
-		var apiKey = _options.TelegramTon.ApiKey.Trim();
-		if (apiKey.Length > 0)
-			message.Headers.Add("X-API-Key", apiKey);
-
-		using var response = await _http.SendAsync(message, ct);
-		var body = await response.Content.ReadAsStringAsync(ct);
-		if (!response.IsSuccessStatusCode)
+		try
 		{
-			var ttl = response.StatusCode == System.Net.HttpStatusCode.TooManyRequests
-				? TimeSpan.FromSeconds(15)
-				: TimeSpan.FromSeconds(5);
-			var failure = new CachedTransactionBatch(
-				false,
-				Array.Empty<TelegramTonTransactionCandidate>(),
-				$"TON lookup failed ({(int)response.StatusCode}).",
-				0,
-				now.Add(ttl));
-			TransactionCache[cacheKey] = failure;
-			return failure;
+			using var client = CreateTonClient(baseUrl);
+			var address = new Address(walletAddress.Trim());
+			var response = await client.GetTransactions(
+				address,
+				checked((uint)Math.Clamp(limit, 1, 100)),
+				null,
+				null,
+				null,
+				archival);
+
+			var rawTransactions = response ?? [];
+			var transactions = new List<TelegramTonTransactionCandidate>();
+			foreach (var tx in rawTransactions)
+			{
+				transactions.Add(new TelegramTonTransactionCandidate(
+					string.IsNullOrWhiteSpace(tx.TransactionId.Hash) ? null : tx.TransactionId.Hash,
+					DateTimeOffset.FromUnixTimeSeconds(tx.UTime),
+					ExtractMessageText(tx.InMsg.Message),
+					ToNanotons(tx.InMsg.Value.ToDecimal()),
+					tx.InMsg.Source?.ToString()));
+			}
+
+			var success = new CachedTransactionBatch(true, transactions, null, rawTransactions.Length, now.AddSeconds(5));
+			TransactionCache[cacheKey] = success;
+			return success;
 		}
-
-		using var doc = JsonDocument.Parse(body);
-		var root = doc.RootElement;
-		if (root.ValueKind != JsonValueKind.Object)
-			return CacheFailure(cacheKey, now, "Unexpected TON response format.");
-
-		if (root.TryGetProperty("ok", out var okProp)
-			&& okProp.ValueKind == JsonValueKind.False)
+		catch (Exception ex)
 		{
-			return CacheFailure(cacheKey, now, ExtractError(root) ?? "TON API returned an error.");
+			return CacheFailure(cacheKey, now, ex.Message);
 		}
-
-		if (!root.TryGetProperty("result", out var resultProp) || resultProp.ValueKind != JsonValueKind.Array)
-			return CacheFailure(cacheKey, now, "TON API response does not contain transactions.");
-
-		var rawTransactionCount = resultProp.GetArrayLength();
-		var transactions = new List<TelegramTonTransactionCandidate>();
-		foreach (var tx in resultProp.EnumerateArray())
-		{
-			if (tx.ValueKind != JsonValueKind.Object)
-				continue;
-
-			if (!tx.TryGetProperty("in_msg", out var inMsg) || inMsg.ValueKind != JsonValueKind.Object)
-				continue;
-
-			transactions.Add(new TelegramTonTransactionCandidate(
-				ExtractTransactionId(tx),
-				TryGetTransactionTime(tx),
-				ExtractMessageText(inMsg),
-				TryGetDecimal(inMsg, "value"),
-				TryGetString(inMsg, "source")));
-		}
-
-		var success = new CachedTransactionBatch(true, transactions, null, rawTransactionCount, now.AddSeconds(5));
-		TransactionCache[cacheKey] = success;
-		return success;
 	}
 
 	private static CachedTransactionBatch CacheFailure(string cacheKey, DateTimeOffset now, string error)
@@ -324,100 +295,10 @@ public sealed class TelegramTonClient : ITelegramTonClient
 		}
 	}
 
-	private static string? ExtractError(JsonElement root)
-		=> TryGetString(root, "error") ?? TryGetString(root, "description");
-
-	private static string? ExtractMessageText(JsonElement inMsg)
+	private static string? ExtractMessageText(string? message)
 	{
-		if (TryGetString(inMsg, "message") is { Length: > 0 } message) return message;
-		if (TryGetString(inMsg, "comment") is { Length: > 0 } comment) return comment;
-		if (TryGetString(inMsg, "text") is { Length: > 0 } text) return text;
-
-		if (inMsg.TryGetProperty("msg_data", out var msgData) && msgData.ValueKind == JsonValueKind.Object)
-		{
-			if (TryGetString(msgData, "text") is { Length: > 0 } nestedText)
-			{
-				if (TryDecodeTonBytesToText(nestedText) is { Length: > 0 } decodedNestedText) return decodedNestedText;
-				return nestedText;
-			}
-
-			if (TryGetString(msgData, "comment") is { Length: > 0 } nestedComment)
-			{
-				if (TryDecodeTonBytesToText(nestedComment) is { Length: > 0 } decodedNestedComment) return decodedNestedComment;
-				return nestedComment;
-			}
-
-			if (TryExtractCommentFromRawBody(msgData) is { Length: > 0 } rawComment) return rawComment;
-		}
-
-		return null;
-	}
-
-	private static string? TryExtractCommentFromRawBody(JsonElement msgData)
-	{
-		if (TryGetString(msgData, "body") is not { Length: > 0 } body)
-			return null;
-
-		try
-		{
-			var cell = Cell.From(body.Trim());
-			var slice = cell.Parse();
-			var op = slice.LoadUInt(32);
-			if (op != 0)
-				return null;
-
-			var comment = slice.LoadString().TrimEnd('\0');
-			return string.IsNullOrWhiteSpace(comment) ? null : comment;
-		}
-		catch
-		{
-			return null;
-		}
-	}
-
-	private static string? TryDecodeTonBytesToText(string value)
-	{
-		if (string.IsNullOrWhiteSpace(value))
-			return null;
-
-		try
-		{
-			var bytes = Convert.FromBase64String(value);
-			var decoded = System.Text.Encoding.UTF8.GetString(bytes).TrimEnd('\0');
-			return string.IsNullOrWhiteSpace(decoded) ? null : decoded;
-		}
-		catch
-		{
-			return null;
-		}
-	}
-
-	private static DateTimeOffset? TryGetTransactionTime(JsonElement tx)
-	{
-		if (!tx.TryGetProperty("utime", out var utimeProp))
-			return null;
-
-		if (utimeProp.ValueKind == JsonValueKind.Number && utimeProp.TryGetInt64(out var unixSeconds))
-			return DateTimeOffset.FromUnixTimeSeconds(unixSeconds);
-
-		if (utimeProp.ValueKind == JsonValueKind.String
-			&& long.TryParse(utimeProp.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out unixSeconds))
-		{
-			return DateTimeOffset.FromUnixTimeSeconds(unixSeconds);
-		}
-
-		return null;
-	}
-
-	private static string? ExtractTransactionId(JsonElement tx)
-	{
-		if (tx.TryGetProperty("transaction_id", out var txId) && txId.ValueKind == JsonValueKind.Object)
-		{
-			if (TryGetString(txId, "hash") is { Length: > 0 } hash)
-				return hash;
-		}
-
-		return TryGetString(tx, "hash") ?? TryGetString(tx, "id");
+		var normalized = (message ?? string.Empty).Trim().TrimEnd('\0');
+		return normalized.Length == 0 ? null : normalized;
 	}
 
 	private static string? BuildExplorerLink(string? explorerBaseUrl, string? transactionId)
@@ -460,6 +341,16 @@ public sealed class TelegramTonClient : ITelegramTonClient
 
 	private static decimal ToNanotons(decimal tonAmount)
 		=> decimal.Round(tonAmount * 1_000_000_000m, 0, MidpointRounding.AwayFromZero);
+
+	private TonClient CreateTonClient(string baseUrl)
+		=> new(
+			TonClientType.HTTP_TONCENTERAPIV2,
+			new HttpParameters
+			{
+				Endpoint = baseUrl,
+				ApiKey = string.IsNullOrWhiteSpace(_options.TelegramTon.ApiKey) ? null : _options.TelegramTon.ApiKey.Trim(),
+				Timeout = _options.TelegramTon.RequestTimeoutSeconds <= 0 ? 15 : _options.TelegramTon.RequestTimeoutSeconds
+			});
 
 	private sealed record TelegramTonTransactionCandidate(
 		string? TransactionId,
