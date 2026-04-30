@@ -48,6 +48,8 @@ public sealed class BtcPayOptions
 
 public sealed class TelegramTonOptions
 {
+    public const decimal MaxDepositMatchToleranceTon = 0.0001m;
+
     public bool Enabled { get; set; }
 
     public bool AutoRefreshEnabled { get; set; } = true;
@@ -99,6 +101,8 @@ public sealed class TelegramTonOptions
     public int RequestTimeoutSeconds { get; set; } = 15;
 
     public int TransactionSearchLimit { get; set; } = 25;
+
+    public decimal DepositMatchToleranceTon { get; set; } = 0.000001m;
 
     public int PaymentTimeoutMinutes { get; set; } = 20;
 
@@ -234,6 +238,12 @@ public sealed class PaymentsOptionsValidator : IValidateOptions<PaymentsOptions>
 
             if (telegramTon.TransactionSearchLimit <= 0)
                 errors.Add("Payments:TelegramTon:TransactionSearchLimit must be greater than 0.");
+
+            if (telegramTon.DepositMatchToleranceTon < 0m)
+                errors.Add("Payments:TelegramTon:DepositMatchToleranceTon must be zero or greater.");
+
+            if (telegramTon.DepositMatchToleranceTon > TelegramTonOptions.MaxDepositMatchToleranceTon)
+                errors.Add($"Payments:TelegramTon:DepositMatchToleranceTon must be less than or equal to {TelegramTonOptions.MaxDepositMatchToleranceTon.ToString(System.Globalization.CultureInfo.InvariantCulture)} TON.");
 
             if (telegramTon.PaymentTimeoutMinutes <= 0)
                 errors.Add("Payments:TelegramTon:PaymentTimeoutMinutes must be greater than 0.");

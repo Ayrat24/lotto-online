@@ -51,6 +51,7 @@ services:
       Payments__TelegramTon__ApiKey: ${TELEGRAMTON_API_KEY:-${Payments__TelegramTon__ApiKey:-}}
       Payments__TelegramTon__RequestTimeoutSeconds: ${TELEGRAMTON_REQUEST_TIMEOUT_SECONDS:-${Payments__TelegramTon__RequestTimeoutSeconds:-15}}
       Payments__TelegramTon__TransactionSearchLimit: ${TELEGRAMTON_TRANSACTION_SEARCH_LIMIT:-${Payments__TelegramTon__TransactionSearchLimit:-25}}
+      Payments__TelegramTon__DepositMatchToleranceTon: ${TELEGRAMTON_DEPOSIT_MATCH_TOLERANCE_TON:-${Payments__TelegramTon__DepositMatchToleranceTon:-0.000001}}
       Payments__TelegramTon__PaymentTimeoutMinutes: ${TELEGRAMTON_PAYMENT_TIMEOUT_MINUTES:-${Payments__TelegramTon__PaymentTimeoutMinutes:-20}}
       Payments__TelegramTon__ExplorerBaseUrl: ${TELEGRAMTON_EXPLORER_BASE_URL:-${Payments__TelegramTon__ExplorerBaseUrl:-https://tonviewer.com/transaction/}}
       Payments__Ops__EnableReconciliation: ${PAYMENTS_ENABLE_RECONCILIATION:-false}

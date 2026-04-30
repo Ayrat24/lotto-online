@@ -26,6 +26,9 @@ public sealed class TelegramTonClient : ITelegramTonClient
 		if (walletAddress.Length == 0 || referenceMemo.Length == 0)
 			return new TelegramTonLookupResult(false, false, "TON wallet address and reference memo are required.");
 
+		var expectedNanotons = ToNanotons(request.ExpectedTonAmount);
+		var toleranceNanotons = ToNanotons(GetDepositMatchToleranceTon());
+
 		var baseUrl = _options.TelegramTon.ApiBaseUrl.Trim();
 		if (baseUrl.Length == 0)
 			baseUrl = "https://toncenter.com/api/v2/";
@@ -53,7 +56,7 @@ public sealed class TelegramTonClient : ITelegramTonClient
 					continue;
 
 				var valueTon = decimal.Round(tx.ValueNanotons.Value / 1_000_000_000m, 8, MidpointRounding.AwayFromZero);
-				if (valueTon + 0.00000001m < request.ExpectedTonAmount)
+				if (tx.ValueNanotons.Value + toleranceNanotons < expectedNanotons)
 					continue;
 
 				return new TelegramTonLookupResult(
@@ -78,6 +81,12 @@ public sealed class TelegramTonClient : ITelegramTonClient
 			return new TelegramTonLookupResult(false, false, ex.Message);
 		}
 	}
+
+	private decimal GetDepositMatchToleranceTon()
+		=> decimal.Clamp(
+			_options.TelegramTon.DepositMatchToleranceTon,
+			0m,
+			TelegramTonOptions.MaxDepositMatchToleranceTon);
 
 	private async Task<CachedTransactionBatch> GetTransactionsAsync(string walletAddress, string baseUrl, int limit, CancellationToken ct)
 	{
@@ -339,6 +348,9 @@ public sealed class TelegramTonClient : ITelegramTonClient
 
 		return null;
 	}
+
+	private static decimal ToNanotons(decimal tonAmount)
+		=> decimal.Round(tonAmount * 1_000_000_000m, 0, MidpointRounding.AwayFromZero);
 
 	private sealed record TelegramTonTransactionCandidate(
 		string? TransactionId,
