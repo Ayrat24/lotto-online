@@ -172,11 +172,66 @@ public sealed class TelegramTonClient : ITelegramTonClient
 
 		if (inMsg.TryGetProperty("msg_data", out var msgData) && msgData.ValueKind == JsonValueKind.Object)
 		{
-			if (TryGetString(msgData, "text") is { Length: > 0 } nestedText) return nestedText;
-			if (TryGetString(msgData, "comment") is { Length: > 0 } nestedComment) return nestedComment;
+			if (TryGetString(msgData, "text") is { Length: > 0 } nestedText)
+			{
+				if (TryDecodeTonBytesToText(nestedText) is { Length: > 0 } decodedNestedText) return decodedNestedText;
+				return nestedText;
+			}
+
+			if (TryGetString(msgData, "comment") is { Length: > 0 } nestedComment)
+			{
+				if (TryDecodeTonBytesToText(nestedComment) is { Length: > 0 } decodedNestedComment) return decodedNestedComment;
+				return nestedComment;
+			}
+
+			if (TryExtractCommentFromRawBody(msgData) is { Length: > 0 } rawComment) return rawComment;
 		}
 
 		return null;
+	}
+
+	private static string? TryExtractCommentFromRawBody(JsonElement msgData)
+	{
+		if (TryGetString(msgData, "body") is not { Length: > 0 } body)
+			return null;
+
+		try
+		{
+			var payload = Convert.FromBase64String(body);
+			if (payload.Length >= 4
+				&& payload[0] == 0
+				&& payload[1] == 0
+				&& payload[2] == 0
+				&& payload[3] == 0)
+			{
+				var comment = System.Text.Encoding.UTF8.GetString(payload, 4, payload.Length - 4).TrimEnd('\0');
+				return string.IsNullOrWhiteSpace(comment) ? null : comment;
+			}
+
+			var decoded = System.Text.Encoding.UTF8.GetString(payload).TrimEnd('\0');
+			return string.IsNullOrWhiteSpace(decoded) ? null : decoded;
+		}
+		catch
+		{
+			return null;
+		}
+	}
+
+	private static string? TryDecodeTonBytesToText(string value)
+	{
+		if (string.IsNullOrWhiteSpace(value))
+			return null;
+
+		try
+		{
+			var bytes = Convert.FromBase64String(value);
+			var decoded = System.Text.Encoding.UTF8.GetString(bytes).TrimEnd('\0');
+			return string.IsNullOrWhiteSpace(decoded) ? null : decoded;
+		}
+		catch
+		{
+			return null;
+		}
 	}
 
 	private static DateTimeOffset? TryGetTransactionTime(JsonElement tx)

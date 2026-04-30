@@ -427,14 +427,6 @@ public sealed class PaymentsService : IPaymentsService
 
     private async Task RefreshTelegramTonDepositAsync(CryptoDepositIntent deposit, DateTimeOffset now, CancellationToken ct)
     {
-        if (deposit.ExpiresAtUtc is not null && deposit.ExpiresAtUtc <= now)
-        {
-            deposit.Status = CryptoDepositStatus.Expired;
-            deposit.LastProviderEventType = "expired";
-            deposit.UpdatedAtUtc = now;
-            return;
-        }
-
         if (string.IsNullOrWhiteSpace(deposit.DestinationAddress)
             || string.IsNullOrWhiteSpace(deposit.DestinationMemo)
             || deposit.AssetAmount is null
@@ -451,8 +443,30 @@ public sealed class PaymentsService : IPaymentsService
             Math.Max(_options.TelegramTon.TransactionSearchLimit, 1),
             _options.TelegramTon.ExplorerBaseUrl), ct);
 
-        if (!lookup.Success || !lookup.TransferFound)
+        if (!lookup.Success)
+        {
+            _logger.LogWarning(
+                "Telegram TON lookup failed for deposit {DepositId} (userId={UserId}, address={Address}, memo={Memo}, expectedTon={ExpectedTon}). Error: {Error}",
+                deposit.Id,
+                deposit.UserId,
+                deposit.DestinationAddress,
+                deposit.DestinationMemo,
+                deposit.AssetAmount,
+                lookup.Error ?? "Unknown error");
             return;
+        }
+
+        if (!lookup.TransferFound)
+        {
+            if (deposit.ExpiresAtUtc is not null && deposit.ExpiresAtUtc <= now)
+            {
+                deposit.Status = CryptoDepositStatus.Expired;
+                deposit.LastProviderEventType = "expired";
+                deposit.UpdatedAtUtc = now;
+            }
+
+            return;
+        }
 
         deposit.ProviderTransactionId ??= lookup.TransactionId;
         deposit.LastProviderEventType = "telegram_ton.transfer_detected";
