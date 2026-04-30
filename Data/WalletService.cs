@@ -256,33 +256,39 @@ public sealed class WalletService : IWalletService
         return new WalletClaimResult(true, user.Balance, amount, null);
     }
 
-    public async Task<WalletWithdrawRequestResult> CreateWithdrawalRequestAsync(long userId, decimal amount, string number, CancellationToken ct)
+    public async Task<WalletWithdrawRequestResult> CreateWithdrawalRequestAsync(long userId, decimal amount, string assetCode, string? address, bool saveAddress, CancellationToken ct)
     {
         var normalizedAmount = RoundAmount(amount);
         if (normalizedAmount <= 0)
             return new WalletWithdrawRequestResult(false, 0m, "Withdrawal amount must be greater than zero.");
 
+        var normalizedAssetCode = WithdrawalAssetCodes.Normalize(assetCode, defaultToBitcoin: false);
+        if (normalizedAssetCode is null)
+            return new WalletWithdrawRequestResult(false, 0m, "Unsupported withdrawal asset.");
+
         var user = await _db.Users.SingleOrDefaultAsync(x => x.Id == userId, ct);
         if (user is null)
             return new WalletWithdrawRequestResult(false, 0m, "User was not found.");
 
-        var normalizedNumber = NormalizePayoutNumber(number)
-            ?? NormalizePayoutNumber(user.WalletAddress);
+        var normalizedNumber = NormalizePayoutNumber(address)
+            ?? GetSavedPayoutAddress(user, normalizedAssetCode);
         if (normalizedNumber is null)
             return new WalletWithdrawRequestResult(false, 0m, "Please enter a valid payout address.");
 
         if (user.Balance < normalizedAmount)
-            return new WalletWithdrawRequestResult(false, user.Balance, "Insufficient balance.");
+            return new WalletWithdrawRequestResult(false, user.Balance, "Insufficient balance.", SavedAddresses: BuildSavedAddresses(user));
 
         var serverWallet = await EnsureServerWalletAsync(ct);
         var now = DateTimeOffset.UtcNow;
         user.Balance = RoundAmount(user.Balance - normalizedAmount);
-        user.WalletAddress = normalizedNumber;
+        if (saveAddress)
+            SetSavedPayoutAddress(user, normalizedAssetCode, normalizedNumber);
 
         var request = new WithdrawalRequest
         {
             UserId = user.Id,
             Amount = normalizedAmount,
+            AssetCode = normalizedAssetCode,
             Number = normalizedNumber,
             Status = WithdrawalRequestStatus.Pending,
             CreatedAtUtc = now
@@ -302,11 +308,15 @@ public sealed class WalletService : IWalletService
         });
 
         await _db.SaveChangesAsync(ct);
-        return new WalletWithdrawRequestResult(true, user.Balance, null, request);
+        return new WalletWithdrawRequestResult(true, user.Balance, null, request, BuildSavedAddresses(user));
     }
 
-    public async Task<WalletSaveAddressResult> SaveWalletAddressAsync(long userId, string address, CancellationToken ct)
+    public async Task<WalletSaveAddressResult> SaveWalletAddressAsync(long userId, string assetCode, string address, CancellationToken ct)
     {
+        var normalizedAssetCode = WithdrawalAssetCodes.Normalize(assetCode, defaultToBitcoin: false);
+        if (normalizedAssetCode is null)
+            return new WalletSaveAddressResult(false, "Unsupported withdrawal asset.");
+
         var normalizedAddress = NormalizePayoutNumber(address);
         if (normalizedAddress is null)
             return new WalletSaveAddressResult(false, "Please enter a valid wallet address.");
@@ -315,18 +325,20 @@ public sealed class WalletService : IWalletService
         if (user is null)
             return new WalletSaveAddressResult(false, "User was not found.");
 
-        user.WalletAddress = normalizedAddress;
+        SetSavedPayoutAddress(user, normalizedAssetCode, normalizedAddress);
         await _db.SaveChangesAsync(ct);
-        return new WalletSaveAddressResult(true, null, normalizedAddress);
+        return new WalletSaveAddressResult(true, null, BuildSavedAddresses(user), normalizedAddress);
     }
 
-    public async Task<string?> GetWalletAddressAsync(long userId, CancellationToken ct)
+    public async Task<WalletSavedAddresses> GetWalletAddressesAsync(long userId, CancellationToken ct)
     {
-        return await _db.Users
+        var addresses = await _db.Users
             .AsNoTracking()
             .Where(x => x.Id == userId)
-            .Select(x => x.WalletAddress)
+            .Select(x => new WalletSavedAddresses(x.WalletAddress, x.TonWalletAddress))
             .SingleOrDefaultAsync(ct);
+
+        return addresses ?? new WalletSavedAddresses(null, null);
     }
 
     public async Task<IReadOnlyList<WalletHistoryEntry>> GetHistoryAsync(long userId, int limit, CancellationToken ct)
@@ -364,8 +376,8 @@ public sealed class WalletService : IWalletService
                 x.CreatedAtUtc,
                 x.ExternalPayoutId,
                 x.ReviewNote,
-                null,
-                null,
+                GetHistoryPaymentMethod(x.AssetCode),
+                x.AssetCode,
                 null))
             .ToListAsync(ct);
 
@@ -378,9 +390,6 @@ public sealed class WalletService : IWalletService
 
     public async Task<WalletReviewWithdrawalResult> ConfirmWithdrawalAsync(long withdrawalRequestId, string adminUsername, CancellationToken ct)
     {
-        if (!_payments.Enabled)
-            return new WalletReviewWithdrawalResult(false, "Payments are disabled. Enable BTCPay payouts before confirming withdrawals.");
-
         var request = await _db.WithdrawalRequests
             .Include(x => x.User)
             .SingleOrDefaultAsync(x => x.Id == withdrawalRequestId, ct);
@@ -394,29 +403,46 @@ public sealed class WalletService : IWalletService
         if (!string.IsNullOrWhiteSpace(request.ExternalPayoutId))
             return new WalletReviewWithdrawalResult(false, "This withdrawal already has an external payout id.");
 
+        var normalizedAssetCode = WithdrawalAssetCodes.Normalize(request.AssetCode, defaultToBitcoin: true)
+            ?? WithdrawalAssetCodes.Bitcoin;
+
         var serverWallet = await EnsureServerWalletAsync(ct);
         if (serverWallet.Balance < request.Amount)
             return new WalletReviewWithdrawalResult(false, "Server wallet does not have enough balance to confirm this withdrawal.");
 
-        var payoutResult = await _btcPay.CreatePayoutAsync(new BtcPayCreatePayoutRequest(
-            request.Amount,
-            _payments.BtcPay.DefaultCurrency,
-            request.Number,
-            Reference: $"withdrawal:{request.Id}"), ct);
-        if (!payoutResult.Success)
-            return new WalletReviewWithdrawalResult(false, payoutResult.Error ?? "Failed to create BTCPay payout.");
-
         var now = DateTimeOffset.UtcNow;
+
+        if (normalizedAssetCode == WithdrawalAssetCodes.Bitcoin)
+        {
+            if (!_payments.Enabled)
+                return new WalletReviewWithdrawalResult(false, "Payments are disabled. Enable BTCPay payouts before confirming withdrawals.");
+
+            var payoutResult = await _btcPay.CreatePayoutAsync(new BtcPayCreatePayoutRequest(
+                request.Amount,
+                _payments.BtcPay.DefaultCurrency,
+                request.Number,
+                Reference: $"withdrawal:{request.Id}"), ct);
+            if (!payoutResult.Success)
+                return new WalletReviewWithdrawalResult(false, payoutResult.Error ?? "Failed to create BTCPay payout.");
+
+            request.ExternalPayoutId = payoutResult.PayoutId;
+            request.ExternalPayoutState = payoutResult.State;
+            request.ExternalPayoutCreatedAtUtc = payoutResult.CreatedAtUtc ?? now;
+        }
+        else
+        {
+            request.ExternalPayoutState = "sent";
+            request.ExternalPayoutCreatedAtUtc = now;
+        }
+
         serverWallet.Balance = RoundAmount(serverWallet.Balance - request.Amount);
         serverWallet.UpdatedAtUtc = now;
 
         request.Status = WithdrawalRequestStatus.Confirmed;
+        request.AssetCode = normalizedAssetCode;
         request.ReviewedByAdmin = string.IsNullOrWhiteSpace(adminUsername) ? "admin" : adminUsername.Trim();
         request.ReviewNote = null;
         request.ReviewedAtUtc = now;
-        request.ExternalPayoutId = payoutResult.PayoutId;
-        request.ExternalPayoutState = payoutResult.State;
-        request.ExternalPayoutCreatedAtUtc = payoutResult.CreatedAtUtc ?? now;
 
         _db.WalletTransactions.Add(new WalletTransaction
         {
@@ -480,6 +506,39 @@ public sealed class WalletService : IWalletService
             return null;
 
         return trimmed;
+    }
+
+    private static string? GetSavedPayoutAddress(MiniAppUser user, string assetCode)
+    {
+        return NormalizePayoutNumber(assetCode switch
+        {
+            WithdrawalAssetCodes.Ton => user.TonWalletAddress,
+            _ => user.WalletAddress
+        });
+    }
+
+    private static void SetSavedPayoutAddress(MiniAppUser user, string assetCode, string address)
+    {
+        if (assetCode == WithdrawalAssetCodes.Ton)
+        {
+            user.TonWalletAddress = address;
+            return;
+        }
+
+        user.WalletAddress = address;
+    }
+
+    private static WalletSavedAddresses BuildSavedAddresses(MiniAppUser user)
+        => new(user.WalletAddress, user.TonWalletAddress);
+
+    private static string? GetHistoryPaymentMethod(string? assetCode)
+    {
+        return WithdrawalAssetCodes.Normalize(assetCode, defaultToBitcoin: true) switch
+        {
+            WithdrawalAssetCodes.Ton => PaymentMethodKeys.TelegramTon,
+            WithdrawalAssetCodes.Bitcoin => PaymentMethodKeys.BtcPayCrypto,
+            _ => null
+        };
     }
 
     private static string MapWithdrawalHistoryStatus(WithdrawalRequestStatus status, string? externalPayoutState)

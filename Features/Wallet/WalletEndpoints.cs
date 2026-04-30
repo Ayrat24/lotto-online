@@ -47,7 +47,7 @@ public static class WalletEndpoints
             var telegramUserId = authResult.TelegramUserId!.Value;
             var user = await users.TouchUserAsync(telegramUserId, ct);
 
-            var result = await wallet.CreateWithdrawalRequestAsync(user.Id, req.Amount, req.Number, ct);
+            var result = await wallet.CreateWithdrawalRequestAsync(user.Id, req.Amount, req.AssetCode, req.Address ?? req.Number, req.SaveAddress, ct);
             if (!result.Success)
                 return Results.BadRequest(new { ok = false, error = result.Error ?? "Withdrawal request failed.", balance = result.UserBalance });
 
@@ -57,7 +57,13 @@ public static class WalletEndpoints
                 balance = result.UserBalance,
                 requestId = result.Request!.Id,
                 amount = result.Request.Amount,
-                walletAddress = result.Request.Number
+                assetCode = result.Request.AssetCode,
+                walletAddress = result.Request.Number,
+                savedAddresses = new
+                {
+                    bitcoinAddress = result.SavedAddresses?.BitcoinAddress,
+                    tonAddress = result.SavedAddresses?.TonAddress
+                }
             });
         });
 
@@ -77,9 +83,17 @@ public static class WalletEndpoints
 
             var telegramUserId = authResult.TelegramUserId!.Value;
             var user = await users.TouchUserAsync(telegramUserId, ct);
-            var address = await wallet.GetWalletAddressAsync(user.Id, ct);
+            var addresses = await wallet.GetWalletAddressesAsync(user.Id, ct);
 
-            return Results.Ok(new { ok = true, address });
+            return Results.Ok(new
+            {
+                ok = true,
+                addresses = new
+                {
+                    bitcoinAddress = addresses.BitcoinAddress,
+                    tonAddress = addresses.TonAddress
+                }
+            });
         });
 
         endpoints.MapPost("/api/wallet/address/save", async (
@@ -99,11 +113,20 @@ public static class WalletEndpoints
             var telegramUserId = authResult.TelegramUserId!.Value;
             var user = await users.TouchUserAsync(telegramUserId, ct);
 
-            var result = await wallet.SaveWalletAddressAsync(user.Id, req.Address, ct);
+            var result = await wallet.SaveWalletAddressAsync(user.Id, req.AssetCode, req.Address, ct);
             if (!result.Success)
                 return Results.BadRequest(new { ok = false, error = result.Error ?? "Failed to save wallet address." });
 
-            return Results.Ok(new { ok = true, address = result.WalletAddress });
+            return Results.Ok(new
+            {
+                ok = true,
+                address = result.SavedAddress,
+                addresses = new
+                {
+                    bitcoinAddress = result.SavedAddresses?.BitcoinAddress,
+                    tonAddress = result.SavedAddresses?.TonAddress
+                }
+            });
         });
 
         endpoints.MapPost("/api/wallet/history", async (

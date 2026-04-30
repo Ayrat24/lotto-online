@@ -10,11 +10,11 @@ public interface IWalletService
 
     Task<WalletClaimResult> ClaimTicketWinningsAsync(long userId, long ticketId, CancellationToken ct);
 
-    Task<WalletWithdrawRequestResult> CreateWithdrawalRequestAsync(long userId, decimal amount, string number, CancellationToken ct);
+    Task<WalletWithdrawRequestResult> CreateWithdrawalRequestAsync(long userId, decimal amount, string assetCode, string? address, bool saveAddress, CancellationToken ct);
 
-    Task<WalletSaveAddressResult> SaveWalletAddressAsync(long userId, string address, CancellationToken ct);
+    Task<WalletSaveAddressResult> SaveWalletAddressAsync(long userId, string assetCode, string address, CancellationToken ct);
 
-    Task<string?> GetWalletAddressAsync(long userId, CancellationToken ct);
+    Task<WalletSavedAddresses> GetWalletAddressesAsync(long userId, CancellationToken ct);
 
     Task<IReadOnlyList<WalletHistoryEntry>> GetHistoryAsync(long userId, int limit, CancellationToken ct);
 
@@ -29,11 +29,13 @@ public sealed record WalletPurchaseResult(bool Success, decimal UserBalance, str
 public sealed record WalletBatchPurchaseResult(bool Success, decimal UserBalance, decimal TotalCost, string? Error, IReadOnlyList<Ticket>? Tickets = null);
 public sealed record WalletClaimResult(bool Success, decimal UserBalance, decimal Amount, string? Error);
 
-public sealed record WalletWithdrawRequestResult(bool Success, decimal UserBalance, string? Error, WithdrawalRequest? Request = null);
+public sealed record WalletSavedAddresses(string? BitcoinAddress, string? TonAddress);
+
+public sealed record WalletWithdrawRequestResult(bool Success, decimal UserBalance, string? Error, WithdrawalRequest? Request = null, WalletSavedAddresses? SavedAddresses = null);
 
 public sealed record WalletReviewWithdrawalResult(bool Success, string? Error);
 
-public sealed record WalletSaveAddressResult(bool Success, string? Error, string? WalletAddress = null);
+public sealed record WalletSaveAddressResult(bool Success, string? Error, WalletSavedAddresses? SavedAddresses = null, string? SavedAddress = null);
 
 public sealed record WalletHistoryEntry(
     string Kind,

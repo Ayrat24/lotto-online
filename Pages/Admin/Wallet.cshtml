@@ -35,7 +35,8 @@
                         <th>@Model.T("admin.wallet.table.id", "Id")</th>
                         <th>@Model.T("admin.wallet.table.user", "User")</th>
                         <th>@Model.T("admin.wallet.table.amount", "Amount")</th>
-                        <th>@Model.T("admin.wallet.table.number", "Number")</th>
+                        <th>@Model.T("admin.wallet.table.asset", "Asset")</th>
+                        <th>@Model.T("admin.wallet.table.payoutAddress", "Payout address")</th>
                         <th>@Model.T("admin.wallet.table.createdUtc", "Created (UTC)")</th>
                         <th>@Model.T("admin.wallet.table.actions", "Actions")</th>
                     </tr>
@@ -47,6 +48,7 @@
                             <td>@wr.Id</td>
                             <td><code>@wr.UserId</code> / <code>@wr.TelegramUserId</code></td>
                             <td>@wr.Amount.ToString("0.00")</td>
+                            <td><span class="badge text-bg-secondary">@wr.AssetCode</span></td>
                             <td><code>@wr.Number</code></td>
                             <td>@wr.CreatedAtUtc.ToString("u")</td>
                             <td>
@@ -88,7 +90,8 @@
                         <th>@Model.T("admin.wallet.table.id", "Id")</th>
                         <th>@Model.T("admin.wallet.table.user", "User")</th>
                         <th>@Model.T("admin.wallet.table.amount", "Amount")</th>
-                        <th>@Model.T("admin.wallet.table.number", "Number")</th>
+                        <th>@Model.T("admin.wallet.table.asset", "Asset")</th>
+                        <th>@Model.T("admin.wallet.table.payoutAddress", "Payout address")</th>
                         <th>@Model.T("admin.wallet.table.status", "Status")</th>
                         <th>@Model.T("admin.wallet.table.createdUtc", "Created (UTC)")</th>
                         <th>@Model.T("admin.wallet.table.reviewedUtc", "Reviewed (UTC)")</th>
@@ -103,6 +106,7 @@
                             <td>@wr.Id</td>
                             <td><code>@wr.UserId</code> / <code>@wr.TelegramUserId</code></td>
                             <td>@wr.Amount.ToString("0.00")</td>
+                            <td><span class="badge text-bg-secondary">@wr.AssetCode</span></td>
                             <td><code>@wr.Number</code></td>
                             <td>@wr.Status</td>
                             <td>@wr.CreatedAtUtc.ToString("u")</td>

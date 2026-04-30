@@ -44,6 +44,7 @@ public sealed class AppDbContext : DbContext
             b.Property(x => x.PreferredLanguage).HasMaxLength(8);
             b.Property(x => x.AcquisitionDeepLink).HasMaxLength(128);
             b.Property(x => x.WalletAddress).HasMaxLength(256);
+            b.Property(x => x.TonWalletAddress).HasMaxLength(256);
             b.Property(x => x.InviteCode).HasMaxLength(32);
             b.Property(x => x.IsFake).IsRequired().HasDefaultValue(false);
             b.Property(x => x.Balance).HasPrecision(18, 2).IsRequired();
@@ -308,6 +309,10 @@ public sealed class AppDbContext : DbContext
                 .HasFilter("\"ExternalPayoutId\" IS NOT NULL");
 
             b.Property(x => x.Amount).HasPrecision(18, 2).IsRequired();
+            b.Property(x => x.AssetCode)
+                .HasMaxLength(16)
+                .IsRequired()
+                .HasDefaultValue(WithdrawalAssetCodes.Bitcoin);
             b.Property(x => x.Number).HasMaxLength(256).IsRequired();
             b.Property(x => x.ExternalPayoutId).HasMaxLength(128);
             b.Property(x => x.ExternalPayoutState).HasMaxLength(64);

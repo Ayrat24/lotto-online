@@ -317,15 +317,44 @@
           </div>
         </div>
 
-        <div class="profile-field-label" data-loc="client.profile.savedWallet">Saved wallet address</div>
-        <input id="walletAddressInput" type="text" maxlength="256" placeholder="Bitcoin wallet address" data-loc-placeholder="client.profile.walletPlaceholder" class="profile-input" />
-        <button id="saveWalletAddressBtn" type="button" class="secondary-btn" data-loc="client.button.saveWallet">Save wallet address</button>
-        <div id="walletAddressStatus" class="muted profile-status"></div>
+        <label class="profile-field-block" for="withdrawAmountInput">
+          <span class="profile-field-label" data-loc="client.profile.withdrawTitle">Request withdrawal</span>
+          <span class="profile-amount-field">
+            <span class="profile-amount-prefix">$</span>
+            <input id="withdrawAmountInput" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Amount" data-loc-placeholder="client.profile.amountPlaceholder" class="profile-input profile-amount-input" />
+          </span>
+        </label>
 
-        <div class="profile-field-label" data-loc="client.profile.withdrawTitle">Request withdrawal</div>
-        <input id="withdrawAmountInput" type="number" min="0.01" step="0.01" placeholder="Amount" data-loc-placeholder="client.profile.amountPlaceholder" class="profile-input" />
-        <input id="withdrawNumberInput" type="text" maxlength="256" placeholder="Wallet address (or leave empty to use saved)" data-loc-placeholder="client.profile.withdrawAddressPlaceholder" class="profile-input" />
-        <button id="withdrawBtn" type="button" class="profile-primary-cta" data-loc="client.button.withdraw">Withdraw</button>
+        <div class="profile-field-label" data-loc="client.withdraw.assetTitle">Choose coin</div>
+        <div id="withdrawAssetList" class="payment-systems-list payment-systems-icon-list"></div>
+
+        <section id="withdrawBitcoinFields" class="withdraw-payout-card">
+          <div class="profile-field-label" data-loc="client.withdraw.btcAddressLabel">Bitcoin payout address</div>
+          <input id="withdrawBitcoinAddressInput" type="text" maxlength="256" placeholder="Bitcoin wallet address" data-loc-placeholder="client.withdraw.btcAddressPlaceholder" class="profile-input" />
+          <label class="profile-checkbox-row" for="withdrawSaveBitcoinAddressCheckbox">
+            <input id="withdrawSaveBitcoinAddressCheckbox" type="checkbox" class="profile-checkbox-input" />
+            <span data-loc="client.withdraw.saveBtcAddress">Save this Bitcoin address for later</span>
+          </label>
+        </section>
+
+        <section id="withdrawTonFields" class="withdraw-payout-card" hidden>
+          <div class="profile-field-label" data-loc="client.withdraw.tonWalletLabel">TON payout wallet</div>
+          <div class="section-subtitle" data-loc="client.withdraw.tonWalletHint">Connect your TON wallet or paste a TON address below.</div>
+          <div class="withdraw-ton-connect-card">
+            <div id="withdrawTonConnectStatus" class="muted" data-loc="client.withdraw.tonConnectNotConnected">No TON wallet connected yet. You can connect one now or paste a TON address below.</div>
+            <div class="ton-connect-panel-actions withdraw-ton-connect-actions">
+              <button id="withdrawTonConnectBtn" type="button" class="secondary-btn" data-loc="client.topup.tonConnect.connectWallet">Connect wallet</button>
+              <button id="withdrawTonDisconnectBtn" type="button" class="secondary-btn" data-loc="client.topup.tonConnect.disconnectWallet" hidden>Disconnect</button>
+            </div>
+          </div>
+          <input id="withdrawTonAddressInput" type="text" maxlength="256" placeholder="TON wallet address" data-loc-placeholder="client.withdraw.tonAddressPlaceholder" class="profile-input" />
+          <label class="profile-checkbox-row" for="withdrawSaveTonAddressCheckbox">
+            <input id="withdrawSaveTonAddressCheckbox" type="checkbox" class="profile-checkbox-input" />
+            <span data-loc="client.withdraw.saveTonAddress">Save this TON address for later</span>
+          </label>
+        </section>
+
+        <button id="withdrawBtn" type="button" class="profile-primary-cta" data-loc="client.button.continue">Continue</button>
         <div id="withdrawStatus" class="muted profile-status"></div>
       </div>
 

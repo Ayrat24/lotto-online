@@ -32,10 +32,16 @@
   var withdrawBtn = document.getElementById('withdrawBtn');
   var withdrawStatusEl = document.getElementById('withdrawStatus');
   var withdrawAmountInputEl = document.getElementById('withdrawAmountInput');
-  var withdrawNumberInputEl = document.getElementById('withdrawNumberInput');
-  var walletAddressInputEl = document.getElementById('walletAddressInput');
-  var saveWalletAddressBtn = document.getElementById('saveWalletAddressBtn');
-  var walletAddressStatusEl = document.getElementById('walletAddressStatus');
+  var withdrawAssetListEl = document.getElementById('withdrawAssetList');
+  var withdrawBitcoinFieldsEl = document.getElementById('withdrawBitcoinFields');
+  var withdrawBitcoinAddressInputEl = document.getElementById('withdrawBitcoinAddressInput');
+  var withdrawSaveBitcoinAddressCheckboxEl = document.getElementById('withdrawSaveBitcoinAddressCheckbox');
+  var withdrawTonFieldsEl = document.getElementById('withdrawTonFields');
+  var withdrawTonConnectStatusEl = document.getElementById('withdrawTonConnectStatus');
+  var withdrawTonConnectBtn = document.getElementById('withdrawTonConnectBtn');
+  var withdrawTonDisconnectBtn = document.getElementById('withdrawTonDisconnectBtn');
+  var withdrawTonAddressInputEl = document.getElementById('withdrawTonAddressInput');
+  var withdrawSaveTonAddressCheckboxEl = document.getElementById('withdrawSaveTonAddressCheckbox');
   var openDepositScreenBtn = document.getElementById('openDepositScreenBtn');
   var openInviteScreenBtn = document.getElementById('openInviteScreenBtn');
   var openWithdrawScreenBtn = document.getElementById('openWithdrawScreenBtn');
@@ -185,6 +191,8 @@
   var referralIsBound = false;
   var paymentSystemsOptions = null;
   var selectedPaymentMethod = null;
+  var selectedWithdrawAsset = 'BTC';
+  var savedWalletAddresses = { bitcoin: '', ton: '' };
   var debugPaymentVariant = 'default';
 
   var activeDeposit = null;
@@ -469,10 +477,6 @@
 
   function setWithdrawStatus(text) {
     if (withdrawStatusEl) withdrawStatusEl.textContent = text || '';
-  }
-
-  function setWalletAddressStatus(text) {
-    if (walletAddressStatusEl) walletAddressStatusEl.textContent = text || '';
   }
 
   function setHistoryStatus(text) {
@@ -3024,6 +3028,66 @@
     return String(methodKey || '').trim().toLowerCase() === 'telegram_ton';
   }
 
+  function normalizeWithdrawAsset(assetCode) {
+    var normalized = String(assetCode || '').trim().toUpperCase();
+    return normalized === 'TON' ? 'TON' : 'BTC';
+  }
+
+  function getSelectedWithdrawAsset() {
+    selectedWithdrawAsset = normalizeWithdrawAsset(selectedWithdrawAsset);
+    return selectedWithdrawAsset;
+  }
+
+  function getSavedWithdrawAddress(assetCode) {
+    var normalizedAsset = normalizeWithdrawAsset(assetCode);
+    return normalizedAsset === 'TON'
+      ? String(savedWalletAddresses.ton || '').trim()
+      : String(savedWalletAddresses.bitcoin || '').trim();
+  }
+
+  function setSelectedWithdrawAsset(assetCode) {
+    selectedWithdrawAsset = normalizeWithdrawAsset(assetCode);
+    renderWithdrawAssetOptions();
+    renderWithdrawTonConnectPanel();
+  }
+
+  function renderWithdrawAssetOptions() {
+    if (!withdrawAssetListEl) return;
+
+    var selected = getSelectedWithdrawAsset();
+    var options = [
+      { assetCode: 'BTC', iconMethod: 'btcpay_crypto', title: t('client.withdraw.asset.btc', 'Bitcoin') },
+      { assetCode: 'TON', iconMethod: 'telegram_ton', title: t('client.withdraw.asset.ton', 'TON') }
+    ];
+
+    withdrawAssetListEl.innerHTML = '';
+
+    options.forEach(function (option) {
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'payment-system-icon-btn';
+      if (selected === option.assetCode) button.classList.add('payment-system-card-selected');
+      button.setAttribute('aria-label', option.title);
+      button.setAttribute('title', option.title);
+      button.setAttribute('aria-pressed', selected === option.assetCode ? 'true' : 'false');
+      button.appendChild(createPaymentSystemIcon(option.iconMethod));
+
+      var srText = document.createElement('span');
+      srText.className = 'visually-hidden';
+      srText.textContent = option.title;
+      button.appendChild(srText);
+
+      button.addEventListener('click', function () {
+        setSelectedWithdrawAsset(option.assetCode);
+      });
+
+      withdrawAssetListEl.appendChild(button);
+    });
+
+    if (withdrawBitcoinFieldsEl) withdrawBitcoinFieldsEl.hidden = selected !== 'BTC';
+    if (withdrawTonFieldsEl) withdrawTonFieldsEl.hidden = selected !== 'TON';
+  }
+
   function supportsTonConnect() {
     return !!(window.TON_CONNECT_UI && window.TON_CONNECT_UI.TonConnectUI && window.TonWeb && window.location && /^https:$/i.test(window.location.protocol || ''));
   }
@@ -3084,6 +3148,45 @@
     return value.slice(0, 6) + '…' + value.slice(-6);
   }
 
+  function applySavedWalletAddresses(addresses, force) {
+    var nextAddresses = addresses && typeof addresses === 'object' ? addresses : {};
+    savedWalletAddresses.bitcoin = String(nextAddresses.bitcoinAddress || nextAddresses.bitcoin || '').trim();
+    savedWalletAddresses.ton = String(nextAddresses.tonAddress || nextAddresses.ton || '').trim();
+
+    if (withdrawBitcoinAddressInputEl && (force || !String(withdrawBitcoinAddressInputEl.value || '').trim())) {
+      withdrawBitcoinAddressInputEl.value = savedWalletAddresses.bitcoin;
+    }
+
+    if (withdrawTonAddressInputEl && (force || !String(withdrawTonAddressInputEl.value || '').trim())) {
+      withdrawTonAddressInputEl.value = savedWalletAddresses.ton;
+    }
+  }
+
+  function renderWithdrawTonConnectPanel() {
+    if (!withdrawTonConnectStatusEl) return;
+
+    var selectedAsset = getSelectedWithdrawAsset();
+    var connectedAddress = getTonConnectAccountAddress();
+    var available = supportsTonConnect();
+    var shouldShow = selectedAsset === 'TON';
+
+    if (withdrawTonConnectBtn) withdrawTonConnectBtn.hidden = !shouldShow || !available || !!connectedAddress;
+    if (withdrawTonDisconnectBtn) withdrawTonDisconnectBtn.hidden = !shouldShow || !available || !connectedAddress;
+    if (!shouldShow) return;
+
+    if (!available) {
+      withdrawTonConnectStatusEl.textContent = t('client.withdraw.tonConnectUnavailable', 'TON Connect is unavailable here. Paste a TON address below instead.');
+      return;
+    }
+
+    if (connectedAddress) {
+      withdrawTonConnectStatusEl.textContent = t('client.topup.tonConnect.connectedPrefix', 'Connected wallet: ') + shortenWalletAddress(connectedAddress);
+      return;
+    }
+
+    withdrawTonConnectStatusEl.textContent = t('client.withdraw.tonConnectNotConnected', 'No TON wallet connected yet. You can connect one now or paste a TON address below.');
+  }
+
   function syncTonDepositScreenState() {
     if (!profileTonDepositScreenEl) return;
 
@@ -3131,6 +3234,7 @@
     if (tonConnectDisconnectBtn) tonConnectDisconnectBtn.hidden = !available || !connectedAddress;
     syncDepositWalletButtonLabel();
     syncTonDepositScreenState();
+    renderWithdrawTonConnectPanel();
   }
 
   function ensureTonConnectUi() {
@@ -4245,56 +4349,22 @@
       });
   }
 
-  function loadWalletAddress() {
+  function loadWalletAddresses() {
     if (!initData) return Promise.resolve(null);
 
     return postJson('/api/wallet/address/get', { initData: initData || '' }, null)
       .then(function (res) {
         if (!(res && res.ok)) return null;
 
-        var address = String(res.address || '').trim();
-        if (walletAddressInputEl) walletAddressInputEl.value = address;
-        if (withdrawNumberInputEl && !String(withdrawNumberInputEl.value || '').trim()) {
-          withdrawNumberInputEl.value = address;
-        }
-        return address;
+        var addresses = res.addresses || {};
+        applySavedWalletAddresses(addresses, false);
+        return addresses;
       })
       .catch(function () {
         return null;
       });
   }
 
-  function saveWalletAddress() {
-    if (!initData) return;
-
-    var address = walletAddressInputEl ? String(walletAddressInputEl.value || '').trim() : '';
-    if (!address) {
-      setWalletAddressStatus(t('client.wallet.enterAddressFirst', 'Enter wallet address first.'));
-      return;
-    }
-
-    if (saveWalletAddressBtn) saveWalletAddressBtn.disabled = true;
-    setWalletAddressStatus(t('client.wallet.savingAddress', 'Saving wallet address...'));
-
-    postJson('/api/wallet/address/save', { initData: initData || '', address: address }, null)
-      .then(function (res) {
-        if (!(res && res.ok)) {
-          setWalletAddressStatus(t('client.wallet.saveFailed', 'Failed to save wallet address.'));
-          return;
-        }
-
-        var normalized = String(res.address || address);
-        if (walletAddressInputEl) walletAddressInputEl.value = normalized;
-        if (withdrawNumberInputEl) withdrawNumberInputEl.value = normalized;
-        setWalletAddressStatus(t('client.wallet.saved', 'Wallet address saved.'));
-      })
-      .catch(function (err) {
-        setWalletAddressStatus(err.message || t('client.wallet.saveFailed', 'Failed to save wallet address.'));
-      })
-      .finally(function () {
-        if (saveWalletAddressBtn) saveWalletAddressBtn.disabled = false;
-      });
-  }
 
   function loadHistory() {
     if (!initData) return Promise.resolve(null);
@@ -4603,14 +4673,20 @@
     if (!initData) return;
 
     var amount = withdrawAmountInputEl ? Number(withdrawAmountInputEl.value) : NaN;
-    var number = withdrawNumberInputEl ? String(withdrawNumberInputEl.value || '').trim() : '';
+    var assetCode = getSelectedWithdrawAsset();
+    var number = assetCode === 'TON'
+      ? String((withdrawTonAddressInputEl && withdrawTonAddressInputEl.value) || getTonConnectAccountAddress() || '').trim()
+      : String((withdrawBitcoinAddressInputEl && withdrawBitcoinAddressInputEl.value) || '').trim();
+    var saveAddress = assetCode === 'TON'
+      ? !!(withdrawSaveTonAddressCheckboxEl && withdrawSaveTonAddressCheckboxEl.checked)
+      : !!(withdrawSaveBitcoinAddressCheckboxEl && withdrawSaveBitcoinAddressCheckboxEl.checked);
 
     if (!Number.isFinite(amount) || amount <= 0) {
       setWithdrawStatus(t('client.withdraw.enterValidAmount', 'Enter a valid withdrawal amount.'));
       return;
     }
 
-    if (!number && !(walletAddressInputEl && String(walletAddressInputEl.value || '').trim())) {
+    if (!number) {
       setWithdrawStatus(t('client.withdraw.enterAddressOrSave', 'Enter wallet address or save one first.'));
       return;
     }
@@ -4622,6 +4698,9 @@
     postJson('/api/wallet/withdraw', {
       initData: initData || '',
       amount: amount,
+      assetCode: assetCode,
+      address: number,
+      saveAddress: saveAddress,
       number: number
     }, null)
       .then(function (res) {
@@ -4632,8 +4711,10 @@
 
         latestState.balance = Number(res.balance || 0);
         renderBalance(latestState.balance);
-        if (res.walletAddress && walletAddressInputEl) walletAddressInputEl.value = String(res.walletAddress);
+        if (res.savedAddresses) applySavedWalletAddresses(res.savedAddresses, !!saveAddress);
         if (withdrawAmountInputEl) withdrawAmountInputEl.value = '';
+        if (withdrawSaveBitcoinAddressCheckboxEl) withdrawSaveBitcoinAddressCheckboxEl.checked = false;
+        if (withdrawSaveTonAddressCheckboxEl) withdrawSaveTonAddressCheckboxEl.checked = false;
         setWithdrawStatus(
           t('client.withdraw.requestPrefix', 'Withdrawal request #')
           + res.requestId
@@ -4642,6 +4723,9 @@
           + formatCurrency(res.amount)
           + '. '
           + t('client.withdraw.waitingApproval', 'Waiting for admin approval.'));
+        showCenterPopup(t('client.withdraw.popupSubmitted', 'Withdrawal request created. Please wait for admin approval.'), {
+          confirmText: t('client.popup.close', 'Close')
+        });
         loadHistory();
       })
       .catch(function (err) {
@@ -4728,10 +4812,15 @@
   }
   if (copyReferralLinkBtn) copyReferralLinkBtn.addEventListener('click', copyReferralLink);
   if (withdrawBtn) withdrawBtn.addEventListener('click', withdrawBalance);
-  if (saveWalletAddressBtn) saveWalletAddressBtn.addEventListener('click', saveWalletAddress);
+  if (withdrawTonConnectBtn) withdrawTonConnectBtn.addEventListener('click', connectTonWallet);
+  if (withdrawTonDisconnectBtn) withdrawTonDisconnectBtn.addEventListener('click', disconnectTonWallet);
   if (openDepositScreenBtn) openDepositScreenBtn.addEventListener('click', function () { setProfileScreen('deposit'); });
   if (openInviteScreenBtn) openInviteScreenBtn.addEventListener('click', function () { setProfileScreen('invite'); });
-  if (openWithdrawScreenBtn) openWithdrawScreenBtn.addEventListener('click', function () { setProfileScreen('withdraw'); });
+  if (openWithdrawScreenBtn) openWithdrawScreenBtn.addEventListener('click', function () {
+    setProfileScreen('withdraw');
+    renderWithdrawAssetOptions();
+    renderWithdrawTonConnectPanel();
+  });
   if (openHistoryScreenBtn) openHistoryScreenBtn.addEventListener('click', function () { setProfileScreen('history'); });
   if (backFromDepositBtn) backFromDepositBtn.addEventListener('click', function () { setProfileScreen('home'); });
   if (backFromTonDepositBtn) backFromTonDepositBtn.addEventListener('click', function () { setProfileScreen('deposit'); });
@@ -4814,6 +4903,8 @@
   renderWinners([]);
   renderHistory();
   renderBalance(0);
+  renderWithdrawAssetOptions();
+  renderWithdrawTonConnectPanel();
   if (topUpAmountInputEl && !String(topUpAmountInputEl.value || '').trim()) {
     setTopUpAmountValue(10);
   }
@@ -4846,7 +4937,7 @@
       .then(function () { return loadReferralProfile(); })
       .then(function () { return bindReferralCodeFromQuery(); })
       .then(function () { return refreshState(); })
-      .then(function () { return loadWalletAddress(); })
+      .then(function () { return loadWalletAddresses(); })
       .then(function () { return loadHistory(); })
       .then(function () {
         startPolling();
@@ -4885,7 +4976,7 @@
       .then(function () { return loadReferralProfile(); })
       .then(function () { return bindReferralCodeFromQuery(); })
       .then(function () { return refreshState(); })
-      .then(function () { return loadWalletAddress(); })
+      .then(function () { return loadWalletAddresses(); })
       .then(function () { return loadHistory(); })
       .then(function () {
         startPolling();

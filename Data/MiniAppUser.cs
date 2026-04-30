@@ -30,6 +30,8 @@ public sealed class MiniAppUser
 
     public string? WalletAddress { get; set; }
 
+    public string? TonWalletAddress { get; set; }
+
     public string? InviteCode { get; set; }
 
     public long? ReferredByUserId { get; set; }
