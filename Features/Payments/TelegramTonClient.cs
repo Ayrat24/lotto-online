@@ -359,7 +359,7 @@ public sealed class TelegramTonClient : ITelegramTonClient
 	}
 
 	private static string CoalesceError(string? error, string fallback)
-		=> string.IsNullOrWhiteSpace(error) ? fallback : error.Trim();
+		=> HasMeaningfulTonError(error) ? error!.Trim() : fallback;
 
 	private static string FormatTonException(Exception ex)
 	{
@@ -369,9 +369,9 @@ public sealed class TelegramTonClient : ITelegramTonClient
 		while (cursor is not null)
 		{
 			var typeName = cursor.GetType().Name;
-			var message = string.IsNullOrWhiteSpace(cursor.Message)
-				? "No error message was provided by the TON SDK/provider."
-				: cursor.Message.Trim();
+			var message = HasMeaningfulTonError(cursor.Message)
+				? cursor.Message.Trim()
+				: "TON SDK/provider returned an empty error response.";
 
 			var formatted = $"{typeName}: {message}";
 			if (!parts.Contains(formatted, StringComparer.Ordinal))
@@ -383,6 +383,21 @@ public sealed class TelegramTonClient : ITelegramTonClient
 		return parts.Count == 0
 			? "TON lookup failed with an unknown SDK error."
 			: string.Join(" | ", parts);
+	}
+
+	private static bool HasMeaningfulTonError(string? value)
+	{
+		if (string.IsNullOrWhiteSpace(value))
+			return false;
+
+		var normalized = value.Trim();
+		if (normalized.Length == 0)
+			return false;
+
+		return !string.Equals(normalized, "Received error:", StringComparison.OrdinalIgnoreCase)
+			&& !string.Equals(normalized, "Received error", StringComparison.OrdinalIgnoreCase)
+			&& !string.Equals(normalized, "Error:", StringComparison.OrdinalIgnoreCase)
+			&& !string.Equals(normalized, "Error", StringComparison.OrdinalIgnoreCase);
 	}
 
 	private sealed record TelegramTonTransactionCandidate(
