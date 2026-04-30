@@ -2,25 +2,25 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using MiniApp.Features.Offers;
 using MiniApp.Features.Payments;
+using Npgsql;
 
 namespace MiniApp.Data;
 
 public sealed class WalletService : IWalletService
 {
-    private const decimal DefaultTopUpAmount = 10m;
     private const string TonWithdrawalSupportMigrationName = "20260430053832_AddTonWithdrawalSupport";
     private readonly AppDbContext _db;
     private readonly IBtcPayClient _btcPay;
+    private readonly ITelegramTonRateService _telegramTonRate;
     private readonly PaymentsOptions _payments;
 
-    public WalletService(AppDbContext db, IBtcPayClient btcPay, IOptions<PaymentsOptions> payments)
+    public WalletService(AppDbContext db, IBtcPayClient btcPay, ITelegramTonRateService telegramTonRate, IOptions<PaymentsOptions> payments)
     {
         _db = db;
         _btcPay = btcPay;
+        _telegramTonRate = telegramTonRate;
         _payments = payments.Value;
     }
-
-    public decimal TopUpAmount => DefaultTopUpAmount;
 
     public async Task<ServerWallet> EnsureServerWalletAsync(CancellationToken ct)
     {
@@ -38,34 +38,6 @@ public sealed class WalletService : IWalletService
         _db.ServerWallets.Add(wallet);
         await _db.SaveChangesAsync(ct);
         return wallet;
-    }
-
-    public async Task<decimal> TopUpUserAsync(long userId, CancellationToken ct)
-    {
-        var user = await _db.Users.SingleOrDefaultAsync(x => x.Id == userId, ct)
-            ?? throw new InvalidOperationException($"User {userId} was not found.");
-
-        var serverWallet = await EnsureServerWalletAsync(ct);
-        var now = DateTimeOffset.UtcNow;
-
-        user.Balance = RoundAmount(user.Balance + TopUpAmount);
-        serverWallet.Balance = RoundAmount(serverWallet.Balance + TopUpAmount);
-        serverWallet.UpdatedAtUtc = now;
-
-        _db.WalletTransactions.Add(new WalletTransaction
-        {
-            UserId = user.Id,
-            Type = WalletTransactionType.TopUp,
-            UserDelta = TopUpAmount,
-            UserBalanceAfter = user.Balance,
-            ServerDelta = TopUpAmount,
-            ServerBalanceAfter = serverWallet.Balance,
-            Reference = "profile-topup",
-            CreatedAtUtc = now
-        });
-
-        await _db.SaveChangesAsync(ct);
-        return user.Balance;
     }
 
     public async Task<WalletBatchPurchaseResult> TryPurchaseTicketsAsync(long userId, long drawId, IReadOnlyList<string> numbersByTicket, long? offerId, CancellationToken ct)
@@ -269,11 +241,17 @@ public sealed class WalletService : IWalletService
         if (normalizedAssetCode is null)
             return new WalletWithdrawRequestResult(false, 0m, "Unsupported withdrawal asset.");
 
+        if (normalizedAssetCode == WithdrawalAssetCodes.Ton
+            && (!_payments.Enabled || !_payments.TelegramTon.Enabled || !_payments.TelegramTon.ServerWithdrawalsEnabled))
+        {
+            return new WalletWithdrawRequestResult(false, 0m, "TON withdrawals are unavailable right now.");
+        }
+
         var user = await _db.Users.SingleOrDefaultAsync(x => x.Id == userId, ct);
         if (user is null)
             return new WalletWithdrawRequestResult(false, 0m, "User was not found.");
 
-        var normalizedNumber = NormalizePayoutNumber(address)
+        var normalizedNumber = NormalizePayoutAddress(address, normalizedAssetCode)
             ?? GetSavedPayoutAddress(user, normalizedAssetCode);
         if (normalizedNumber is null)
             return new WalletWithdrawRequestResult(false, 0m, "Please enter a valid payout address.");
@@ -322,7 +300,7 @@ public sealed class WalletService : IWalletService
         if (normalizedAssetCode is null)
             return new WalletSaveAddressResult(false, "Unsupported withdrawal asset.");
 
-        var normalizedAddress = NormalizePayoutNumber(address);
+        var normalizedAddress = NormalizePayoutAddress(address, normalizedAssetCode);
         if (normalizedAddress is null)
             return new WalletSaveAddressResult(false, "Please enter a valid wallet address.");
 
@@ -384,10 +362,10 @@ public sealed class WalletService : IWalletService
                 "USD",
                 x.CreatedAtUtc,
                 x.ExternalPayoutId,
-                x.ReviewNote,
+                x.PayoutLastError ?? x.ReviewNote,
                 GetHistoryPaymentMethod(x.AssetCode),
                 x.AssetCode,
-                null))
+                x.AssetAmount))
             .ToListAsync(ct);
 
         return deposits
@@ -397,7 +375,7 @@ public sealed class WalletService : IWalletService
             .ToArray();
     }
 
-    public async Task<WalletReviewWithdrawalResult> ConfirmWithdrawalAsync(long withdrawalRequestId, string adminUsername, CancellationToken ct)
+    public async Task<WalletReviewWithdrawalResult> ConfirmWithdrawalAsync(long withdrawalRequestId, string adminUsername, string? payoutReference, CancellationToken ct)
     {
         await EnsureTonWithdrawalSchemaAsync(ct);
 
@@ -442,8 +420,32 @@ public sealed class WalletService : IWalletService
         }
         else
         {
-            request.ExternalPayoutState = "sent";
+            if (!_payments.Enabled || !_payments.TelegramTon.Enabled || !_payments.TelegramTon.ServerWithdrawalsEnabled)
+            {
+                return new WalletReviewWithdrawalResult(false, "Server-executed TON withdrawals are disabled.");
+            }
+
+            var resolvedRate = await _telegramTonRate.GetResolvedRateAsync(ct);
+            var usdPerTon = resolvedRate?.UsdPerTon ?? 0m;
+            if (usdPerTon <= 0m)
+                return new WalletReviewWithdrawalResult(false, "TON rate is unavailable right now.");
+
+            var tonAmount = RoundAssetAmountUp(request.Amount / usdPerTon, 9);
+            if (tonAmount <= 0m)
+                return new WalletReviewWithdrawalResult(false, "Calculated TON payout amount is too small.");
+
+            request.AssetAmount = tonAmount;
+            request.AssetRate = usdPerTon;
+            request.PayoutMemo ??= BuildTonWithdrawalMemo(request.Id);
+            request.ExternalPayoutId = null;
+            request.ExternalPayoutState = TonWithdrawalPayoutStates.Queued;
             request.ExternalPayoutCreatedAtUtc = now;
+            request.PayoutAttemptCount = 0;
+            request.PayoutSeqno = null;
+            request.PayoutLastAttemptAtUtc = null;
+            request.PayoutSubmittedAtUtc = null;
+            request.PayoutConfirmedAtUtc = null;
+            request.PayoutLastError = null;
         }
 
         serverWallet.Balance = RoundAmount(serverWallet.Balance - request.Amount);
@@ -467,7 +469,15 @@ public sealed class WalletService : IWalletService
             CreatedAtUtc = now
         });
 
-        await _db.SaveChangesAsync(ct);
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (IsDuplicateExternalPayoutId(ex))
+        {
+            return new WalletReviewWithdrawalResult(false, "This payout reference is already attached to another withdrawal request.");
+        }
+
         return new WalletReviewWithdrawalResult(true, null);
     }
 
@@ -509,13 +519,17 @@ public sealed class WalletService : IWalletService
         return new WalletReviewWithdrawalResult(true, null);
     }
 
-    private static string? NormalizePayoutNumber(string? value)
+    private static string? NormalizePayoutAddress(string? value, string assetCode)
     {
         var trimmed = value?.Trim();
         if (string.IsNullOrWhiteSpace(trimmed))
             return null;
 
         if (trimmed.Length > 256)
+            return null;
+
+        var normalizedAssetCode = WithdrawalAssetCodes.Normalize(assetCode, defaultToBitcoin: true) ?? WithdrawalAssetCodes.Bitcoin;
+        if (normalizedAssetCode == WithdrawalAssetCodes.Ton && !LooksLikeTonAddress(trimmed))
             return null;
 
         return trimmed;
@@ -535,11 +549,11 @@ public sealed class WalletService : IWalletService
 
     private static string? GetSavedPayoutAddress(MiniAppUser user, string assetCode)
     {
-        return NormalizePayoutNumber(assetCode switch
+        return NormalizePayoutAddress(assetCode switch
         {
             WithdrawalAssetCodes.Ton => user.TonWalletAddress,
             _ => user.WalletAddress
-        });
+        }, assetCode);
     }
 
     private static void SetSavedPayoutAddress(MiniAppUser user, string assetCode, string address)
@@ -569,15 +583,18 @@ public sealed class WalletService : IWalletService
     private static string MapWithdrawalHistoryStatus(WithdrawalRequestStatus status, string? externalPayoutState)
     {
         var payoutState = (externalPayoutState ?? string.Empty).Trim().ToLowerInvariant();
-        var isPaid = payoutState is "completed" or "sent";
-        var isRejected = payoutState is "failed" or "cancelled";
+        var isPaid = payoutState is "completed" or "sent" or "paid" or "confirmed" or "succeeded";
+        var isRejected = payoutState is "failed" or "cancelled" or "rejected" or "expired" or "invalid";
+        var isProcessing = payoutState is "queued" or "sending" or "submitted" or "retry_pending";
 
         return status switch
         {
             WithdrawalRequestStatus.Confirmed when isPaid => "paid",
             WithdrawalRequestStatus.Confirmed when isRejected => "rejected",
+            WithdrawalRequestStatus.Confirmed when isProcessing => "processing",
             WithdrawalRequestStatus.Pending => "waiting_for_admin_approval",
             WithdrawalRequestStatus.Denied => "rejected",
+            WithdrawalRequestStatus.Confirmed => "processing",
             _ => "waiting_for_admin_approval"
         };
     }
@@ -606,6 +623,50 @@ public sealed class WalletService : IWalletService
 
     private static decimal RoundAmount(decimal amount)
         => decimal.Round(amount, 2, MidpointRounding.AwayFromZero);
+
+    private static bool LooksLikeTonAddress(string value)
+    {
+        var trimmed = value.Trim();
+        if (trimmed.Length == 0)
+            return false;
+
+        var separatorIndex = trimmed.IndexOf(':');
+        if (separatorIndex > 0)
+        {
+            var workchain = trimmed[..separatorIndex];
+            var hash = trimmed[(separatorIndex + 1)..];
+            if ((workchain == "0" || workchain == "-1")
+                && hash.Length == 64
+                && hash.All(Uri.IsHexDigit))
+            {
+                return true;
+            }
+        }
+
+        if (trimmed.Length != 48)
+            return false;
+
+        return trimmed.All(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_' or '+' or '/');
+    }
+
+    private static string BuildTonWithdrawalMemo(long withdrawalRequestId)
+        => $"WD-{withdrawalRequestId}";
+
+    private static decimal RoundAssetAmountUp(decimal amount, int decimals)
+    {
+        var factor = 1m;
+        for (var i = 0; i < decimals; i++)
+            factor *= 10m;
+
+        return Math.Ceiling(amount * factor) / factor;
+    }
+
+    private static bool IsDuplicateExternalPayoutId(DbUpdateException ex)
+    {
+        return ex.InnerException is PostgresException pg
+            && pg.SqlState == PostgresErrorCodes.UniqueViolation
+            && string.Equals(pg.ConstraintName, "IX_withdrawal_requests_ExternalPayoutId", StringComparison.Ordinal);
+    }
 }
 
 

@@ -29,7 +29,9 @@ public sealed class WalletModel : LocalizedAdminPageModel
         long TelegramUserId,
         decimal Amount,
         string AssetCode,
+        decimal? AssetAmount,
         string Number,
+        string? ExternalPayoutId,
         string Status,
         DateTimeOffset CreatedAtUtc,
         DateTimeOffset? ReviewedAtUtc,
@@ -79,7 +81,7 @@ public sealed class WalletModel : LocalizedAdminPageModel
 
     public async Task<IActionResult> OnPostConfirmWithdrawalAsync(long id, CancellationToken ct)
     {
-        var result = await _wallet.ConfirmWithdrawalAsync(id, User.Identity?.Name ?? "admin", ct);
+        var result = await _wallet.ConfirmWithdrawalAsync(id, User.Identity?.Name ?? "admin", null, ct);
         var successTemplate = await GetTextAsync("admin.wallet.flash.confirmed", "Confirmed withdrawal request #{0}.", ct);
         var failedText = await GetTextAsync("admin.wallet.flash.confirmFailed", "Failed to confirm withdrawal request.", ct);
         FlashMessage = result.Success ? string.Format(successTemplate, id) : result.Error ?? failedText;
@@ -133,12 +135,14 @@ public sealed class WalletModel : LocalizedAdminPageModel
                 x.User.TelegramUserId,
                 x.Amount,
                 WithdrawalAssetCodes.Normalize(x.AssetCode, defaultToBitcoin: true) ?? WithdrawalAssetCodes.Bitcoin,
+                x.AssetAmount,
                 x.Number,
+                x.ExternalPayoutId,
                 x.Status.ToString(),
                 x.CreatedAtUtc,
                 x.ReviewedAtUtc,
                 x.ReviewedByAdmin,
-                x.ReviewNote))
+                x.PayoutLastError ?? x.ReviewNote))
             .ToArrayAsync(ct);
 
         RecentWithdrawalRequests = await _db.WithdrawalRequests
@@ -151,12 +155,14 @@ public sealed class WalletModel : LocalizedAdminPageModel
                 x.User.TelegramUserId,
                 x.Amount,
                 WithdrawalAssetCodes.Normalize(x.AssetCode, defaultToBitcoin: true) ?? WithdrawalAssetCodes.Bitcoin,
+                x.AssetAmount,
                 x.Number,
-                x.Status.ToString(),
+                x.ExternalPayoutId,
+                string.IsNullOrWhiteSpace(x.ExternalPayoutState) ? x.Status.ToString() : x.ExternalPayoutState!,
                 x.CreatedAtUtc,
                 x.ReviewedAtUtc,
                 x.ReviewedByAdmin,
-                x.ReviewNote))
+                x.PayoutLastError ?? x.ReviewNote))
             .ToArrayAsync(ct);
     }
 }

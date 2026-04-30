@@ -52,6 +52,30 @@ public sealed class TelegramTonOptions
 
     public bool AutoRefreshEnabled { get; set; } = true;
 
+    public bool ServerWithdrawalsEnabled { get; set; }
+
+    public int ReconciliationIntervalSeconds { get; set; } = 5;
+
+    public int WithdrawalWorkerIntervalSeconds { get; set; } = 8;
+
+    public int WithdrawalConfirmationTimeoutMinutes { get; set; } = 15;
+
+    public int WithdrawalMaxRetryAttempts { get; set; } = 3;
+
+    public int WithdrawalMessageTtlSeconds { get; set; } = 600;
+
+    public int HotWalletWorkchain { get; set; } = 0;
+
+    public int HotWalletRevision { get; set; } = 2;
+
+    public int HotWalletSubwalletId { get; set; } = 698983191;
+
+    public decimal HotWalletMinReserveTon { get; set; } = 0.2m;
+
+    public string HotWalletExpectedAddress { get; set; } = string.Empty;
+
+    public string HotWalletMnemonic { get; set; } = string.Empty;
+
     public string TwaReturnUrl { get; set; } = string.Empty;
 
     public string MerchantAddress { get; set; } = string.Empty;
@@ -174,6 +198,39 @@ public sealed class PaymentsOptionsValidator : IValidateOptions<PaymentsOptions>
 
             if (telegramTon.RequestTimeoutSeconds <= 0)
                 errors.Add("Payments:TelegramTon:RequestTimeoutSeconds must be greater than 0.");
+
+            if (telegramTon.ReconciliationIntervalSeconds <= 0)
+                errors.Add("Payments:TelegramTon:ReconciliationIntervalSeconds must be greater than 0.");
+
+            if (telegramTon.WithdrawalWorkerIntervalSeconds <= 0)
+                errors.Add("Payments:TelegramTon:WithdrawalWorkerIntervalSeconds must be greater than 0.");
+
+            if (telegramTon.WithdrawalConfirmationTimeoutMinutes <= 0)
+                errors.Add("Payments:TelegramTon:WithdrawalConfirmationTimeoutMinutes must be greater than 0.");
+
+            if (telegramTon.WithdrawalMaxRetryAttempts <= 0)
+                errors.Add("Payments:TelegramTon:WithdrawalMaxRetryAttempts must be greater than 0.");
+
+            if (telegramTon.WithdrawalMessageTtlSeconds <= 0)
+                errors.Add("Payments:TelegramTon:WithdrawalMessageTtlSeconds must be greater than 0.");
+
+            if (telegramTon.HotWalletSubwalletId < 0)
+                errors.Add("Payments:TelegramTon:HotWalletSubwalletId must be zero or greater.");
+
+            if (telegramTon.HotWalletRevision <= 0)
+                errors.Add("Payments:TelegramTon:HotWalletRevision must be greater than 0.");
+
+            if (telegramTon.HotWalletMinReserveTon < 0m)
+                errors.Add("Payments:TelegramTon:HotWalletMinReserveTon must be zero or greater.");
+
+            if (telegramTon.ServerWithdrawalsEnabled)
+            {
+                if (string.IsNullOrWhiteSpace(telegramTon.HotWalletExpectedAddress))
+                    errors.Add("Payments:TelegramTon:HotWalletExpectedAddress is required when server withdrawals are enabled.");
+
+                if (string.IsNullOrWhiteSpace(telegramTon.HotWalletMnemonic))
+                    errors.Add("Payments:TelegramTon:HotWalletMnemonic is required when server withdrawals are enabled.");
+            }
 
             if (telegramTon.TransactionSearchLimit <= 0)
                 errors.Add("Payments:TelegramTon:TransactionSearchLimit must be greater than 0.");

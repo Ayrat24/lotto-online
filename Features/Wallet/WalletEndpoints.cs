@@ -8,27 +8,14 @@ public static class WalletEndpoints
 {
     public static IEndpointRouteBuilder MapWalletEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapPost("/api/wallet/topup", async (
-            WalletTopUpRequest req,
-            HttpContext http,
-            IConfiguration config,
-            IWebHostEnvironment env,
-            AppDbContext db,
-            IUserService users,
-            IWalletService wallet,
-            CancellationToken ct) =>
-        {
-            var authResult = await TryResolveTelegramUserIdAsync(req.InitData, http, config, env, db, ct);
-            if (authResult.ErrorResult is not null)
-                return authResult.ErrorResult;
-
-            var telegramUserId = authResult.TelegramUserId!.Value;
-
-            var user = await users.TouchUserAsync(telegramUserId, ct);
-            var balance = await wallet.TopUpUserAsync(user.Id, ct);
-
-            return Results.Ok(new { ok = true, balance, added = wallet.TopUpAmount });
-        });
+        endpoints.MapPost("/api/wallet/topup", () =>
+            Results.Json(
+                new
+                {
+                    ok = false,
+                    error = "Direct wallet top ups are disabled. Create a crypto deposit intent instead."
+                },
+                statusCode: StatusCodes.Status410Gone));
 
         endpoints.MapPost("/api/wallet/withdraw", async (
             WalletWithdrawRequest req,

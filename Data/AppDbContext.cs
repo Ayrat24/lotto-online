@@ -304,11 +304,14 @@ public sealed class AppDbContext : DbContext
             b.HasIndex(x => x.Status);
             b.HasIndex(x => new { x.Status, x.CreatedAtUtc });
             b.HasIndex(x => new { x.UserId, x.CreatedAtUtc });
+            b.HasIndex(x => new { x.AssetCode, x.ExternalPayoutState, x.CreatedAtUtc });
             b.HasIndex(x => x.ExternalPayoutId)
                 .IsUnique()
                 .HasFilter("\"ExternalPayoutId\" IS NOT NULL");
 
             b.Property(x => x.Amount).HasPrecision(18, 2).IsRequired();
+            b.Property(x => x.AssetAmount).HasPrecision(18, 9);
+            b.Property(x => x.AssetRate).HasPrecision(18, 8);
             b.Property(x => x.AssetCode)
                 .HasMaxLength(16)
                 .IsRequired()
@@ -316,6 +319,8 @@ public sealed class AppDbContext : DbContext
             b.Property(x => x.Number).HasMaxLength(256).IsRequired();
             b.Property(x => x.ExternalPayoutId).HasMaxLength(128);
             b.Property(x => x.ExternalPayoutState).HasMaxLength(64);
+            b.Property(x => x.PayoutMemo).HasMaxLength(128);
+            b.Property(x => x.PayoutLastError).HasMaxLength(512);
             b.Property(x => x.Status)
                 .HasConversion<string>()
                 .HasMaxLength(32)

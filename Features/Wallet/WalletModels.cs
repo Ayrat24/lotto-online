@@ -2,7 +2,6 @@ using MiniApp.Data;
 
 namespace MiniApp.Features.Wallet;
 
-public sealed record WalletTopUpRequest(string InitData);
 
 public sealed record WalletWithdrawRequest(string InitData, decimal Amount, string AssetCode = WithdrawalAssetCodes.Bitcoin, string? Address = null, bool SaveAddress = false, string? Number = null);
 

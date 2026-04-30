@@ -114,12 +114,58 @@ public sealed class PaymentsService : IPaymentsService
         if (deposit is null)
             return new CryptoDepositStatusResult(false, "Deposit was not found.");
 
-        var now = DateTimeOffset.UtcNow;
-        await RefreshDepositStatusAsync(deposit, now, ct);
+        if (ShouldRefreshDepositOnStatusRequest(deposit))
+        {
+            var now = DateTimeOffset.UtcNow;
+            await RefreshDepositStatusAsync(deposit, now, ct);
+            if (_db.ChangeTracker.HasChanges())
+                await _db.SaveChangesAsync(ct);
+        }
+
+        return new CryptoDepositStatusResult(true, null, ToView(deposit));
+    }
+
+    public async Task<int> ReconcilePendingTelegramTonDepositsAsync(CancellationToken ct)
+    {
+        if (!_options.Enabled || !_options.TelegramTon.Enabled)
+            return 0;
+
+        var openStatuses = new[]
+        {
+            CryptoDepositStatus.AwaitingPayment,
+            CryptoDepositStatus.Paid,
+            CryptoDepositStatus.Confirmed
+        };
+
+        var deposits = await _db.CryptoDepositIntents
+            .Where(x => x.PaymentMethod == PaymentMethodKeys.TelegramTon && openStatuses.Contains(x.Status))
+            .OrderBy(x => x.CreatedAtUtc)
+            .ToListAsync(ct);
+
+        if (deposits.Count == 0)
+            return 0;
+
+        var changedCount = 0;
+        foreach (var deposit in deposits)
+        {
+            var beforeStatus = deposit.Status;
+            var beforeUpdatedAt = deposit.UpdatedAtUtc;
+            var beforeCreditedAt = deposit.CreditedAtUtc;
+
+            await RefreshTelegramTonDepositAsync(deposit, DateTimeOffset.UtcNow, ct);
+
+            if (deposit.Status != beforeStatus
+                || deposit.UpdatedAtUtc != beforeUpdatedAt
+                || deposit.CreditedAtUtc != beforeCreditedAt)
+            {
+                changedCount++;
+            }
+        }
+
         if (_db.ChangeTracker.HasChanges())
             await _db.SaveChangesAsync(ct);
 
-        return new CryptoDepositStatusResult(true, null, ToView(deposit));
+        return changedCount;
     }
 
     public async Task<ProcessWebhookResult> ProcessBtcPayWebhookAsync(string payloadJson, string? deliveryId, string? signature, CancellationToken ct)
@@ -339,12 +385,6 @@ public sealed class PaymentsService : IPaymentsService
         if (IsTerminalDepositStatus(deposit.Status))
             return;
 
-        if (string.Equals(deposit.PaymentMethod, PaymentMethodKeys.TelegramTon, StringComparison.Ordinal))
-        {
-            await RefreshTelegramTonDepositAsync(deposit, now, ct);
-            return;
-        }
-
         if (string.Equals(deposit.PaymentMethod, PaymentMethodKeys.BtcPayCrypto, StringComparison.Ordinal))
         {
             await RefreshBtcPayDepositAsync(deposit, now, ct);
@@ -414,6 +454,14 @@ public sealed class PaymentsService : IPaymentsService
         deposit.PaidAtUtc ??= lookup.ObservedAtUtc ?? now;
         deposit.ConfirmedAtUtc ??= lookup.ObservedAtUtc ?? now;
         deposit.UpdatedAtUtc = now;
+
+        _logger.LogInformation(
+            "Detected Telegram TON transfer for deposit {DepositId} (userId={UserId}, tx={TransactionId}, amountTon={AmountTon}, observedAt={ObservedAtUtc:u}).",
+            deposit.Id,
+            deposit.UserId,
+            lookup.TransactionId,
+            lookup.ReceivedTonAmount,
+            lookup.ObservedAtUtc ?? now);
 
         await CreditDepositOnceAsync(deposit, now, ct);
     }
@@ -750,6 +798,9 @@ public sealed class PaymentsService : IPaymentsService
 
     private static bool IsTerminalDepositStatus(CryptoDepositStatus status)
         => status is CryptoDepositStatus.Credited or CryptoDepositStatus.Expired or CryptoDepositStatus.Invalid;
+
+    private static bool ShouldRefreshDepositOnStatusRequest(CryptoDepositIntent deposit)
+        => string.Equals(deposit.PaymentMethod, PaymentMethodKeys.BtcPayCrypto, StringComparison.Ordinal);
 
     private static decimal RoundAmount(decimal amount)
         => decimal.Round(amount, 2, MidpointRounding.AwayFromZero);

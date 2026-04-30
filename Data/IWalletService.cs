@@ -2,10 +2,6 @@ namespace MiniApp.Data;
 
 public interface IWalletService
 {
-    decimal TopUpAmount { get; }
-
-    Task<decimal> TopUpUserAsync(long userId, CancellationToken ct);
-
     Task<WalletBatchPurchaseResult> TryPurchaseTicketsAsync(long userId, long drawId, IReadOnlyList<string> numbersByTicket, long? offerId, CancellationToken ct);
 
     Task<WalletClaimResult> ClaimTicketWinningsAsync(long userId, long ticketId, CancellationToken ct);
@@ -18,7 +14,7 @@ public interface IWalletService
 
     Task<IReadOnlyList<WalletHistoryEntry>> GetHistoryAsync(long userId, int limit, CancellationToken ct);
 
-    Task<WalletReviewWithdrawalResult> ConfirmWithdrawalAsync(long withdrawalRequestId, string adminUsername, CancellationToken ct);
+    Task<WalletReviewWithdrawalResult> ConfirmWithdrawalAsync(long withdrawalRequestId, string adminUsername, string? payoutReference, CancellationToken ct);
 
     Task<WalletReviewWithdrawalResult> DenyWithdrawalAsync(long withdrawalRequestId, string adminUsername, string? note, CancellationToken ct);
 

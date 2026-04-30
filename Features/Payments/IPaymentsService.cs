@@ -8,6 +8,8 @@ public interface IPaymentsService
 
     Task<CryptoDepositStatusResult> GetCryptoDepositStatusAsync(long userId, long depositId, CancellationToken ct);
 
+    Task<int> ReconcilePendingTelegramTonDepositsAsync(CancellationToken ct);
+
     Task<ProcessWebhookResult> ProcessBtcPayWebhookAsync(string payloadJson, string? deliveryId, string? signature, CancellationToken ct);
 }
 

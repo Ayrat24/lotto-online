@@ -80,7 +80,11 @@ builder.Services.AddHttpClient<ITelegramTonClient, TelegramTonClient>((sp, http)
     http.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
 });
 builder.Services.AddSingleton<ITelegramTonRateService, TelegramTonRateService>();
+builder.Services.AddSingleton<ITelegramTonHotWalletService, TelegramTonHotWalletService>();
+builder.Services.AddScoped<TelegramTonWithdrawalProcessor>();
 builder.Services.AddHostedService<TelegramTonRateRefreshHostedService>();
+builder.Services.AddHostedService<TelegramTonDepositReconciliationHostedService>();
+builder.Services.AddHostedService<TelegramTonWithdrawalHostedService>();
 builder.Services.AddScoped<IPaymentsService, PaymentsService>();
 builder.Services.AddScoped<ILocalizationService, LocalizationService>();
 
