@@ -199,7 +199,81 @@ public sealed class TelegramTonClient : ITelegramTonClient
 		}
 		catch (Exception ex)
 		{
-			return CacheFailure(cacheKey, now, FormatTonException(ex));
+			var sdkError = FormatTonException(ex);
+			var httpFallback = await TryGetTransactionsViaHttpAsync(walletAddress, baseUrl, limit, archival, ct);
+			if (httpFallback.Success)
+			{
+				TransactionCache[cacheKey] = httpFallback;
+				return httpFallback;
+			}
+
+			return CacheFailure(cacheKey, now, $"SDK failed: {sdkError} | HTTP fallback failed: {CoalesceError(httpFallback.Error, "TON lookup failed.")}");
+		}
+	}
+
+	private async Task<CachedTransactionBatch> TryGetTransactionsViaHttpAsync(string walletAddress, string baseUrl, int limit, bool archival, CancellationToken ct)
+	{
+		var now = DateTimeOffset.UtcNow;
+		try
+		{
+			var requestUri = BuildToncenterTransactionsUri(baseUrl, walletAddress, limit, archival);
+			using var message = new HttpRequestMessage(HttpMethod.Get, requestUri);
+			var apiKey = _options.TelegramTon.ApiKey.Trim();
+			if (apiKey.Length > 0)
+				message.Headers.Add("X-API-Key", apiKey);
+
+			using var response = await _http.SendAsync(message, ct);
+			var body = await response.Content.ReadAsStringAsync(ct);
+			if (!response.IsSuccessStatusCode)
+			{
+				return new CachedTransactionBatch(
+					false,
+					Array.Empty<TelegramTonTransactionCandidate>(),
+					$"TON lookup failed ({(int)response.StatusCode}).",
+					0,
+					now.AddSeconds(response.StatusCode == System.Net.HttpStatusCode.TooManyRequests ? 15 : 5));
+			}
+
+			using var doc = JsonDocument.Parse(body);
+			var root = doc.RootElement;
+			if (root.ValueKind != JsonValueKind.Object)
+				return new CachedTransactionBatch(false, Array.Empty<TelegramTonTransactionCandidate>(), "Unexpected TON response format.", 0, now.AddSeconds(5));
+
+			if (root.TryGetProperty("ok", out var okProp)
+				&& okProp.ValueKind == JsonValueKind.False)
+			{
+				return new CachedTransactionBatch(false, Array.Empty<TelegramTonTransactionCandidate>(), ExtractToncenterError(root), 0, now.AddSeconds(5));
+			}
+
+			if (!root.TryGetProperty("result", out var resultProp) || resultProp.ValueKind != JsonValueKind.Array)
+				return new CachedTransactionBatch(false, Array.Empty<TelegramTonTransactionCandidate>(), "TON API response does not contain transactions.", 0, now.AddSeconds(5));
+
+			var transactions = new List<TelegramTonTransactionCandidate>();
+			foreach (var tx in resultProp.EnumerateArray())
+			{
+				if (tx.ValueKind != JsonValueKind.Object)
+					continue;
+
+				if (!tx.TryGetProperty("in_msg", out var inMsg) || inMsg.ValueKind != JsonValueKind.Object)
+					continue;
+
+				transactions.Add(new TelegramTonTransactionCandidate(
+					ExtractTransactionId(tx),
+					TryGetTransactionTime(tx),
+					ExtractHttpMessageText(inMsg),
+					TryGetDecimal(inMsg, "value"),
+					TryGetString(inMsg, "source")));
+			}
+
+			return new CachedTransactionBatch(true, transactions, null, resultProp.GetArrayLength(), now.AddSeconds(5));
+		}
+		catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+		{
+			return new CachedTransactionBatch(false, Array.Empty<TelegramTonTransactionCandidate>(), "TON lookup timed out.", 0, now.AddSeconds(5));
+		}
+		catch (Exception ex)
+		{
+			return new CachedTransactionBatch(false, Array.Empty<TelegramTonTransactionCandidate>(), FormatTonException(ex), 0, now.AddSeconds(5));
 		}
 	}
 
@@ -299,6 +373,83 @@ public sealed class TelegramTonClient : ITelegramTonClient
 	{
 		var normalized = (message ?? string.Empty).Trim().TrimEnd('\0');
 		return normalized.Length == 0 ? null : normalized;
+	}
+
+	private static string? ExtractHttpMessageText(JsonElement inMsg)
+	{
+		if (TryGetString(inMsg, "message") is { Length: > 0 } message)
+			return ExtractMessageText(message);
+
+		if (TryGetString(inMsg, "comment") is { Length: > 0 } comment)
+			return ExtractMessageText(comment);
+
+		if (inMsg.TryGetProperty("msg_data", out var msgData) && msgData.ValueKind == JsonValueKind.Object)
+		{
+			if (TryGetString(msgData, "text") is { Length: > 0 } encodedText)
+			{
+				var decoded = TryDecodeBase64Text(encodedText);
+				return ExtractMessageText(decoded ?? encodedText);
+			}
+		}
+
+		return null;
+	}
+
+	private static string? TryDecodeBase64Text(string value)
+	{
+		if (string.IsNullOrWhiteSpace(value))
+			return null;
+
+		try
+		{
+			var bytes = Convert.FromBase64String(value);
+			var decoded = System.Text.Encoding.UTF8.GetString(bytes).TrimEnd('\0');
+			return string.IsNullOrWhiteSpace(decoded) ? null : decoded;
+		}
+		catch
+		{
+			return null;
+		}
+	}
+
+	private static DateTimeOffset? TryGetTransactionTime(JsonElement tx)
+	{
+		if (!tx.TryGetProperty("utime", out var utimeProp))
+			return null;
+
+		if (utimeProp.ValueKind == JsonValueKind.Number && utimeProp.TryGetInt64(out var unixSeconds))
+			return DateTimeOffset.FromUnixTimeSeconds(unixSeconds);
+
+		if (utimeProp.ValueKind == JsonValueKind.String
+			&& long.TryParse(utimeProp.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out unixSeconds))
+		{
+			return DateTimeOffset.FromUnixTimeSeconds(unixSeconds);
+		}
+
+		return null;
+	}
+
+	private static string? ExtractTransactionId(JsonElement tx)
+	{
+		if (tx.TryGetProperty("transaction_id", out var txId) && txId.ValueKind == JsonValueKind.Object)
+		{
+			if (TryGetString(txId, "hash") is { Length: > 0 } hash)
+				return hash;
+		}
+
+		return TryGetString(tx, "hash") ?? TryGetString(tx, "id");
+	}
+
+	private static string ExtractToncenterError(JsonElement root)
+		=> CoalesceError(TryGetString(root, "error") ?? TryGetString(root, "description") ?? TryGetString(root, "result"), "TON API returned an error.");
+
+	private static Uri BuildToncenterTransactionsUri(string baseUrl, string walletAddress, int limit, bool archival)
+	{
+		var uri = baseUrl + "getTransactions?address=" + Uri.EscapeDataString(walletAddress.Trim()) + "&limit=" + Math.Clamp(limit, 1, 100).ToString(CultureInfo.InvariantCulture);
+		if (archival)
+			uri += "&archival=true";
+
+		return new Uri(uri, UriKind.Absolute);
 	}
 
 	private static string? BuildExplorerLink(string? explorerBaseUrl, string? transactionId)

@@ -200,6 +200,12 @@ public sealed class PaymentsOptionsValidator : IValidateOptions<PaymentsOptions>
                 errors.Add("Payments:TelegramTon:ApiBaseUrl must be an absolute URI.");
             }
 
+            if (LooksLikeTestnetFriendlyTonAddress(telegramTon.MerchantAddress)
+                && !ApiBaseUrlLooksLikeTestnet(telegramTon.ApiBaseUrl))
+            {
+                errors.Add("Payments:TelegramTon:MerchantAddress looks like a TON testnet-friendly address (for example 0Q... or kQ...), but Payments:TelegramTon:ApiBaseUrl is not a testnet endpoint. Use a mainnet merchant address or set Payments:TelegramTon:ApiBaseUrl to https://testnet.toncenter.com/api/v2/ for testnet runs.");
+            }
+
             if (telegramTon.RequestTimeoutSeconds <= 0)
                 errors.Add("Payments:TelegramTon:RequestTimeoutSeconds must be greater than 0.");
 
@@ -250,6 +256,22 @@ public sealed class PaymentsOptionsValidator : IValidateOptions<PaymentsOptions>
         }
 
         return errors.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(errors);
+    }
+
+    private static bool LooksLikeTestnetFriendlyTonAddress(string? address)
+    {
+        var trimmed = (address ?? string.Empty).Trim();
+        return trimmed.StartsWith("kQ", StringComparison.Ordinal)
+            || trimmed.StartsWith("0Q", StringComparison.Ordinal);
+    }
+
+    private static bool ApiBaseUrlLooksLikeTestnet(string? apiBaseUrl)
+    {
+        var trimmed = (apiBaseUrl ?? string.Empty).Trim();
+        if (trimmed.Length == 0)
+            return false;
+
+        return trimmed.Contains("testnet", StringComparison.OrdinalIgnoreCase);
     }
 }
 
