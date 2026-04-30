@@ -236,8 +236,14 @@ public sealed class TelegramTonHotWalletService : ITelegramTonHotWalletService
             {
                 Endpoint = endpoint,
                 ApiKey = string.IsNullOrWhiteSpace(telegramTon.ApiKey) ? null : telegramTon.ApiKey.Trim(),
-                Timeout = telegramTon.RequestTimeoutSeconds <= 0 ? 15 : telegramTon.RequestTimeoutSeconds
+                Timeout = GetTonSdkTimeoutMilliseconds(telegramTon.RequestTimeoutSeconds)
             });
+    }
+
+    private static int GetTonSdkTimeoutMilliseconds(int requestTimeoutSeconds)
+    {
+        var timeoutSeconds = requestTimeoutSeconds <= 0 ? 15 : requestTimeoutSeconds;
+        return checked(timeoutSeconds * 1000);
     }
 
     private static string NormalizeAddress(string address)

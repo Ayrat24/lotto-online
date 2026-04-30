@@ -349,8 +349,14 @@ public sealed class TelegramTonClient : ITelegramTonClient
 			{
 				Endpoint = baseUrl,
 				ApiKey = string.IsNullOrWhiteSpace(_options.TelegramTon.ApiKey) ? null : _options.TelegramTon.ApiKey.Trim(),
-				Timeout = _options.TelegramTon.RequestTimeoutSeconds <= 0 ? 15 : _options.TelegramTon.RequestTimeoutSeconds
+				Timeout = GetTonSdkTimeoutMilliseconds()
 			});
+
+	private int GetTonSdkTimeoutMilliseconds()
+	{
+		var timeoutSeconds = _options.TelegramTon.RequestTimeoutSeconds <= 0 ? 15 : _options.TelegramTon.RequestTimeoutSeconds;
+		return checked(timeoutSeconds * 1000);
+	}
 
 	private sealed record TelegramTonTransactionCandidate(
 		string? TransactionId,
