@@ -21,8 +21,11 @@ using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
+using System.Globalization;
 
 var builder = WebApplication.CreateBuilder(args);
+
+ApplyLocalDotEnvConfiguration(builder);
 
 // ===== Config =====
 var localDebugRequested = builder.Configuration.GetValue<bool>("LocalDebug:Enabled");
@@ -354,6 +357,107 @@ if (telegramEnabled)
 }
 
 app.Run();
+
+static void ApplyLocalDotEnvConfiguration(WebApplicationBuilder builder)
+{
+    if (!builder.Environment.IsDevelopment())
+        return;
+
+    var dotEnvPath = Path.Combine(builder.Environment.ContentRootPath, ".env");
+    if (!File.Exists(dotEnvPath))
+        return;
+
+    var values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+    foreach (var rawLine in File.ReadAllLines(dotEnvPath))
+    {
+        var line = rawLine.Trim();
+        if (line.Length == 0 || line.StartsWith('#'))
+            continue;
+
+        var separatorIndex = line.IndexOf('=');
+        if (separatorIndex <= 0)
+            continue;
+
+        var key = line[..separatorIndex].Trim();
+        var value = line[(separatorIndex + 1)..].Trim();
+        if (value.Length >= 2 && value.StartsWith('"') && value.EndsWith('"'))
+            value = value[1..^1];
+
+        AddMappedDotEnvValue(values, key, value);
+    }
+
+    if (values.Count > 0)
+        builder.Configuration.AddInMemoryCollection(values);
+}
+
+static void AddMappedDotEnvValue(IDictionary<string, string?> values, string key, string value)
+{
+    if (key.Contains("__", StringComparison.Ordinal))
+    {
+        values[key.Replace("__", ":", StringComparison.Ordinal)] = value;
+        return;
+    }
+
+    if (TryMapDockerStyleDotEnvKey(key, out var mappedKey))
+    {
+        values[mappedKey] = value;
+        return;
+    }
+
+    values[key] = value;
+}
+
+static bool TryMapDockerStyleDotEnvKey(string key, out string mappedKey)
+{
+    mappedKey = key switch
+    {
+        "PAYMENTS_ENABLED" => "Payments:Enabled",
+        "PAYMENTS_DEFAULT_PAYMENT_METHOD" => "Payments:DefaultPaymentMethod",
+        "PAYMENTS_ENABLE_RECONCILIATION" => "Payments:Ops:EnableReconciliation",
+        "BTCPAY_ENABLED" => "Payments:BtcPay:Enabled",
+        "BTCPAY_BASE_URL" => "Payments:BtcPay:BaseUrl",
+        "BTCPAY_STORE_ID" => "Payments:BtcPay:StoreId",
+        "BTCPAY_API_KEY" => "Payments:BtcPay:ApiKey",
+        "BTCPAY_WEBHOOK_SECRET" => "Payments:BtcPay:WebhookSecret",
+        "BTCPAY_DEFAULT_CURRENCY" => "Payments:BtcPay:DefaultCurrency",
+        "BTCPAY_REQUEST_TIMEOUT_SECONDS" => "Payments:BtcPay:RequestTimeoutSeconds",
+        "BTCPAY_MAX_RETRY_ATTEMPTS" => "Payments:BtcPay:MaxRetryAttempts",
+        "BTCPAY_WITHDRAWALS_PULL_PAYMENT_ID" => "Payments:BtcPay:WithdrawalsPullPaymentId",
+        "BTCPAY_WITHDRAWALS_PAYMENT_METHOD" => "Payments:BtcPay:WithdrawalsPaymentMethod",
+        "TELEGRAMTON_ENABLED" => "Payments:TelegramTon:Enabled",
+        "TELEGRAMTON_TWA_RETURN_URL" => "Payments:TelegramTon:TwaReturnUrl",
+        "TELEGRAMTON_MERCHANT_ADDRESS" => "Payments:TelegramTon:MerchantAddress",
+        "TELEGRAMTON_MERCHANT_NAME" => "Payments:TelegramTon:MerchantName",
+        "TELEGRAMTON_USD_PER_TON" => "Payments:TelegramTon:UsdPerTon",
+        "TELEGRAMTON_AUTO_REFRESH_ENABLED" => "Payments:TelegramTon:AutoRefreshEnabled",
+        "TELEGRAMTON_RATE_API_BASE_URL" => "Payments:TelegramTon:RateApiBaseUrl",
+        "TELEGRAMTON_RATE_API_KEY" => "Payments:TelegramTon:RateApiKey",
+        "TELEGRAMTON_RATE_REFRESH_INTERVAL_MINUTES" => "Payments:TelegramTon:RateRefreshIntervalMinutes",
+        "TELEGRAMTON_MAX_RATE_AGE_MINUTES" => "Payments:TelegramTon:MaxRateAgeMinutes",
+        "TELEGRAMTON_API_BASE_URL" => "Payments:TelegramTon:ApiBaseUrl",
+        "TELEGRAMTON_API_KEY" => "Payments:TelegramTon:ApiKey",
+        "TELEGRAMTON_REQUEST_TIMEOUT_SECONDS" => "Payments:TelegramTon:RequestTimeoutSeconds",
+        "TELEGRAMTON_TRANSACTION_SEARCH_LIMIT" => "Payments:TelegramTon:TransactionSearchLimit",
+        "TELEGRAMTON_DEPOSIT_MATCH_TOLERANCE_TON" => "Payments:TelegramTon:DepositMatchToleranceTon",
+        "TELEGRAMTON_PAYMENT_TIMEOUT_MINUTES" => "Payments:TelegramTon:PaymentTimeoutMinutes",
+        "TELEGRAMTON_EXPLORER_BASE_URL" => "Payments:TelegramTon:ExplorerBaseUrl",
+        "TELEGRAMTON_SERVER_WITHDRAWALS_ENABLED" => "Payments:TelegramTon:ServerWithdrawalsEnabled",
+        "TELEGRAMTON_RECONCILIATION_INTERVAL_SECONDS" => "Payments:TelegramTon:ReconciliationIntervalSeconds",
+        "TELEGRAMTON_WITHDRAWAL_WORKER_INTERVAL_SECONDS" => "Payments:TelegramTon:WithdrawalWorkerIntervalSeconds",
+        "TELEGRAMTON_WITHDRAWAL_CONFIRMATION_TIMEOUT_MINUTES" => "Payments:TelegramTon:WithdrawalConfirmationTimeoutMinutes",
+        "TELEGRAMTON_WITHDRAWAL_MAX_RETRY_ATTEMPTS" => "Payments:TelegramTon:WithdrawalMaxRetryAttempts",
+        "TELEGRAMTON_WITHDRAWAL_MESSAGE_TTL_SECONDS" => "Payments:TelegramTon:WithdrawalMessageTtlSeconds",
+        "TELEGRAMTON_HOT_WALLET_WORKCHAIN" => "Payments:TelegramTon:HotWalletWorkchain",
+        "TELEGRAMTON_HOT_WALLET_REVISION" => "Payments:TelegramTon:HotWalletRevision",
+        "TELEGRAMTON_HOT_WALLET_SUBWALLET_ID" => "Payments:TelegramTon:HotWalletSubwalletId",
+        "TELEGRAMTON_HOT_WALLET_MIN_RESERVE_TON" => "Payments:TelegramTon:HotWalletMinReserveTon",
+        "TELEGRAMTON_HOT_WALLET_EXPECTED_ADDRESS" => "Payments:TelegramTon:HotWalletExpectedAddress",
+        "TELEGRAMTON_HOT_WALLET_MNEMONIC" => "Payments:TelegramTon:HotWalletMnemonic",
+        _ => string.Empty
+    };
+
+    return mappedKey.Length > 0;
+}
 
 // ===== Implementation =====
 
