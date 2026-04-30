@@ -35,51 +35,53 @@ public static class WalletEndpoints
             HttpContext http,
             IConfiguration config,
             IWebHostEnvironment env,
+            ILoggerFactory loggerFactory,
             AppDbContext db,
             IUserService users,
             IWalletService wallet,
             CancellationToken ct) =>
         {
-            var authResult = await TryResolveTelegramUserIdAsync(req.InitData, http, config, env, db, ct);
-            if (authResult.ErrorResult is not null)
-                return authResult.ErrorResult;
-
-            var telegramUserId = authResult.TelegramUserId!.Value;
-            var user = await users.TouchUserAsync(telegramUserId, ct);
-
-            WalletWithdrawRequestResult result;
             try
             {
-                result = await wallet.CreateWithdrawalRequestAsync(user.Id, req.Amount, req.AssetCode, req.Address ?? req.Number, req.SaveAddress, ct);
+                var authResult = await TryResolveTelegramUserIdAsync(req.InitData, http, config, env, db, ct);
+                if (authResult.ErrorResult is not null)
+                    return authResult.ErrorResult;
+
+                var telegramUserId = authResult.TelegramUserId!.Value;
+                var user = await users.TouchUserAsync(telegramUserId, ct);
+
+                var result = await wallet.CreateWithdrawalRequestAsync(user.Id, req.Amount, req.AssetCode, req.Address ?? req.Number, req.SaveAddress, ct);
+                if (!result.Success)
+                    return Results.BadRequest(new { ok = false, error = result.Error ?? "Withdrawal request failed.", balance = result.UserBalance });
+
+                return Results.Ok(new
+                {
+                    ok = true,
+                    balance = result.UserBalance,
+                    requestId = result.Request!.Id,
+                    amount = result.Request.Amount,
+                    assetCode = result.Request.AssetCode,
+                    walletAddress = result.Request.Number,
+                    savedAddresses = new
+                    {
+                        bitcoinAddress = result.SavedAddresses?.BitcoinAddress,
+                        tonAddress = result.SavedAddresses?.TonAddress
+                    }
+                });
             }
-            catch
+            catch (Exception ex)
             {
+                loggerFactory.CreateLogger("WalletWithdraw")
+                    .LogError(ex, "Wallet withdrawal request failed before completion.");
+
                 return Results.Json(
                     new
                     {
                         ok = false,
-                        error = "wallet_update_in_progress"
+                        error = "wallet_request_failed"
                     },
-                    statusCode: StatusCodes.Status503ServiceUnavailable);
+                    statusCode: StatusCodes.Status500InternalServerError);
             }
-
-            if (!result.Success)
-                return Results.BadRequest(new { ok = false, error = result.Error ?? "Withdrawal request failed.", balance = result.UserBalance });
-
-            return Results.Ok(new
-            {
-                ok = true,
-                balance = result.UserBalance,
-                requestId = result.Request!.Id,
-                amount = result.Request.Amount,
-                assetCode = result.Request.AssetCode,
-                walletAddress = result.Request.Number,
-                savedAddresses = new
-                {
-                    bitcoinAddress = result.SavedAddresses?.BitcoinAddress,
-                    tonAddress = result.SavedAddresses?.TonAddress
-                }
-            });
         });
 
         endpoints.MapPost("/api/wallet/address/get", async (

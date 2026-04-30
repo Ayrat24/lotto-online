@@ -485,6 +485,9 @@
     if (normalized === 'wallet_update_in_progress') {
       return t('client.withdraw.serverUpdating', 'Wallet update is still being applied. Please try again in a moment.');
     }
+    if (normalized === 'wallet_request_failed') {
+      return t('client.withdraw.serverError', 'Server could not create the withdrawal request. Please try again or contact support.');
+    }
 
     if (/^<!doctype html>/i.test(normalized) || /<html/i.test(normalized)) {
       return t('client.withdraw.serverUpdating', 'Wallet update is still being applied. Please try again in a moment.');
@@ -4719,7 +4722,7 @@
     }, null)
       .then(function (res) {
         if (!(res && res.ok)) {
-          setWithdrawStatus(t('client.withdraw.failed', 'Withdrawal request failed.'));
+          setWithdrawStatus(formatWithdrawErrorMessage(res && res.error));
           return;
         }
 

@@ -242,6 +242,7 @@ internal static class LocalizationDefaults
             ["client.withdraw.submitting"] = ("Submitting withdrawal request...", "Отправка запроса на вывод...", "Yechib olish so'rovi yuborilmoqda..."),
             ["client.withdraw.failed"] = ("Withdrawal request failed.", "Запрос на вывод не выполнен.", "Yechib olish so'rovi muvaffaqiyatsiz."),
             ["client.withdraw.serverUpdating"] = ("Wallet update is still being applied. Please try again in a moment.", "Обновление кошелька все еще применяется. Пожалуйста, попробуйте еще раз через минуту.", "Hamyon yangilanishi hali qo'llanmoqda. Iltimos, birozdan so'ng yana urinib ko'ring."),
+            ["client.withdraw.serverError"] = ("Server could not create the withdrawal request. Please try again or contact support.", "Сервер не смог создать запрос на вывод. Попробуйте еще раз или обратитесь в поддержку.", "Server yechib olish so'rovini yarata olmadi. Yana urinib ko'ring yoki qo'llab-quvvatlashga murojaat qiling."),
             ["client.withdraw.requestPrefix"] = ("Withdrawal request #", "Запрос на вывод #", "Yechib olish so'rovi #"),
             ["client.withdraw.submittedFor"] = ("submitted for ", "отправлен на сумму ", "summa uchun yuborildi "),
             ["client.withdraw.waitingApproval"] = ("Waiting for admin approval.", "Ожидает одобрения администратора.", "Admin tasdiqlashini kutmoqda."),
