@@ -2,9 +2,7 @@ using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
-using TonSdk.Client;
 using TonSdk.Core;
-using TonSdk.Core.Boc;
 
 namespace MiniApp.Features.Payments;
 
@@ -75,7 +73,7 @@ public sealed class TelegramTonClient : ITelegramTonClient
 		}
 		catch (Exception ex)
 		{
-			return new TelegramTonLookupResult(false, false, FormatTonException(ex));
+			return new TelegramTonLookupResult(false, false, FormatExceptionText(ex));
 		}
 	}
 
@@ -114,7 +112,7 @@ public sealed class TelegramTonClient : ITelegramTonClient
 		}
 		catch (Exception ex)
 		{
-			return new TelegramTonRecentTransfersResult(false, FormatTonException(ex));
+			return new TelegramTonRecentTransfersResult(false, FormatExceptionText(ex));
 		}
 	}
 
@@ -169,46 +167,9 @@ public sealed class TelegramTonClient : ITelegramTonClient
 		if (TransactionCache.TryGetValue(cacheKey, out var cached) && cached.ExpiresAtUtc > now)
 			return cached;
 
-		try
-		{
-			using var client = CreateTonClient(baseUrl);
-			var address = new Address(walletAddress.Trim());
-			var response = await client.GetTransactions(
-				address,
-				checked((uint)Math.Clamp(limit, 1, 100)),
-				null,
-				null,
-				null,
-				archival);
-
-			var rawTransactions = response ?? [];
-			var transactions = new List<TelegramTonTransactionCandidate>();
-			foreach (var tx in rawTransactions)
-			{
-				transactions.Add(new TelegramTonTransactionCandidate(
-					string.IsNullOrWhiteSpace(tx.TransactionId.Hash) ? null : tx.TransactionId.Hash,
-					DateTimeOffset.FromUnixTimeSeconds(tx.UTime),
-					ExtractMessageText(tx.InMsg.Message),
-					ToNanotons(tx.InMsg.Value.ToDecimal()),
-					tx.InMsg.Source?.ToString()));
-			}
-
-			var success = new CachedTransactionBatch(true, transactions, null, rawTransactions.Length, now.AddSeconds(5));
-			TransactionCache[cacheKey] = success;
-			return success;
-		}
-		catch (Exception ex)
-		{
-			var sdkError = FormatTonException(ex);
-			var httpFallback = await TryGetTransactionsViaHttpAsync(walletAddress, baseUrl, limit, archival, ct);
-			if (httpFallback.Success)
-			{
-				TransactionCache[cacheKey] = httpFallback;
-				return httpFallback;
-			}
-
-			return CacheFailure(cacheKey, now, $"SDK failed: {sdkError} | HTTP fallback failed: {CoalesceError(httpFallback.Error, "TON lookup failed.")}");
-		}
+		var batch = await TryGetTransactionsViaHttpAsync(walletAddress, baseUrl, limit, archival, ct);
+		TransactionCache[cacheKey] = batch;
+		return batch;
 	}
 
 	private async Task<CachedTransactionBatch> TryGetTransactionsViaHttpAsync(string walletAddress, string baseUrl, int limit, bool archival, CancellationToken ct)
@@ -273,7 +234,7 @@ public sealed class TelegramTonClient : ITelegramTonClient
 		}
 		catch (Exception ex)
 		{
-			return new CachedTransactionBatch(false, Array.Empty<TelegramTonTransactionCandidate>(), FormatTonException(ex), 0, now.AddSeconds(5));
+			return new CachedTransactionBatch(false, Array.Empty<TelegramTonTransactionCandidate>(), FormatExceptionText(ex), 0, now.AddSeconds(5));
 		}
 	}
 
@@ -493,62 +454,16 @@ public sealed class TelegramTonClient : ITelegramTonClient
 	private static decimal ToNanotons(decimal tonAmount)
 		=> decimal.Round(tonAmount * 1_000_000_000m, 0, MidpointRounding.AwayFromZero);
 
-	private TonClient CreateTonClient(string baseUrl)
-		=> new(
-			TonClientType.HTTP_TONCENTERAPIV2,
-			new HttpParameters
-			{
-				Endpoint = baseUrl,
-				ApiKey = string.IsNullOrWhiteSpace(_options.TelegramTon.ApiKey) ? null : _options.TelegramTon.ApiKey.Trim(),
-				Timeout = GetTonSdkTimeoutMilliseconds()
-			});
-
-	private int GetTonSdkTimeoutMilliseconds()
-	{
-		var timeoutSeconds = _options.TelegramTon.RequestTimeoutSeconds <= 0 ? 15 : _options.TelegramTon.RequestTimeoutSeconds;
-		return checked(timeoutSeconds * 1000);
-	}
-
 	private static string CoalesceError(string? error, string fallback)
-		=> HasMeaningfulTonError(error) ? error!.Trim() : fallback;
+		=> string.IsNullOrWhiteSpace(error) ? fallback : error.Trim();
 
-	private static string FormatTonException(Exception ex)
+	private static string FormatExceptionText(Exception ex)
 	{
-		var parts = new List<string>();
+		var message = string.IsNullOrWhiteSpace(ex.Message)
+			? "TON lookup failed with an unknown transport error."
+			: ex.Message.Trim();
 
-		var cursor = ex;
-		while (cursor is not null)
-		{
-			var typeName = cursor.GetType().Name;
-			var message = HasMeaningfulTonError(cursor.Message)
-				? cursor.Message.Trim()
-				: "TON SDK/provider returned an empty error response.";
-
-			var formatted = $"{typeName}: {message}";
-			if (!parts.Contains(formatted, StringComparer.Ordinal))
-				parts.Add(formatted);
-
-			cursor = cursor.InnerException;
-		}
-
-		return parts.Count == 0
-			? "TON lookup failed with an unknown SDK error."
-			: string.Join(" | ", parts);
-	}
-
-	private static bool HasMeaningfulTonError(string? value)
-	{
-		if (string.IsNullOrWhiteSpace(value))
-			return false;
-
-		var normalized = value.Trim();
-		if (normalized.Length == 0)
-			return false;
-
-		return !string.Equals(normalized, "Received error:", StringComparison.OrdinalIgnoreCase)
-			&& !string.Equals(normalized, "Received error", StringComparison.OrdinalIgnoreCase)
-			&& !string.Equals(normalized, "Error:", StringComparison.OrdinalIgnoreCase)
-			&& !string.Equals(normalized, "Error", StringComparison.OrdinalIgnoreCase);
+		return $"{ex.GetType().Name}: {message}";
 	}
 
 	private sealed record TelegramTonTransactionCandidate(
