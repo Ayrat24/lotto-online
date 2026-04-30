@@ -875,7 +875,13 @@ public sealed class PaymentsService : IPaymentsService
             .AnyAsync(x => x.Type == WalletTransactionType.CryptoDepositCredited && x.Reference == creditReference, ct);
 
         TelegramTonLookupResult? lookup = null;
-        if (includeLookup
+        var lookupAttempted = includeLookup
+            && !string.IsNullOrWhiteSpace(deposit.DestinationAddress)
+            && !string.IsNullOrWhiteSpace(deposit.DestinationMemo)
+            && deposit.AssetAmount is not null
+            && deposit.AssetAmount.Value > 0m;
+
+        if (lookupAttempted
             && !string.IsNullOrWhiteSpace(deposit.DestinationAddress)
             && !string.IsNullOrWhiteSpace(deposit.DestinationMemo)
             && deposit.AssetAmount is not null
@@ -910,6 +916,7 @@ public sealed class PaymentsService : IPaymentsService
             deposit.CreditedAtUtc,
             creditReference,
             walletTransactionExists,
+            lookupAttempted,
             lookup?.Success ?? false,
             lookup?.TransferFound ?? false,
             lookup?.Error,

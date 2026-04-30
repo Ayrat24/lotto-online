@@ -84,7 +84,7 @@
                             <td>
                                 @if (deposit.LookupTransferFound)
                                 {
-                                    <div><span class="badge text-bg-success">@Model.T("admin.tonDeposits.lookup.found", "Match found")</span></div>
+                                    <div><span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">@Model.T("admin.tonDeposits.lookup.found", "Match found")</span></div>
                                     @if (deposit.LookupReceivedTonAmount is not null)
                                     {
                                         <div class="small text-muted">@deposit.LookupReceivedTonAmount.Value.ToString("0.00000000") TON</div>
@@ -94,14 +94,20 @@
                                         <div class="small"><code>@deposit.LookupSenderAddress</code></div>
                                     }
                                 }
+                                else if (!deposit.LookupAttempted)
+                                {
+                                    <div><span class="badge bg-light text-dark border">@Model.T("admin.tonDeposits.lookup.notRun", "No live lookup yet")</span></div>
+                                    <div class="small text-muted">@Model.T("admin.tonDeposits.lookup.notRunHint", "Click Reconcile now to run a live Toncenter check for this deposit.")</div>
+                                }
                                 else if (!deposit.LookupSuccess && !string.IsNullOrWhiteSpace(deposit.LookupError))
                                 {
-                                    <div><span class="badge text-bg-danger">@Model.T("admin.tonDeposits.lookup.failed", "Lookup failed")</span></div>
+                                    <div><span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle">@Model.T("admin.tonDeposits.lookup.failed", "Lookup failed")</span></div>
                                     <div class="small text-danger">@deposit.LookupError</div>
                                 }
                                 else
                                 {
-                                    <div><span class="badge text-bg-secondary">@Model.T("admin.tonDeposits.lookup.notFound", "No matching transfer")</span></div>
+                                    <div><span class="badge bg-warning-subtle text-dark border border-warning-subtle">@Model.T("admin.tonDeposits.lookup.notFound", "No matching transfer")</span></div>
+                                    <div class="small text-muted">@Model.T("admin.tonDeposits.lookup.notFoundHint", "A live lookup ran, but no recent transaction matched this memo and amount.")</div>
                                 }
                             </td>
                             <td>

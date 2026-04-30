@@ -74,6 +74,7 @@ public sealed record TelegramTonAdminDepositDiagnosticView(
     DateTimeOffset? CreditedAtUtc,
     string CreditReference,
     bool WalletTransactionExists,
+    bool LookupAttempted,
     bool LookupSuccess,
     bool LookupTransferFound,
     string? LookupError,
