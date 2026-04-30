@@ -82,6 +82,48 @@ public sealed class TelegramTonClient : ITelegramTonClient
 		}
 	}
 
+	public async Task<TelegramTonRecentTransfersResult> GetRecentIncomingTransfersAsync(TelegramTonRecentTransfersRequest request, CancellationToken ct)
+	{
+		var walletAddress = request.WalletAddress.Trim();
+		if (walletAddress.Length == 0)
+			return new TelegramTonRecentTransfersResult(false, "TON wallet address is required.");
+
+		var baseUrl = _options.TelegramTon.ApiBaseUrl.Trim();
+		if (baseUrl.Length == 0)
+			baseUrl = "https://toncenter.com/api/v2/";
+		if (!baseUrl.EndsWith("/", StringComparison.Ordinal))
+			baseUrl += "/";
+
+		var limit = Math.Clamp(request.SearchLimit, 1, 100);
+
+		try
+		{
+			var batch = await GetTransactionsAsync(walletAddress, baseUrl, limit, ct);
+			if (!batch.Success)
+				return new TelegramTonRecentTransfersResult(false, batch.Error ?? "TON lookup failed.");
+
+			var transfers = batch.Transactions
+				.Select(tx => new TelegramTonIncomingTransferView(
+					tx.TransactionId,
+					tx.ValueNanotons is null ? null : decimal.Round(tx.ValueNanotons.Value / 1_000_000_000m, 8, MidpointRounding.AwayFromZero),
+					tx.ObservedAtUtc,
+					BuildExplorerLink(request.ExplorerBaseUrl, tx.TransactionId),
+					tx.SenderAddress,
+					tx.Memo))
+				.ToArray();
+
+			return new TelegramTonRecentTransfersResult(true, null, transfers);
+		}
+		catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+		{
+			return new TelegramTonRecentTransfersResult(false, "TON lookup timed out.");
+		}
+		catch (Exception ex)
+		{
+			return new TelegramTonRecentTransfersResult(false, ex.Message);
+		}
+	}
+
 	private decimal GetDepositMatchToleranceTon()
 		=> decimal.Clamp(
 			_options.TelegramTon.DepositMatchToleranceTon,

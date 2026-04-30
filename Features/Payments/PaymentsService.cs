@@ -14,6 +14,7 @@ public sealed class PaymentsService : IPaymentsService
 {
     private const string BtcPayProviderName = "BTCPay";
     private const string TelegramTonProviderName = "TelegramTon";
+    private const int TonDiagnosticsRecentTransferDisplayLimit = 8;
     private readonly AppDbContext _db;
     private readonly IWalletService _wallet;
     private readonly IReferralService _referrals;
@@ -875,6 +876,17 @@ public sealed class PaymentsService : IPaymentsService
             .AnyAsync(x => x.Type == WalletTransactionType.CryptoDepositCredited && x.Reference == creditReference, ct);
 
         TelegramTonLookupResult? lookup = null;
+        TelegramTonRecentTransfersResult? recentTransfers = null;
+        var canInspectWalletTransfers = !string.IsNullOrWhiteSpace(deposit.DestinationAddress);
+
+        if (canInspectWalletTransfers)
+        {
+            recentTransfers = await _telegramTon.GetRecentIncomingTransfersAsync(new TelegramTonRecentTransfersRequest(
+                deposit.DestinationAddress!,
+                Math.Clamp(Math.Min(_options.TelegramTon.TransactionSearchLimit, TonDiagnosticsRecentTransferDisplayLimit), 1, 100),
+                _options.TelegramTon.ExplorerBaseUrl), ct);
+        }
+
         if (includeLookup
             && !string.IsNullOrWhiteSpace(deposit.DestinationAddress)
             && !string.IsNullOrWhiteSpace(deposit.DestinationMemo)
@@ -889,6 +901,20 @@ public sealed class PaymentsService : IPaymentsService
                 Math.Max(_options.TelegramTon.TransactionSearchLimit, 1),
                 _options.TelegramTon.ExplorerBaseUrl), ct);
         }
+
+        var recentTransferViews = (recentTransfers?.Transfers ?? Array.Empty<TelegramTonIncomingTransferView>())
+            .Take(TonDiagnosticsRecentTransferDisplayLimit)
+            .Select(tx => new TelegramTonAdminIncomingTransferDiagnosticView(
+                tx.TransactionId,
+                tx.ReceivedTonAmount,
+                tx.ObservedAtUtc,
+                tx.ExplorerLink,
+                tx.SenderAddress,
+                tx.Memo,
+                string.Equals(tx.Memo?.Trim(), deposit.DestinationMemo?.Trim(), StringComparison.Ordinal),
+                IsTonAmountMatch(deposit.AssetAmount, tx.ReceivedTonAmount),
+                tx.ObservedAtUtc is null || tx.ObservedAtUtc.Value >= deposit.CreatedAtUtc.AddMinutes(-3)))
+            .ToArray();
 
         return new TelegramTonAdminDepositDiagnosticView(
             deposit.Id,
@@ -917,7 +943,22 @@ public sealed class PaymentsService : IPaymentsService
             lookup?.ReceivedTonAmount,
             lookup?.ObservedAtUtc,
             lookup?.ExplorerLink,
-            lookup?.SenderAddress);
+            lookup?.SenderAddress,
+            recentTransfers is { Success: false } ? recentTransfers.Error : null,
+            recentTransferViews);
+    }
+
+    private bool IsTonAmountMatch(decimal? expectedTonAmount, decimal? receivedTonAmount)
+    {
+        if (expectedTonAmount is null || expectedTonAmount.Value <= 0m || receivedTonAmount is null || receivedTonAmount.Value <= 0m)
+            return false;
+
+        var toleranceTon = decimal.Clamp(
+            _options.TelegramTon.DepositMatchToleranceTon,
+            0m,
+            TelegramTonOptions.MaxDepositMatchToleranceTon);
+
+        return ToNanotons(receivedTonAmount.Value) + ToNanotons(toleranceTon) >= ToNanotons(expectedTonAmount.Value);
     }
 
     private static decimal RoundAmount(decimal amount)

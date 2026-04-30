@@ -48,6 +48,7 @@
                         <th>@Model.T("admin.tonDeposits.table.destination", "Destination")</th>
                         <th>@Model.T("admin.tonDeposits.table.memo", "Memo")</th>
                         <th>@Model.T("admin.tonDeposits.table.lookup", "Latest lookup")</th>
+                        <th>@Model.T("admin.tonDeposits.table.walletTransactions", "Recent wallet transactions")</th>
                         <th>@Model.T("admin.tonDeposits.table.transaction", "Matched transaction")</th>
                         <th>@Model.T("admin.tonDeposits.table.timeline", "Timeline")</th>
                         <th>@Model.T("admin.tonDeposits.table.actions", "Actions")</th>
@@ -82,26 +83,77 @@
                                 <div class="small text-muted">@Model.T("admin.tonDeposits.credit.reference", "Credit ref:") @deposit.CreditReference</div>
                             </td>
                             <td>
-                                @if (deposit.LookupTransferFound)
+                                <div class="ton-diag-lookup">
+                                    @if (deposit.LookupTransferFound)
+                                    {
+                                        <div><span class="ton-diag-status ton-diag-status--success">@Model.T("admin.tonDeposits.lookup.found", "Match found")</span></div>
+                                        @if (deposit.LookupReceivedTonAmount is not null)
+                                        {
+                                            <div class="small ton-diag-meta">@deposit.LookupReceivedTonAmount.Value.ToString("0.00000000") TON</div>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(deposit.LookupSenderAddress))
+                                        {
+                                            <div class="small"><code class="ton-diag-code">@deposit.LookupSenderAddress</code></div>
+                                        }
+                                    }
+                                    else if (!deposit.LookupSuccess && !string.IsNullOrWhiteSpace(deposit.LookupError))
+                                    {
+                                        <div><span class="ton-diag-status ton-diag-status--danger">@Model.T("admin.tonDeposits.lookup.failed", "Lookup failed")</span></div>
+                                        <div class="small ton-diag-error">@deposit.LookupError</div>
+                                    }
+                                    else
+                                    {
+                                        <div><span class="ton-diag-status ton-diag-status--neutral">@Model.T("admin.tonDeposits.lookup.notFound", "No matching transfer")</span></div>
+                                    }
+                                </div>
+                            </td>
+                            <td>
+                                @if (!string.IsNullOrWhiteSpace(deposit.RecentWalletTransfersError))
                                 {
-                                    <div><span class="badge text-bg-success">@Model.T("admin.tonDeposits.lookup.found", "Match found")</span></div>
-                                    @if (deposit.LookupReceivedTonAmount is not null)
-                                    {
-                                        <div class="small text-muted">@deposit.LookupReceivedTonAmount.Value.ToString("0.00000000") TON</div>
-                                    }
-                                    @if (!string.IsNullOrWhiteSpace(deposit.LookupSenderAddress))
-                                    {
-                                        <div class="small"><code>@deposit.LookupSenderAddress</code></div>
-                                    }
+                                    <div class="ton-diag-lookup">
+                                        <div><span class="ton-diag-status ton-diag-status--danger">@Model.T("admin.tonDeposits.walletTx.error", "Wallet lookup failed")</span></div>
+                                        <div class="small ton-diag-error">@deposit.RecentWalletTransfersError</div>
+                                    </div>
                                 }
-                                else if (!deposit.LookupSuccess && !string.IsNullOrWhiteSpace(deposit.LookupError))
+                                else if (deposit.RecentWalletTransfers.Count == 0)
                                 {
-                                    <div><span class="badge text-bg-danger">@Model.T("admin.tonDeposits.lookup.failed", "Lookup failed")</span></div>
-                                    <div class="small text-danger">@deposit.LookupError</div>
+                                    <span class="small ton-diag-meta">@Model.T("admin.tonDeposits.walletTx.none", "No recent incoming wallet transactions were fetched.")</span>
                                 }
                                 else
                                 {
-                                    <div><span class="badge text-bg-secondary">@Model.T("admin.tonDeposits.lookup.notFound", "No matching transfer")</span></div>
+                                    <div class="ton-diag-transfer-list">
+                                        @foreach (var tx in deposit.RecentWalletTransfers)
+                                        {
+                                            var candidateClass = tx.MemoMatches && tx.AmountMatches && tx.TimeMatches
+                                                ? " ton-diag-transfer-item--candidate"
+                                                : string.Empty;
+                                            <div class="ton-diag-transfer-item@candidateClass">
+                                                <div class="d-flex flex-wrap justify-content-between gap-1">
+                                                    <strong>@(tx.ReceivedTonAmount?.ToString("0.00000000") ?? "-") TON</strong>
+                                                    <span class="small ton-diag-meta">@(tx.ObservedAtUtc?.ToString("u") ?? "-")</span>
+                                                </div>
+                                                <div class="small ton-diag-meta">@Model.T("admin.tonDeposits.walletTx.sender", "Sender:") <code class="ton-diag-code">@(string.IsNullOrWhiteSpace(tx.SenderAddress) ? "-" : tx.SenderAddress)</code></div>
+                                                <div class="small ton-diag-meta">@Model.T("admin.tonDeposits.walletTx.memo", "Memo:") <code class="ton-diag-code">@(string.IsNullOrWhiteSpace(tx.Memo) ? "-" : tx.Memo)</code></div>
+                                                @if (!string.IsNullOrWhiteSpace(tx.TransactionId))
+                                                {
+                                                    <div class="small ton-diag-meta">@Model.T("admin.tonDeposits.walletTx.txId", "Tx:") <code class="ton-diag-code">@tx.TransactionId</code></div>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(tx.ExplorerLink))
+                                                {
+                                                    <div class="small"><a href="@tx.ExplorerLink" target="_blank" rel="noopener">@Model.T("admin.tonDeposits.action.openExplorer", "Open explorer")</a></div>
+                                                }
+                                                <div class="ton-diag-flags">
+                                                    <span class="ton-diag-flag @(tx.MemoMatches ? "ton-diag-flag--ok" : "ton-diag-flag--warn")">@(tx.MemoMatches ? Model.T("admin.tonDeposits.walletTx.memoMatch", "Memo ok") : Model.T("admin.tonDeposits.walletTx.memoDifferent", "Memo differs"))</span>
+                                                    <span class="ton-diag-flag @(tx.AmountMatches ? "ton-diag-flag--ok" : "ton-diag-flag--warn")">@(tx.AmountMatches ? Model.T("admin.tonDeposits.walletTx.amountMatch", "Amount ok") : Model.T("admin.tonDeposits.walletTx.amountLow", "Amount too low"))</span>
+                                                    <span class="ton-diag-flag @(tx.TimeMatches ? "ton-diag-flag--ok" : "ton-diag-flag--warn")">@(tx.TimeMatches ? Model.T("admin.tonDeposits.walletTx.timeMatch", "Time ok") : Model.T("admin.tonDeposits.walletTx.timeOld", "Before intent window"))</span>
+                                                    @if (tx.MemoMatches && tx.AmountMatches && tx.TimeMatches)
+                                                    {
+                                                        <span class="ton-diag-flag ton-diag-flag--candidate">@Model.T("admin.tonDeposits.walletTx.candidate", "Candidate match")</span>
+                                                    }
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
                                 }
                             </td>
                             <td>

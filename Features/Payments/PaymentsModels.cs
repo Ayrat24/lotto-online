@@ -81,7 +81,20 @@ public sealed record TelegramTonAdminDepositDiagnosticView(
     decimal? LookupReceivedTonAmount,
     DateTimeOffset? LookupObservedAtUtc,
     string? LookupExplorerLink,
-    string? LookupSenderAddress);
+    string? LookupSenderAddress,
+    string? RecentWalletTransfersError,
+    IReadOnlyList<TelegramTonAdminIncomingTransferDiagnosticView> RecentWalletTransfers);
+
+public sealed record TelegramTonAdminIncomingTransferDiagnosticView(
+    string? TransactionId,
+    decimal? ReceivedTonAmount,
+    DateTimeOffset? ObservedAtUtc,
+    string? ExplorerLink,
+    string? SenderAddress,
+    string? Memo,
+    bool MemoMatches,
+    bool AmountMatches,
+    bool TimeMatches);
 
 public sealed record TonConnectRequestContextView(
     string Scheme,
