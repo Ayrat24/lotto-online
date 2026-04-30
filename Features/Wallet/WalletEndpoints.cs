@@ -1,5 +1,7 @@
+using Microsoft.Extensions.Options;
 using MiniApp.Data;
 using MiniApp.Features.Auth;
+using MiniApp.Features.Payments;
 using MiniApp.TelegramLogin;
 
 namespace MiniApp.Features.Wallet;
@@ -79,6 +81,7 @@ public static class WalletEndpoints
             AppDbContext db,
             IUserService users,
             IWalletService wallet,
+            IOptions<PaymentsOptions> paymentsOptions,
             CancellationToken ct) =>
         {
             var authResult = await TryResolveTelegramUserIdAsync(req.InitData, http, config, env, db, ct);
@@ -88,6 +91,9 @@ public static class WalletEndpoints
             var telegramUserId = authResult.TelegramUserId!.Value;
             var user = await users.TouchUserAsync(telegramUserId, ct);
             var addresses = await wallet.GetWalletAddressesAsync(user.Id, ct);
+            var payments = paymentsOptions.Value;
+            var tonWithdrawEnabled = payments.Enabled && payments.TelegramTon.Enabled && payments.TelegramTon.ServerWithdrawalsEnabled;
+            var bitcoinWithdrawEnabled = payments.Enabled;
 
             return Results.Ok(new
             {
@@ -96,6 +102,11 @@ public static class WalletEndpoints
                 {
                     bitcoinAddress = addresses.BitcoinAddress,
                     tonAddress = addresses.TonAddress
+                },
+                withdrawal = new
+                {
+                    bitcoinEnabled = bitcoinWithdrawEnabled,
+                    tonEnabled = tonWithdrawEnabled
                 }
             });
         });

@@ -192,6 +192,7 @@
   var paymentSystemsOptions = null;
   var selectedPaymentMethod = null;
   var selectedWithdrawAsset = 'BTC';
+  var withdrawalCapabilities = { bitcoin: true, ton: false };
   var savedWalletAddresses = { bitcoin: '', ton: '' };
   var debugPaymentVariant = 'default';
 
@@ -3047,7 +3048,8 @@
 
   function normalizeWithdrawAsset(assetCode) {
     var normalized = String(assetCode || '').trim().toUpperCase();
-    return normalized === 'TON' ? 'TON' : 'BTC';
+    if (normalized === 'TON' && withdrawalCapabilities.ton) return 'TON';
+    return 'BTC';
   }
 
   function getSelectedWithdrawAsset() {
@@ -3072,10 +3074,17 @@
     if (!withdrawAssetListEl) return;
 
     var selected = getSelectedWithdrawAsset();
-    var options = [
-      { assetCode: 'BTC', iconMethod: 'btcpay_crypto', title: t('client.withdraw.asset.btc', 'Bitcoin') },
-      { assetCode: 'TON', iconMethod: 'telegram_ton', title: t('client.withdraw.asset.ton', 'TON') }
-    ];
+    var options = [];
+    if (withdrawalCapabilities.bitcoin) {
+      options.push({ assetCode: 'BTC', iconMethod: 'btcpay_crypto', title: t('client.withdraw.asset.btc', 'Bitcoin') });
+    }
+    if (withdrawalCapabilities.ton) {
+      options.push({ assetCode: 'TON', iconMethod: 'telegram_ton', title: t('client.withdraw.asset.ton', 'TON') });
+    }
+
+    if (!options.length) {
+      options.push({ assetCode: 'BTC', iconMethod: 'btcpay_crypto', title: t('client.withdraw.asset.btc', 'Bitcoin') });
+    }
 
     withdrawAssetListEl.innerHTML = '';
 
@@ -3177,6 +3186,15 @@
     if (withdrawTonAddressInputEl && (force || !String(withdrawTonAddressInputEl.value || '').trim())) {
       withdrawTonAddressInputEl.value = savedWalletAddresses.ton;
     }
+  }
+
+  function applyWithdrawalCapabilities(withdrawal) {
+    var next = withdrawal && typeof withdrawal === 'object' ? withdrawal : {};
+    withdrawalCapabilities.bitcoin = next.bitcoinEnabled !== false;
+    withdrawalCapabilities.ton = !!next.tonEnabled;
+    selectedWithdrawAsset = normalizeWithdrawAsset(selectedWithdrawAsset);
+    renderWithdrawAssetOptions();
+    renderWithdrawTonConnectPanel();
   }
 
   function renderWithdrawTonConnectPanel() {
@@ -4375,6 +4393,7 @@
 
         var addresses = res.addresses || {};
         applySavedWalletAddresses(addresses, false);
+        applyWithdrawalCapabilities(res.withdrawal);
         return addresses;
       })
       .catch(function () {
