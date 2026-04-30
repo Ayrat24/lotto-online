@@ -1,0 +1,146 @@
+@page
+@model MiniApp.Pages.Admin.TonDepositsModel
+@{
+    ViewData["Title"] = Model.T("admin.tonDeposits.title", "TON deposit diagnostics");
+}
+
+<h1>@Model.T("admin.tonDeposits.heading", "TON deposit diagnostics")</h1>
+<p class="text-muted">@Model.T("admin.tonDeposits.subtitle", "Inspect recent TON top-ups, view the latest lookup result, and manually rerun reconciliation for stuck deposits.")</p>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <div class="alert @(Model.StatusIsError ? "alert-danger" : "alert-info") mt-3">@Model.StatusMessage</div>
+}
+
+<div class="card mt-3">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-sm-4 col-md-3">
+                <label class="form-label" for="limit">@Model.T("admin.tonDeposits.limit", "Deposits to show")</label>
+                <input class="form-control" id="limit" name="limit" type="number" min="1" max="100" value="@Model.Limit" />
+            </div>
+            <div class="col-sm-auto">
+                <button class="btn btn-primary" type="submit">@Model.T("admin.tonDeposits.action.refresh", "Refresh diagnostics")</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card mt-3">
+    <div class="card-body">
+        <h5 class="card-title">@Model.T("admin.tonDeposits.table.title", "Recent TON deposit intents")</h5>
+
+        @if (Model.Deposits.Count == 0)
+        {
+            <div class="alert alert-secondary mb-0">@Model.T("admin.tonDeposits.empty", "No TON deposit intents found.")</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                    <tr>
+                        <th>@Model.T("admin.tonDeposits.table.id", "Id")</th>
+                        <th>@Model.T("admin.tonDeposits.table.user", "User")</th>
+                        <th>@Model.T("admin.tonDeposits.table.amount", "Amount")</th>
+                        <th>@Model.T("admin.tonDeposits.table.status", "Status")</th>
+                        <th>@Model.T("admin.tonDeposits.table.destination", "Destination")</th>
+                        <th>@Model.T("admin.tonDeposits.table.memo", "Memo")</th>
+                        <th>@Model.T("admin.tonDeposits.table.lookup", "Latest lookup")</th>
+                        <th>@Model.T("admin.tonDeposits.table.transaction", "Matched transaction")</th>
+                        <th>@Model.T("admin.tonDeposits.table.timeline", "Timeline")</th>
+                        <th>@Model.T("admin.tonDeposits.table.actions", "Actions")</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var deposit in Model.Deposits)
+                    {
+                        <tr>
+                            <td>
+                                <div><strong>#@deposit.Id</strong></div>
+                                <div class="small text-muted">@deposit.ProviderInvoiceId</div>
+                            </td>
+                            <td><code>@deposit.UserId</code> / <code>@deposit.TelegramUserId</code></td>
+                            <td>
+                                <div>@deposit.Amount.ToString("0.00") @deposit.Currency</div>
+                                @if (deposit.ExpectedTonAmount is not null)
+                                {
+                                    <div class="small text-muted">@deposit.ExpectedTonAmount.Value.ToString("0.00000000") TON</div>
+                                }
+                            </td>
+                            <td>
+                                <div><span class="badge text-bg-secondary">@deposit.Status</span></div>
+                                <div class="small text-muted">@(!string.IsNullOrWhiteSpace(deposit.LastProviderEventType) ? deposit.LastProviderEventType : "-")</div>
+                                <div class="small">
+                                    <span class="badge @(deposit.WalletTransactionExists ? "text-bg-success" : "text-bg-warning")">@(deposit.WalletTransactionExists ? Model.T("admin.tonDeposits.credit.exists", "Credited") : Model.T("admin.tonDeposits.credit.missing", "Not credited"))</span>
+                                </div>
+                            </td>
+                            <td><code>@(string.IsNullOrWhiteSpace(deposit.DestinationAddress) ? "-" : deposit.DestinationAddress)</code></td>
+                            <td>
+                                <div><code>@(string.IsNullOrWhiteSpace(deposit.DestinationMemo) ? "-" : deposit.DestinationMemo)</code></div>
+                                <div class="small text-muted">@Model.T("admin.tonDeposits.credit.reference", "Credit ref:") @deposit.CreditReference</div>
+                            </td>
+                            <td>
+                                @if (deposit.LookupTransferFound)
+                                {
+                                    <div><span class="badge text-bg-success">@Model.T("admin.tonDeposits.lookup.found", "Match found")</span></div>
+                                    @if (deposit.LookupReceivedTonAmount is not null)
+                                    {
+                                        <div class="small text-muted">@deposit.LookupReceivedTonAmount.Value.ToString("0.00000000") TON</div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(deposit.LookupSenderAddress))
+                                    {
+                                        <div class="small"><code>@deposit.LookupSenderAddress</code></div>
+                                    }
+                                }
+                                else if (!deposit.LookupSuccess && !string.IsNullOrWhiteSpace(deposit.LookupError))
+                                {
+                                    <div><span class="badge text-bg-danger">@Model.T("admin.tonDeposits.lookup.failed", "Lookup failed")</span></div>
+                                    <div class="small text-danger">@deposit.LookupError</div>
+                                }
+                                else
+                                {
+                                    <div><span class="badge text-bg-secondary">@Model.T("admin.tonDeposits.lookup.notFound", "No matching transfer")</span></div>
+                                }
+                            </td>
+                            <td>
+                                @if (!string.IsNullOrWhiteSpace(deposit.LookupTransactionId) || !string.IsNullOrWhiteSpace(deposit.ProviderTransactionId))
+                                {
+                                    <div><code>@(!string.IsNullOrWhiteSpace(deposit.LookupTransactionId) ? deposit.LookupTransactionId : deposit.ProviderTransactionId)</code></div>
+                                    @if (!string.IsNullOrWhiteSpace(deposit.LookupExplorerLink))
+                                    {
+                                        <div class="small"><a href="@deposit.LookupExplorerLink" target="_blank" rel="noopener">@Model.T("admin.tonDeposits.action.openExplorer", "Open explorer")</a></div>
+                                    }
+                                }
+                                else
+                                {
+                                    <span>-</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="small">@Model.T("admin.tonDeposits.timeline.created", "Created:") @deposit.CreatedAtUtc.ToString("u")</div>
+                                <div class="small">@Model.T("admin.tonDeposits.timeline.expires", "Expires:") @(deposit.ExpiresAtUtc?.ToString("u") ?? "-")</div>
+                                <div class="small">@Model.T("admin.tonDeposits.timeline.paid", "Paid:") @(deposit.PaidAtUtc?.ToString("u") ?? "-")</div>
+                                <div class="small">@Model.T("admin.tonDeposits.timeline.confirmed", "Confirmed:") @(deposit.ConfirmedAtUtc?.ToString("u") ?? "-")</div>
+                                <div class="small">@Model.T("admin.tonDeposits.timeline.credited", "Credited:") @(deposit.CreditedAtUtc?.ToString("u") ?? "-")</div>
+                                @if (deposit.LookupObservedAtUtc is not null)
+                                {
+                                    <div class="small text-muted">@Model.T("admin.tonDeposits.timeline.observed", "Observed:") @deposit.LookupObservedAtUtc.Value.ToString("u")</div>
+                                }
+                            </td>
+                            <td>
+                                <form method="post" asp-page-handler="Reconcile" asp-route-id="@deposit.Id" onsubmit="return confirm('@string.Format(Model.T("admin.tonDeposits.confirm.reconcile", "Run TON reconciliation for deposit #{0}?"), deposit.Id)');">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="limit" value="@Model.Limit" />
+                                    <button class="btn btn-sm btn-outline-primary" type="submit">@Model.T("admin.tonDeposits.action.reconcile", "Reconcile now")</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+

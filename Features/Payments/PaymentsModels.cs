@@ -21,6 +21,17 @@ public sealed record CryptoDepositStatusResult(bool Success, string? Error, Cryp
 
 public sealed record ProcessWebhookResult(bool Success, string? Error, bool Duplicate = false);
 
+public sealed record TelegramTonAdminDepositDiagnosticsResult(
+    bool Success,
+    string? Error,
+    IReadOnlyList<TelegramTonAdminDepositDiagnosticView> Deposits);
+
+public sealed record TelegramTonAdminDepositReconcileResult(
+    bool Success,
+    string? Error,
+    TelegramTonAdminDepositDiagnosticView? Deposit = null,
+    bool Changed = false);
+
 public sealed record CryptoDepositView(
     long Id,
     string PaymentMethod,
@@ -42,6 +53,35 @@ public sealed record CryptoDepositView(
     DateTimeOffset? PaidAtUtc,
     DateTimeOffset? ConfirmedAtUtc,
     DateTimeOffset? CreditedAtUtc);
+
+public sealed record TelegramTonAdminDepositDiagnosticView(
+    long Id,
+    long UserId,
+    long TelegramUserId,
+    decimal Amount,
+    string Currency,
+    decimal? ExpectedTonAmount,
+    string Status,
+    string ProviderInvoiceId,
+    string? DestinationAddress,
+    string? DestinationMemo,
+    string? ProviderTransactionId,
+    string? LastProviderEventType,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset? ExpiresAtUtc,
+    DateTimeOffset? PaidAtUtc,
+    DateTimeOffset? ConfirmedAtUtc,
+    DateTimeOffset? CreditedAtUtc,
+    string CreditReference,
+    bool WalletTransactionExists,
+    bool LookupSuccess,
+    bool LookupTransferFound,
+    string? LookupError,
+    string? LookupTransactionId,
+    decimal? LookupReceivedTonAmount,
+    DateTimeOffset? LookupObservedAtUtc,
+    string? LookupExplorerLink,
+    string? LookupSenderAddress);
 
 public sealed record TonConnectRequestContextView(
     string Scheme,

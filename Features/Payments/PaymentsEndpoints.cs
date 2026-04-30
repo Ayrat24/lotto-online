@@ -24,6 +24,30 @@ public static class PaymentsEndpoints
             return Results.Ok(diagnostics);
         });
 
+        endpoints.MapGet("/api/admin/payments/ton-deposits/diagnostics", [Authorize(Policy = AdminAuth.PolicyName)] async (
+            int? limit,
+            IPaymentsService payments,
+            CancellationToken ct) =>
+        {
+            var result = await payments.GetTelegramTonAdminDepositDiagnosticsAsync(limit ?? 25, ct);
+            if (!result.Success)
+                return Results.BadRequest(new { ok = false, error = result.Error ?? "Failed to load TON deposit diagnostics." });
+
+            return Results.Ok(new { ok = true, deposits = result.Deposits });
+        });
+
+        endpoints.MapPost("/api/admin/payments/ton-deposits/{depositId:long}/reconcile", [Authorize(Policy = AdminAuth.PolicyName)] async (
+            long depositId,
+            IPaymentsService payments,
+            CancellationToken ct) =>
+        {
+            var result = await payments.ReconcileTelegramTonAdminDepositAsync(depositId, ct);
+            if (!result.Success)
+                return Results.BadRequest(new { ok = false, error = result.Error ?? "Failed to reconcile TON deposit." });
+
+            return Results.Ok(new { ok = true, changed = result.Changed, deposit = result.Deposit });
+        });
+
         endpoints.MapGet("/api/payments/systems", (IPaymentsService payments) =>
         {
             var options = payments.GetPaymentSystems();

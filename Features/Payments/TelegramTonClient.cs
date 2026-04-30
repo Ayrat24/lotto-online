@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
+using TonSdk.Core.Boc;
 
 namespace MiniApp.Features.Payments;
 
@@ -197,19 +198,14 @@ public sealed class TelegramTonClient : ITelegramTonClient
 
 		try
 		{
-			var payload = Convert.FromBase64String(body);
-			if (payload.Length >= 4
-				&& payload[0] == 0
-				&& payload[1] == 0
-				&& payload[2] == 0
-				&& payload[3] == 0)
-			{
-				var comment = System.Text.Encoding.UTF8.GetString(payload, 4, payload.Length - 4).TrimEnd('\0');
-				return string.IsNullOrWhiteSpace(comment) ? null : comment;
-			}
+			var cell = Cell.From(body.Trim());
+			var slice = cell.Parse();
+			var op = slice.LoadUInt(32);
+			if (op != 0)
+				return null;
 
-			var decoded = System.Text.Encoding.UTF8.GetString(payload).TrimEnd('\0');
-			return string.IsNullOrWhiteSpace(decoded) ? null : decoded;
+			var comment = slice.LoadString().TrimEnd('\0');
+			return string.IsNullOrWhiteSpace(comment) ? null : comment;
 		}
 		catch
 		{

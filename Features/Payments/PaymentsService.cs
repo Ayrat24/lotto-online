@@ -125,6 +125,50 @@ public sealed class PaymentsService : IPaymentsService
         return new CryptoDepositStatusResult(true, null, ToView(deposit));
     }
 
+    public async Task<TelegramTonAdminDepositDiagnosticsResult> GetTelegramTonAdminDepositDiagnosticsAsync(int limit, CancellationToken ct)
+    {
+        var take = Math.Clamp(limit, 1, 100);
+        var deposits = await _db.CryptoDepositIntents
+            .AsNoTracking()
+            .Include(x => x.User)
+            .Where(x => x.PaymentMethod == PaymentMethodKeys.TelegramTon)
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .Take(take)
+            .ToListAsync(ct);
+
+        var diagnostics = new List<TelegramTonAdminDepositDiagnosticView>(deposits.Count);
+        foreach (var deposit in deposits)
+            diagnostics.Add(await BuildTelegramTonAdminDepositDiagnosticAsync(deposit, ct));
+
+        return new TelegramTonAdminDepositDiagnosticsResult(true, null, diagnostics);
+    }
+
+    public async Task<TelegramTonAdminDepositReconcileResult> ReconcileTelegramTonAdminDepositAsync(long depositId, CancellationToken ct)
+    {
+        var deposit = await _db.CryptoDepositIntents
+            .Include(x => x.User)
+            .SingleOrDefaultAsync(x => x.Id == depositId && x.PaymentMethod == PaymentMethodKeys.TelegramTon, ct);
+
+        if (deposit is null)
+            return new TelegramTonAdminDepositReconcileResult(false, "TON deposit was not found.");
+
+        var beforeStatus = deposit.Status;
+        var beforeUpdatedAt = deposit.UpdatedAtUtc;
+        var beforeCreditedAt = deposit.CreditedAtUtc;
+        var now = DateTimeOffset.UtcNow;
+
+        await RefreshTelegramTonDepositAsync(deposit, now, ct);
+        if (_db.ChangeTracker.HasChanges())
+            await _db.SaveChangesAsync(ct);
+
+        var changed = deposit.Status != beforeStatus
+            || deposit.UpdatedAtUtc != beforeUpdatedAt
+            || deposit.CreditedAtUtc != beforeCreditedAt;
+
+        var diagnostic = await BuildTelegramTonAdminDepositDiagnosticAsync(deposit, ct);
+        return new TelegramTonAdminDepositReconcileResult(true, null, diagnostic, changed);
+    }
+
     public async Task<int> ReconcilePendingTelegramTonDepositsAsync(CancellationToken ct)
     {
         if (!_options.Enabled || !_options.TelegramTon.Enabled)
@@ -822,6 +866,58 @@ public sealed class PaymentsService : IPaymentsService
     private static bool ShouldRefreshDepositOnStatusRequest(CryptoDepositIntent deposit)
         => string.Equals(deposit.PaymentMethod, PaymentMethodKeys.BtcPayCrypto, StringComparison.Ordinal)
             || string.Equals(deposit.PaymentMethod, PaymentMethodKeys.TelegramTon, StringComparison.Ordinal);
+
+    private async Task<TelegramTonAdminDepositDiagnosticView> BuildTelegramTonAdminDepositDiagnosticAsync(CryptoDepositIntent deposit, CancellationToken ct)
+    {
+        var creditReference = BuildCreditReference(deposit.PaymentMethod, deposit.ProviderInvoiceId);
+        var walletTransactionExists = await _db.WalletTransactions
+            .AsNoTracking()
+            .AnyAsync(x => x.Type == WalletTransactionType.CryptoDepositCredited && x.Reference == creditReference, ct);
+
+        TelegramTonLookupResult? lookup = null;
+        if (!string.IsNullOrWhiteSpace(deposit.DestinationAddress)
+            && !string.IsNullOrWhiteSpace(deposit.DestinationMemo)
+            && deposit.AssetAmount is not null
+            && deposit.AssetAmount.Value > 0m)
+        {
+            lookup = await _telegramTon.TryFindIncomingTransferAsync(new TelegramTonLookupRequest(
+                deposit.DestinationAddress,
+                deposit.DestinationMemo,
+                deposit.AssetAmount.Value,
+                deposit.CreatedAtUtc,
+                Math.Max(_options.TelegramTon.TransactionSearchLimit, 1),
+                _options.TelegramTon.ExplorerBaseUrl), ct);
+        }
+
+        return new TelegramTonAdminDepositDiagnosticView(
+            deposit.Id,
+            deposit.UserId,
+            deposit.User.TelegramUserId,
+            deposit.Amount,
+            deposit.Currency,
+            deposit.AssetAmount,
+            deposit.Status.ToString(),
+            deposit.ProviderInvoiceId,
+            deposit.DestinationAddress,
+            deposit.DestinationMemo,
+            deposit.ProviderTransactionId,
+            deposit.LastProviderEventType,
+            deposit.CreatedAtUtc,
+            deposit.ExpiresAtUtc,
+            deposit.PaidAtUtc,
+            deposit.ConfirmedAtUtc,
+            deposit.CreditedAtUtc,
+            creditReference,
+            walletTransactionExists,
+            lookup?.Success ?? false,
+            lookup?.TransferFound ?? false,
+            lookup?.Error,
+            lookup?.TransactionId,
+            lookup?.ReceivedTonAmount,
+            lookup?.ObservedAtUtc,
+            lookup?.ExplorerLink,
+            lookup?.SenderAddress);
+    }
 
     private static decimal RoundAmount(decimal amount)
         => decimal.Round(amount, 2, MidpointRounding.AwayFromZero);
