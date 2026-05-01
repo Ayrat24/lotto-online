@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using MiniApp.Features.Offers;
 using MiniApp.Features.Payments;
 using Npgsql;
+using TonSdk.Core;
 
 namespace MiniApp.Data;
 
@@ -251,8 +252,16 @@ public sealed class WalletService : IWalletService
         if (user is null)
             return new WalletWithdrawRequestResult(false, 0m, "User was not found.");
 
-        var normalizedNumber = NormalizePayoutAddress(address, normalizedAssetCode)
-            ?? GetSavedPayoutAddress(user, normalizedAssetCode);
+        string? normalizedNumber;
+        if (string.IsNullOrWhiteSpace(address))
+        {
+            normalizedNumber = GetSavedPayoutAddress(user, normalizedAssetCode);
+        }
+        else if (!TryNormalizePayoutAddress(address, normalizedAssetCode, out normalizedNumber, out var addressError))
+        {
+            return new WalletWithdrawRequestResult(false, 0m, addressError ?? "Please enter a valid payout address.");
+        }
+
         if (normalizedNumber is null)
             return new WalletWithdrawRequestResult(false, 0m, "Please enter a valid payout address.");
 
@@ -300,9 +309,11 @@ public sealed class WalletService : IWalletService
         if (normalizedAssetCode is null)
             return new WalletSaveAddressResult(false, "Unsupported withdrawal asset.");
 
-        var normalizedAddress = NormalizePayoutAddress(address, normalizedAssetCode);
-        if (normalizedAddress is null)
-            return new WalletSaveAddressResult(false, "Please enter a valid wallet address.");
+        if (!TryNormalizePayoutAddress(address, normalizedAssetCode, out var normalizedAddress, out var addressError)
+            || normalizedAddress is null)
+        {
+            return new WalletSaveAddressResult(false, addressError ?? "Please enter a valid wallet address.");
+        }
 
         var user = await _db.Users.SingleOrDefaultAsync(x => x.Id == userId, ct);
         if (user is null)
@@ -519,20 +530,41 @@ public sealed class WalletService : IWalletService
         return new WalletReviewWithdrawalResult(true, null);
     }
 
-    private static string? NormalizePayoutAddress(string? value, string assetCode)
+    private static bool TryNormalizePayoutAddress(string? value, string assetCode, out string? normalizedAddress, out string? error)
     {
+        normalizedAddress = null;
+        error = null;
+
         var trimmed = value?.Trim();
         if (string.IsNullOrWhiteSpace(trimmed))
-            return null;
+            return false;
 
         if (trimmed.Length > 256)
-            return null;
+            return false;
 
         var normalizedAssetCode = WithdrawalAssetCodes.Normalize(assetCode, defaultToBitcoin: true) ?? WithdrawalAssetCodes.Bitcoin;
-        if (normalizedAssetCode == WithdrawalAssetCodes.Ton && !LooksLikeTonAddress(trimmed))
-            return null;
+        if (normalizedAssetCode == WithdrawalAssetCodes.Ton)
+        {
+            try
+            {
+                var tonAddress = new Address(trimmed);
+                if (tonAddress.IsTestOnly())
+                {
+                    error = "wallet_ton_testnet_not_supported";
+                    return false;
+                }
 
-        return trimmed;
+                normalizedAddress = ToCanonicalTonAddress(tonAddress);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        normalizedAddress = trimmed;
+        return true;
     }
 
     private async Task EnsureTonWithdrawalSchemaAsync(CancellationToken ct)
@@ -549,11 +581,15 @@ public sealed class WalletService : IWalletService
 
     private static string? GetSavedPayoutAddress(MiniAppUser user, string assetCode)
     {
-        return NormalizePayoutAddress(assetCode switch
+        var value = assetCode switch
         {
             WithdrawalAssetCodes.Ton => user.TonWalletAddress,
             _ => user.WalletAddress
-        }, assetCode);
+        };
+
+        return TryNormalizePayoutAddress(value, assetCode, out var normalizedAddress, out _)
+            ? normalizedAddress
+            : null;
     }
 
     private static void SetSavedPayoutAddress(MiniAppUser user, string assetCode, string address)
@@ -624,29 +660,17 @@ public sealed class WalletService : IWalletService
     private static decimal RoundAmount(decimal amount)
         => decimal.Round(amount, 2, MidpointRounding.AwayFromZero);
 
-    private static bool LooksLikeTonAddress(string value)
+    private static string ToCanonicalTonAddress(Address address)
     {
-        var trimmed = value.Trim();
-        if (trimmed.Length == 0)
-            return false;
-
-        var separatorIndex = trimmed.IndexOf(':');
-        if (separatorIndex > 0)
+        var options = new AddressStringifyOptions(true, true, false, 0)
         {
-            var workchain = trimmed[..separatorIndex];
-            var hash = trimmed[(separatorIndex + 1)..];
-            if ((workchain == "0" || workchain == "-1")
-                && hash.Length == 64
-                && hash.All(Uri.IsHexDigit))
-            {
-                return true;
-            }
-        }
+            UrlSafe = true,
+            Bounceable = false,
+            TestOnly = false,
+            Workchain = null
+        };
 
-        if (trimmed.Length != 48)
-            return false;
-
-        return trimmed.All(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_' or '+' or '/');
+        return address.ToString(AddressType.Base64, options);
     }
 
     private static string BuildTonWithdrawalMemo(long withdrawalRequestId)

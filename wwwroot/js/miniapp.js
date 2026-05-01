@@ -489,6 +489,9 @@
     if (normalized === 'wallet_request_failed') {
       return t('client.withdraw.serverError', 'Server could not create the withdrawal request. Please try again or contact support.');
     }
+    if (normalized === 'wallet_ton_testnet_not_supported') {
+      return t('client.withdraw.tonMainnetOnly', 'This TON wallet address is testnet-only. Use a mainnet TON address for withdrawals.');
+    }
 
     if (/^<!doctype html>/i.test(normalized) || /<html/i.test(normalized)) {
       return t('client.withdraw.serverUpdating', 'Wallet update is still being applied. Please try again in a moment.');
@@ -3160,11 +3163,26 @@
     }
   }
 
+  function getTonConnectAccount() {
+    if (tonConnectUi && tonConnectUi.account) return tonConnectUi.account;
+    if (tonConnectWallet && tonConnectWallet.account) return tonConnectWallet.account;
+    if (tonConnectUi && tonConnectUi.wallet && tonConnectUi.wallet.account) return tonConnectUi.wallet.account;
+    return null;
+  }
+
+  function getTonConnectAccountChain() {
+    var account = getTonConnectAccount();
+    return account && account.chain ? String(account.chain).trim() : '';
+  }
+
+  function isTonConnectTestnetAccount() {
+    var chain = getTonConnectAccountChain();
+    if (!chain) return false;
+    return chain === '-3' || /testnet/i.test(chain);
+  }
+
   function getTonConnectAccountAddress() {
-    var account = null;
-    if (tonConnectUi && tonConnectUi.account) account = tonConnectUi.account;
-    if (!account && tonConnectWallet && tonConnectWallet.account) account = tonConnectWallet.account;
-    if (!account && tonConnectUi && tonConnectUi.wallet && tonConnectUi.wallet.account) account = tonConnectUi.wallet.account;
+    var account = getTonConnectAccount();
     return account && account.address ? String(account.address).trim() : '';
   }
 
@@ -3215,6 +3233,11 @@
     }
 
     if (connectedAddress) {
+      if (isTonConnectTestnetAccount()) {
+        withdrawTonConnectStatusEl.textContent = t('client.withdraw.tonConnectTestnetUnsupported', 'Connected TON wallet is on testnet. Switch to mainnet or paste a mainnet TON address below.');
+        return;
+      }
+
       withdrawTonConnectStatusEl.textContent = t('client.topup.tonConnect.connectedPrefix', 'Connected wallet: ') + shortenWalletAddress(connectedAddress);
       return;
     }
@@ -4710,8 +4733,11 @@
 
     var amount = withdrawAmountInputEl ? Number(withdrawAmountInputEl.value) : NaN;
     var assetCode = getSelectedWithdrawAsset();
+    var manualTonAddress = String((withdrawTonAddressInputEl && withdrawTonAddressInputEl.value) || '').trim();
+    var connectedTonAddress = getTonConnectAccountAddress();
+    var usingConnectedTonAddress = assetCode === 'TON' && !manualTonAddress && !!connectedTonAddress;
     var number = assetCode === 'TON'
-      ? String((withdrawTonAddressInputEl && withdrawTonAddressInputEl.value) || getTonConnectAccountAddress() || '').trim()
+      ? String(manualTonAddress || connectedTonAddress || '').trim()
       : String((withdrawBitcoinAddressInputEl && withdrawBitcoinAddressInputEl.value) || '').trim();
     var saveAddress = assetCode === 'TON'
       ? !!(withdrawSaveTonAddressCheckboxEl && withdrawSaveTonAddressCheckboxEl.checked)
@@ -4724,6 +4750,11 @@
 
     if (!number) {
       setWithdrawStatus(t('client.withdraw.enterAddressOrSave', 'Enter wallet address or save one first.'));
+      return;
+    }
+
+    if (usingConnectedTonAddress && isTonConnectTestnetAccount()) {
+      setWithdrawStatus(t('client.withdraw.tonMainnetOnly', 'This TON wallet address is testnet-only. Use a mainnet TON address for withdrawals.'));
       return;
     }
 
