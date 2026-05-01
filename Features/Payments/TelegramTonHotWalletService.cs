@@ -214,10 +214,18 @@ public sealed class TelegramTonHotWalletService : ITelegramTonHotWalletService
         }, revision);
 
         var expectedAddress = telegramTon.HotWalletExpectedAddress.Trim();
-        if (!string.IsNullOrWhiteSpace(expectedAddress)
-            && !string.Equals(NormalizeAddress(wallet.Address.ToString()), NormalizeAddress(expectedAddress), StringComparison.Ordinal))
+        if (!string.IsNullOrWhiteSpace(expectedAddress))
         {
-            throw new InvalidOperationException("Derived TON hot wallet address does not match Payments:TelegramTon:HotWalletExpectedAddress.");
+            var derivedAddress = NormalizeAddress(wallet.Address.ToString());
+            var normalizedExpectedAddress = NormalizeAddress(expectedAddress);
+            if (!string.Equals(derivedAddress, normalizedExpectedAddress, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "Derived TON hot wallet address does not match Payments:TelegramTon:HotWalletExpectedAddress."
+                    + " Derived=" + derivedAddress
+                    + "; Expected=" + normalizedExpectedAddress + "."
+                    + " Check mnemonic, hot wallet workchain, revision, and subwallet id.");
+            }
         }
 
         return new TonHotWalletContext(wallet, mnemonic.Keys);
@@ -247,7 +255,12 @@ public sealed class TelegramTonHotWalletService : ITelegramTonHotWalletService
     }
 
     private static string NormalizeAddress(string address)
-        => new Address(address.Trim()).ToString();
+        => new Address(address.Trim()).ToString(
+            AddressType.Raw,
+            new AddressStringifyOptions(true, true, false, 0)
+            {
+                Workchain = null
+            });
 
     private static string ToNanoString(decimal amountTon)
     {
