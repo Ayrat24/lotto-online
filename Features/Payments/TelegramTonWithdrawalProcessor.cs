@@ -138,13 +138,8 @@ public sealed class TelegramTonWithdrawalProcessor
             return true;
         }
 
-        if (request.PayoutAttemptCount >= _options.TelegramTon.WithdrawalMaxRetryAttempts)
-        {
-            await FailAndRefundAsync(request, "TON payout stayed in sending state and exceeded the retry limit. Funds were returned to the user.", ct);
-            return true;
-        }
-
         request.ExternalPayoutState = TonWithdrawalPayoutStates.RetryPending;
+        request.PayoutLastAttemptAtUtc = DateTimeOffset.UtcNow;
         request.PayoutLastError = "Recovered stale TON payout send state. The worker will retry broadcast.";
         await _db.SaveChangesAsync(ct);
         return true;
@@ -152,14 +147,18 @@ public sealed class TelegramTonWithdrawalProcessor
 
     private async Task<bool> SubmitNextQueuedWithdrawalAsync(CancellationToken ct)
     {
-        var request = await _db.WithdrawalRequests
+        var now = DateTimeOffset.UtcNow;
+        var candidates = await _db.WithdrawalRequests
             .Include(x => x.User)
             .Where(x => x.AssetCode == WithdrawalAssetCodes.Ton
                 && x.Status == WithdrawalRequestStatus.Confirmed
                 && (x.ExternalPayoutState == TonWithdrawalPayoutStates.Queued
                     || x.ExternalPayoutState == TonWithdrawalPayoutStates.RetryPending))
             .OrderBy(x => x.ExternalPayoutCreatedAtUtc ?? x.ReviewedAtUtc ?? x.CreatedAtUtc)
-            .FirstOrDefaultAsync(ct);
+            .Take(50)
+            .ToListAsync(ct);
+
+        var request = candidates.FirstOrDefault(x => IsAutomaticQueuedWithdrawalReady(x, now));
 
         if (request is null)
             return false;
@@ -297,13 +296,8 @@ public sealed class TelegramTonWithdrawalProcessor
         {
             if (currentSeqno <= reservedSeqno)
             {
-                if (request.PayoutAttemptCount >= _options.TelegramTon.WithdrawalMaxRetryAttempts)
-                {
-                    await FailAndRefundAsync(request, "TON payout was not accepted on-chain after multiple attempts. Funds were returned to the user.", ct);
-                    return true;
-                }
-
                 request.ExternalPayoutState = TonWithdrawalPayoutStates.RetryPending;
+                request.PayoutLastAttemptAtUtc = DateTimeOffset.UtcNow;
                 request.PayoutLastError = "TON payout confirmation timed out before the reserved seqno advanced. The worker will retry broadcast.";
                 await _db.SaveChangesAsync(ct);
                 return true;
@@ -321,17 +315,37 @@ public sealed class TelegramTonWithdrawalProcessor
 
     private async Task HandleRetryableFailureAsync(WithdrawalRequest request, string error, CancellationToken ct)
     {
+        request.PayoutLastAttemptAtUtc = DateTimeOffset.UtcNow;
         request.PayoutLastError = TruncateError(error);
-
-        if (request.PayoutAttemptCount >= _options.TelegramTon.WithdrawalMaxRetryAttempts)
-        {
-            await FailAndRefundAsync(request, "TON payout failed after multiple attempts. Funds were returned to the user.", ct);
-            return;
-        }
-
         request.ExternalPayoutState = TonWithdrawalPayoutStates.RetryPending;
         await _db.SaveChangesAsync(ct);
     }
+
+    private bool IsAutomaticQueuedWithdrawalReady(WithdrawalRequest request, DateTimeOffset nowUtc)
+    {
+        var payoutState = NormalizePayoutState(request.ExternalPayoutState);
+        if (payoutState == TonWithdrawalPayoutStates.Queued)
+            return true;
+
+        if (payoutState != TonWithdrawalPayoutStates.RetryPending)
+            return false;
+
+        if (request.PayoutLastAttemptAtUtc is null)
+            return true;
+
+        return request.PayoutLastAttemptAtUtc.Value.Add(GetAutomaticRetryDelay(request.PayoutAttemptCount)) <= nowUtc;
+    }
+
+    private static TimeSpan GetAutomaticRetryDelay(int payoutAttemptCount)
+        => payoutAttemptCount switch
+        {
+            <= 0 => TimeSpan.Zero,
+            1 => TimeSpan.FromSeconds(30),
+            2 => TimeSpan.FromMinutes(2),
+            3 => TimeSpan.FromMinutes(5),
+            4 => TimeSpan.FromMinutes(15),
+            _ => TimeSpan.FromMinutes(30)
+        };
 
     private async Task FailAndRefundAsync(WithdrawalRequest request, string reason, CancellationToken ct)
     {
