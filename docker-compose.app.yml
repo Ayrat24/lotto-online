@@ -54,6 +54,18 @@ services:
       Payments__TelegramTon__DepositMatchToleranceTon: ${TELEGRAMTON_DEPOSIT_MATCH_TOLERANCE_TON:-${Payments__TelegramTon__DepositMatchToleranceTon:-0.000001}}
       Payments__TelegramTon__PaymentTimeoutMinutes: ${TELEGRAMTON_PAYMENT_TIMEOUT_MINUTES:-${Payments__TelegramTon__PaymentTimeoutMinutes:-20}}
       Payments__TelegramTon__ExplorerBaseUrl: ${TELEGRAMTON_EXPLORER_BASE_URL:-${Payments__TelegramTon__ExplorerBaseUrl:-https://tonviewer.com/transaction/}}
+      Payments__TelegramTon__ServerWithdrawalsEnabled: ${TELEGRAMTON_SERVER_WITHDRAWALS_ENABLED:-${Payments__TelegramTon__ServerWithdrawalsEnabled:-false}}
+      Payments__TelegramTon__ReconciliationIntervalSeconds: ${TELEGRAMTON_RECONCILIATION_INTERVAL_SECONDS:-${Payments__TelegramTon__ReconciliationIntervalSeconds:-5}}
+      Payments__TelegramTon__WithdrawalWorkerIntervalSeconds: ${TELEGRAMTON_WITHDRAWAL_WORKER_INTERVAL_SECONDS:-${Payments__TelegramTon__WithdrawalWorkerIntervalSeconds:-8}}
+      Payments__TelegramTon__WithdrawalConfirmationTimeoutMinutes: ${TELEGRAMTON_WITHDRAWAL_CONFIRMATION_TIMEOUT_MINUTES:-${Payments__TelegramTon__WithdrawalConfirmationTimeoutMinutes:-15}}
+      Payments__TelegramTon__WithdrawalMaxRetryAttempts: ${TELEGRAMTON_WITHDRAWAL_MAX_RETRY_ATTEMPTS:-${Payments__TelegramTon__WithdrawalMaxRetryAttempts:-3}}
+      Payments__TelegramTon__WithdrawalMessageTtlSeconds: ${TELEGRAMTON_WITHDRAWAL_MESSAGE_TTL_SECONDS:-${Payments__TelegramTon__WithdrawalMessageTtlSeconds:-600}}
+      Payments__TelegramTon__HotWalletWorkchain: ${TELEGRAMTON_HOT_WALLET_WORKCHAIN:-${Payments__TelegramTon__HotWalletWorkchain:-0}}
+      Payments__TelegramTon__HotWalletRevision: ${TELEGRAMTON_HOT_WALLET_REVISION:-${Payments__TelegramTon__HotWalletRevision:-2}}
+      Payments__TelegramTon__HotWalletSubwalletId: ${TELEGRAMTON_HOT_WALLET_SUBWALLET_ID:-${Payments__TelegramTon__HotWalletSubwalletId:-698983191}}
+      Payments__TelegramTon__HotWalletMinReserveTon: ${TELEGRAMTON_HOT_WALLET_MIN_RESERVE_TON:-${Payments__TelegramTon__HotWalletMinReserveTon:-0.2}}
+      Payments__TelegramTon__HotWalletExpectedAddress: ${TELEGRAMTON_HOT_WALLET_EXPECTED_ADDRESS:-${Payments__TelegramTon__HotWalletExpectedAddress:-}}
+      Payments__TelegramTon__HotWalletMnemonic: ${TELEGRAMTON_HOT_WALLET_MNEMONIC:-${Payments__TelegramTon__HotWalletMnemonic:-}}
       Payments__Ops__EnableReconciliation: ${PAYMENTS_ENABLE_RECONCILIATION:-false}
 
     ports:
