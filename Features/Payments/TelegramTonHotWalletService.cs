@@ -58,7 +58,7 @@ public sealed class TelegramTonHotWalletService : ITelegramTonHotWalletService
             _logger.LogError(ex, "Failed to query Telegram TON hot wallet state.");
             return new TelegramTonHotWalletStateResult(
                 false,
-                ex.Message,
+                FormatExceptionMessage(ex),
                 DerivedAddress: diagnostics?.DerivedAddress,
                 ExpectedAddress: diagnostics?.ExpectedAddress,
                 Workchain: diagnostics?.Workchain,
@@ -145,7 +145,7 @@ public sealed class TelegramTonHotWalletService : ITelegramTonHotWalletService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to send a server-executed Telegram TON withdrawal.");
-            return new TelegramTonSendWithdrawalResult(false, ex.Message);
+            return new TelegramTonSendWithdrawalResult(false, FormatExceptionMessage(ex));
         }
     }
 
@@ -200,7 +200,7 @@ public sealed class TelegramTonHotWalletService : ITelegramTonHotWalletService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to reconcile outgoing Telegram TON withdrawal transfer.");
-            return new TelegramTonOutgoingTransferLookupResult(false, false, ex.Message);
+            return new TelegramTonOutgoingTransferLookupResult(false, false, FormatExceptionMessage(ex));
         }
     }
 
@@ -288,6 +288,28 @@ public sealed class TelegramTonHotWalletService : ITelegramTonHotWalletService
     {
         var nanos = decimal.Round(amountTon * 1_000_000_000m, 0, MidpointRounding.AwayFromZero);
         return nanos.ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private static string FormatExceptionMessage(Exception ex)
+    {
+        var parts = new List<string>();
+
+        var current = ex;
+        while (current is not null && parts.Count < 4)
+        {
+            var typeName = current.GetType().Name;
+            var message = string.IsNullOrWhiteSpace(current.Message)
+                ? typeName
+                : typeName + ": " + current.Message.Trim();
+
+            if (!parts.Contains(message, StringComparer.Ordinal))
+                parts.Add(message);
+
+            current = current.InnerException;
+        }
+
+        var formatted = string.Join(" | ", parts);
+        return formatted.Length == 0 ? "Unhandled TON wallet exception." : formatted;
     }
 
     private TonHotWalletDiagnosticsContext BuildWalletV4DiagnosticsContext(
