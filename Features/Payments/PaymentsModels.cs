@@ -151,12 +151,34 @@ public sealed record TonWithdrawalWorkerDiagnosticsView(
     string ConfiguredNetwork,
     string ApiBaseUrl,
     TelegramTonHotWalletStateResult HotWallet,
+    TonWithdrawalWorkerRuntimeView Worker,
+    TonWithdrawalQueueDiagnosticsView Queue,
+    IReadOnlyList<string> Issues,
     int QueuedCount,
     int RetryPendingCount,
     int SendingCount,
     int SubmittedCount,
     int ConfirmedCount,
     IReadOnlyList<TonWithdrawalRequestDiagnosticView> RecentRequests);
+
+public sealed record TonWithdrawalWorkerRuntimeView(
+    bool Started,
+    bool DisabledByConfiguration,
+    string? DisabledReason,
+    DateTimeOffset? StartedAtUtc,
+    DateTimeOffset? LastCycleStartedAtUtc,
+    DateTimeOffset? LastCycleCompletedAtUtc,
+    DateTimeOffset? LastProgressAtUtc,
+    long CycleCount,
+    int? LastChangedCount,
+    string? LastError,
+    double? IntervalSeconds);
+
+public sealed record TonWithdrawalQueueDiagnosticsView(
+    bool CanProcessQueuedWithdrawals,
+    IReadOnlyList<string> BlockingReasons,
+    TonWithdrawalRequestDiagnosticView? OldestQueuedRequest,
+    double? OldestQueuedAgeMinutes);
 
 public sealed record TonWithdrawalRequestDiagnosticView(
     long Id,
@@ -166,11 +188,17 @@ public sealed record TonWithdrawalRequestDiagnosticView(
     decimal? AmountTon,
     string PayoutAddress,
     string Status,
+    string ReviewStatus,
+    string? RawPayoutState,
+    string? ExternalPayoutId,
+    string? Memo,
     int AttemptCount,
     int? Seqno,
     DateTimeOffset CreatedAtUtc,
+    DateTimeOffset? ExternalPayoutCreatedAtUtc,
     DateTimeOffset? LastAttemptAtUtc,
     DateTimeOffset? SubmittedAtUtc,
     DateTimeOffset? ConfirmedAtUtc,
-    string? LastError);
+    string? LastError,
+    IReadOnlyList<string> Issues);
 

@@ -44,14 +44,25 @@ public sealed class WalletModel : LocalizedAdminPageModel
     private readonly IConfiguration _config;
     private readonly IWebHostEnvironment _env;
     private readonly IWalletService _wallet;
+    private readonly TelegramTonWithdrawalProcessor _tonWithdrawalProcessor;
+    private readonly ILogger<WalletModel> _logger;
 
-    public WalletModel(AppDbContext db, IConfiguration config, IWebHostEnvironment env, IWalletService wallet, ILocalizationService localization)
+    public WalletModel(
+        AppDbContext db,
+        IConfiguration config,
+        IWebHostEnvironment env,
+        IWalletService wallet,
+        TelegramTonWithdrawalProcessor tonWithdrawalProcessor,
+        ILogger<WalletModel> logger,
+        ILocalizationService localization)
         : base(localization)
     {
         _db = db;
         _config = config;
         _env = env;
         _wallet = wallet;
+        _tonWithdrawalProcessor = tonWithdrawalProcessor;
+        _logger = logger;
     }
 
     public decimal ServerBalance { get; private set; }
@@ -84,6 +95,18 @@ public sealed class WalletModel : LocalizedAdminPageModel
     public async Task<IActionResult> OnPostConfirmWithdrawalAsync(long id, CancellationToken ct)
     {
         var result = await _wallet.ConfirmWithdrawalAsync(id, User.Identity?.Name ?? "admin", null, ct);
+        if (result.Success)
+        {
+            try
+            {
+                await _tonWithdrawalProcessor.ProcessNextAsync(ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to process the TON withdrawal queue immediately after confirming request {WithdrawalRequestId}.", id);
+            }
+        }
+
         var successTemplate = await GetTextAsync("admin.wallet.flash.confirmed", "Confirmed withdrawal request #{0}.", ct);
         var failedText = await GetTextAsync("admin.wallet.flash.confirmFailed", "Failed to confirm withdrawal request.", ct);
         FlashMessage = result.Success ? string.Format(successTemplate, id) : result.Error ?? failedText;

@@ -43,10 +43,25 @@ public static class PaymentsEndpoints
             AppDbContext db,
             IOptions<PaymentsOptions> options,
             ITelegramTonHotWalletService hotWallet,
+            TelegramTonWithdrawalWorkerState workerState,
             CancellationToken ct) =>
         {
-            var diagnostics = await BuildTonWithdrawalDiagnosticsAsync(db, options.Value, hotWallet, limit ?? 25, ct);
+            var diagnostics = await BuildTonWithdrawalDiagnosticsAsync(db, options.Value, hotWallet, workerState, limit ?? 25, ct);
             return Results.Ok(new { ok = true, diagnostics });
+        });
+
+        endpoints.MapPost("/api/admin/payments/ton-withdrawals/process-next", [Authorize(Policy = AdminAuth.PolicyName)] async (
+            int? limit,
+            AppDbContext db,
+            IOptions<PaymentsOptions> options,
+            ITelegramTonHotWalletService hotWallet,
+            TelegramTonWithdrawalWorkerState workerState,
+            TelegramTonWithdrawalProcessor processor,
+            CancellationToken ct) =>
+        {
+            var changed = await processor.ProcessNextAsync(ct);
+            var diagnostics = await BuildTonWithdrawalDiagnosticsAsync(db, options.Value, hotWallet, workerState, limit ?? 25, ct);
+            return Results.Ok(new { ok = true, changed, diagnostics });
         });
 
         endpoints.MapPost("/api/admin/payments/ton-deposits/{depositId:long}/reconcile", [Authorize(Policy = AdminAuth.PolicyName)] async (
@@ -517,40 +532,91 @@ public static class PaymentsEndpoints
         AppDbContext db,
         PaymentsOptions options,
         ITelegramTonHotWalletService hotWallet,
+        TelegramTonWithdrawalWorkerState workerState,
         int limit,
         CancellationToken ct)
     {
         var take = Math.Clamp(limit, 1, 100);
         var telegramTon = options.TelegramTon ?? new TelegramTonOptions();
 
-        var requests = await db.WithdrawalRequests
+        var requestRows = await db.WithdrawalRequests
             .AsNoTracking()
             .Include(x => x.User)
             .Where(x => x.AssetCode == WithdrawalAssetCodes.Ton)
             .OrderByDescending(x => x.CreatedAtUtc)
             .Take(take)
-            .Select(x => new TonWithdrawalRequestDiagnosticView(
+            .Select(x => new
+            {
                 x.Id,
                 x.UserId,
-                x.User.TelegramUserId,
-                x.Amount,
-                x.AssetAmount,
-                x.Number,
-                string.IsNullOrWhiteSpace(x.ExternalPayoutState) ? x.Status.ToString() : x.ExternalPayoutState!,
-                x.PayoutAttemptCount,
+                TelegramUserId = x.User.TelegramUserId,
+                AmountUsd = x.Amount,
+                AmountTon = x.AssetAmount,
+                PayoutAddress = x.Number,
+                Status = string.IsNullOrWhiteSpace(x.ExternalPayoutState) ? x.Status.ToString() : x.ExternalPayoutState!,
+                ReviewStatus = x.Status.ToString(),
+                RawPayoutState = x.ExternalPayoutState,
+                x.ExternalPayoutId,
+                Memo = x.PayoutMemo,
+                AttemptCount = x.PayoutAttemptCount,
                 x.PayoutSeqno,
                 x.CreatedAtUtc,
+                x.ExternalPayoutCreatedAtUtc,
                 x.PayoutLastAttemptAtUtc,
                 x.PayoutSubmittedAtUtc,
                 x.PayoutConfirmedAtUtc,
-                x.PayoutLastError ?? x.ReviewNote))
+                LastError = x.PayoutLastError ?? x.ReviewNote
+            })
             .ToArrayAsync(ct);
+
+        var requests = requestRows
+            .Select(x => new TonWithdrawalRequestDiagnosticView(
+                x.Id,
+                x.UserId,
+                x.TelegramUserId,
+                x.AmountUsd,
+                x.AmountTon,
+                x.PayoutAddress,
+                x.Status,
+                x.ReviewStatus,
+                x.RawPayoutState,
+                x.ExternalPayoutId,
+                x.Memo,
+                x.AttemptCount,
+                x.PayoutSeqno,
+                x.CreatedAtUtc,
+                x.ExternalPayoutCreatedAtUtc,
+                x.PayoutLastAttemptAtUtc,
+                x.PayoutSubmittedAtUtc,
+                x.PayoutConfirmedAtUtc,
+                x.LastError,
+                BuildWithdrawalRequestIssues(
+                    x.ReviewStatus,
+                    x.RawPayoutState,
+                    x.AmountTon,
+                    x.Memo,
+                    x.PayoutLastAttemptAtUtc,
+                    x.PayoutSubmittedAtUtc,
+                    x.LastError,
+                    telegramTon)))
+            .ToArray();
 
         var statuses = requests
             .Select(x => (x.Status ?? string.Empty).Trim().ToLowerInvariant())
             .ToArray();
 
         var hotWalletState = await hotWallet.GetHotWalletStateAsync(ct);
+        var worker = workerState.Snapshot();
+        var issues = BuildTonWithdrawalWorkerIssues(options, telegramTon, hotWalletState, worker, requests);
+        var oldestQueuedRequest = requests
+            .Where(x => string.Equals(x.Status, TonWithdrawalPayoutStates.Queued, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(x.Status, TonWithdrawalPayoutStates.RetryPending, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(x => x.ExternalPayoutCreatedAtUtc ?? x.CreatedAtUtc)
+            .FirstOrDefault();
+        var queueBlockingReasons = BuildQueueBlockingReasons(options, telegramTon, hotWalletState, worker, oldestQueuedRequest);
+        double? oldestQueuedAgeMinutes = oldestQueuedRequest is null
+            ? null
+            : Math.Round((DateTimeOffset.UtcNow - (oldestQueuedRequest.ExternalPayoutCreatedAtUtc ?? oldestQueuedRequest.CreatedAtUtc)).TotalMinutes, 2);
 
         return new TonWithdrawalWorkerDiagnosticsView(
             DateTimeOffset.UtcNow,
@@ -560,12 +626,155 @@ public static class PaymentsEndpoints
             TelegramTonNetworkNames.GetConfiguredNetwork(telegramTon),
             telegramTon.ApiBaseUrl,
             hotWalletState,
+            worker,
+            new TonWithdrawalQueueDiagnosticsView(queueBlockingReasons.Count == 0, queueBlockingReasons, oldestQueuedRequest, oldestQueuedAgeMinutes),
+            issues,
             statuses.Count(x => x == TonWithdrawalPayoutStates.Queued),
             statuses.Count(x => x == TonWithdrawalPayoutStates.RetryPending),
             statuses.Count(x => x == TonWithdrawalPayoutStates.Sending),
             statuses.Count(x => x == TonWithdrawalPayoutStates.Submitted),
             statuses.Count(x => x == TonWithdrawalPayoutStates.Confirmed),
             requests);
+    }
+
+    private static IReadOnlyList<string> BuildTonWithdrawalWorkerIssues(
+        PaymentsOptions options,
+        TelegramTonOptions telegramTon,
+        TelegramTonHotWalletStateResult hotWalletState,
+        TonWithdrawalWorkerRuntimeView worker,
+        IReadOnlyList<TonWithdrawalRequestDiagnosticView> requests)
+    {
+        var issues = new List<string>();
+        var queuedCount = requests.Count(x => string.Equals(x.Status, TonWithdrawalPayoutStates.Queued, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(x.Status, TonWithdrawalPayoutStates.RetryPending, StringComparison.OrdinalIgnoreCase));
+
+        if (!options.Enabled)
+            issues.Add("Payments are disabled, so the TON withdrawal worker will never pick up queued requests.");
+        if (!telegramTon.Enabled)
+            issues.Add("Telegram TON payments are disabled.");
+        if (!telegramTon.ServerWithdrawalsEnabled)
+            issues.Add("Server-executed TON withdrawals are disabled.");
+        if (string.IsNullOrWhiteSpace(telegramTon.HotWalletMnemonic))
+            issues.Add("Hot wallet mnemonic is not configured.");
+        if (string.IsNullOrWhiteSpace(telegramTon.HotWalletExpectedAddress))
+            issues.Add("Hot wallet expected address is not configured.");
+
+        if (worker.DisabledByConfiguration && !string.IsNullOrWhiteSpace(worker.DisabledReason))
+            issues.Add("Worker disabled: " + worker.DisabledReason);
+
+        if (queuedCount > 0)
+        {
+            if (worker.LastCycleCompletedAtUtc is null)
+                issues.Add("Queued withdrawals exist, but the worker has not completed any cycle yet.");
+
+            if (!string.IsNullOrWhiteSpace(worker.LastError))
+                issues.Add("Last worker cycle failed: " + worker.LastError);
+
+            if (worker.IntervalSeconds is > 0
+                && worker.LastCycleCompletedAtUtc is { } lastCompletedAtUtc
+                && lastCompletedAtUtc < DateTimeOffset.UtcNow.AddSeconds(-(worker.IntervalSeconds.Value * 3)))
+            {
+                issues.Add("Worker heartbeat looks stale. The last completed cycle is older than three worker intervals.");
+            }
+        }
+
+        if (!hotWalletState.Success)
+        {
+            issues.Add("Hot wallet diagnostics failed: " + (hotWalletState.Error ?? "Unknown hot wallet error."));
+        }
+        else
+        {
+            if (!hotWalletState.IsDeployed)
+                issues.Add("Hot wallet is not deployed on-chain.");
+            if (hotWalletState.Seqno is null)
+                issues.Add("Hot wallet seqno is unavailable.");
+        }
+
+        return issues;
+    }
+
+    private static List<string> BuildQueueBlockingReasons(
+        PaymentsOptions options,
+        TelegramTonOptions telegramTon,
+        TelegramTonHotWalletStateResult hotWalletState,
+        TonWithdrawalWorkerRuntimeView worker,
+        TonWithdrawalRequestDiagnosticView? oldestQueuedRequest)
+    {
+        var blockingReasons = new List<string>();
+        if (oldestQueuedRequest is null)
+            return blockingReasons;
+
+        if (!options.Enabled)
+            blockingReasons.Add("Payments are disabled.");
+        if (!telegramTon.Enabled)
+            blockingReasons.Add("Telegram TON payments are disabled.");
+        if (!telegramTon.ServerWithdrawalsEnabled)
+            blockingReasons.Add("Server-executed TON withdrawals are disabled.");
+        if (worker.DisabledByConfiguration && !string.IsNullOrWhiteSpace(worker.DisabledReason))
+            blockingReasons.Add(worker.DisabledReason);
+        if (!worker.Started && !worker.DisabledByConfiguration)
+            blockingReasons.Add("Worker has not reported a startup heartbeat yet.");
+        if (!string.IsNullOrWhiteSpace(worker.LastError))
+            blockingReasons.Add("Last worker cycle failed: " + worker.LastError);
+
+        if (!hotWalletState.Success)
+            blockingReasons.Add(hotWalletState.Error ?? "Hot wallet diagnostics failed.");
+        else
+        {
+            if (!hotWalletState.IsDeployed)
+                blockingReasons.Add("Hot wallet is not deployed on-chain.");
+            if (hotWalletState.Seqno is null)
+                blockingReasons.Add("Hot wallet seqno is unavailable.");
+        }
+
+        blockingReasons.AddRange(oldestQueuedRequest.Issues);
+        return blockingReasons
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+    }
+
+    private static IReadOnlyList<string> BuildWithdrawalRequestIssues(
+        string reviewStatus,
+        string? rawPayoutState,
+        decimal? amountTon,
+        string? memo,
+        DateTimeOffset? lastAttemptAtUtc,
+        DateTimeOffset? submittedAtUtc,
+        string? lastError,
+        TelegramTonOptions telegramTon)
+    {
+        var issues = new List<string>();
+        if (!string.Equals(reviewStatus, WithdrawalRequestStatus.Confirmed.ToString(), StringComparison.OrdinalIgnoreCase))
+            issues.Add("Withdrawal is not admin-confirmed yet.");
+
+        if (amountTon is null || amountTon <= 0m)
+            issues.Add("TON payout amount has not been calculated yet.");
+
+        if (string.IsNullOrWhiteSpace(memo))
+            issues.Add("TON payout memo is missing.");
+
+        var payoutState = (rawPayoutState ?? string.Empty).Trim().ToLowerInvariant();
+        if (payoutState == TonWithdrawalPayoutStates.Sending && lastAttemptAtUtc is { } sendingSince)
+        {
+            if (sendingSince <= DateTimeOffset.UtcNow.AddMinutes(-2))
+                issues.Add("Withdrawal has been in sending state for more than 2 minutes and should be recovered by the worker.");
+        }
+
+        if (payoutState == TonWithdrawalPayoutStates.Submitted && submittedAtUtc is { } submittedSince)
+        {
+            var timeoutUtc = submittedSince.AddMinutes(Math.Max(telegramTon.WithdrawalConfirmationTimeoutMinutes, 1));
+            if (DateTimeOffset.UtcNow >= timeoutUtc)
+                issues.Add("Withdrawal confirmation timeout has elapsed and reconciliation should decide whether to retry.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(lastError))
+            issues.Add(lastError);
+
+        return issues
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
     }
 }
 

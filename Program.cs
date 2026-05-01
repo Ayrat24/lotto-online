@@ -84,6 +84,7 @@ builder.Services.AddHttpClient<ITelegramTonClient, TelegramTonClient>((sp, http)
 });
 builder.Services.AddSingleton<ITelegramTonRateService, TelegramTonRateService>();
 builder.Services.AddSingleton<ITelegramTonHotWalletService, TelegramTonHotWalletService>();
+builder.Services.AddSingleton<TelegramTonWithdrawalWorkerState>();
 builder.Services.AddScoped<TelegramTonWithdrawalProcessor>();
 builder.Services.AddHostedService<TelegramTonRateRefreshHostedService>();
 builder.Services.AddHostedService<TelegramTonDepositReconciliationHostedService>();
