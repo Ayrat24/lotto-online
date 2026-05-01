@@ -94,6 +94,9 @@ public static class WalletEndpoints
             var payments = paymentsOptions.Value;
             var tonWithdrawEnabled = payments.Enabled && payments.TelegramTon.Enabled && payments.TelegramTon.ServerWithdrawalsEnabled;
             var bitcoinWithdrawEnabled = payments.Enabled;
+            var tonNetwork = payments.Enabled && payments.TelegramTon.Enabled
+                ? TelegramTonNetworkNames.GetConfiguredNetwork(payments.TelegramTon)
+                : null;
 
             return Results.Ok(new
             {
@@ -106,7 +109,8 @@ public static class WalletEndpoints
                 withdrawal = new
                 {
                     bitcoinEnabled = bitcoinWithdrawEnabled,
-                    tonEnabled = tonWithdrawEnabled
+                    tonEnabled = tonWithdrawEnabled,
+                    tonNetwork
                 }
             });
         });

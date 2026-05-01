@@ -334,7 +334,10 @@ public sealed class WalletService : IWalletService
             .Select(x => new WalletSavedAddresses(x.WalletAddress, x.TonWalletAddress))
             .SingleOrDefaultAsync(ct);
 
-        return addresses ?? new WalletSavedAddresses(null, null);
+        if (addresses is null)
+            return new WalletSavedAddresses(null, null);
+
+        return NormalizeSavedAddresses(addresses);
     }
 
     public async Task<IReadOnlyList<WalletHistoryEntry>> GetHistoryAsync(long userId, int limit, CancellationToken ct)
@@ -530,7 +533,7 @@ public sealed class WalletService : IWalletService
         return new WalletReviewWithdrawalResult(true, null);
     }
 
-    private static bool TryNormalizePayoutAddress(string? value, string assetCode, out string? normalizedAddress, out string? error)
+    private bool TryNormalizePayoutAddress(string? value, string assetCode, out string? normalizedAddress, out string? error)
     {
         normalizedAddress = null;
         error = null;
@@ -548,13 +551,14 @@ public sealed class WalletService : IWalletService
             try
             {
                 var tonAddress = new Address(trimmed);
-                if (tonAddress.IsTestOnly())
+                if (LooksLikeFriendlyTonAddress(trimmed)
+                    && tonAddress.IsTestOnly() != TelegramTonNetworkNames.IsTestnet(_payments.TelegramTon))
                 {
-                    error = "wallet_ton_testnet_not_supported";
+                    error = "wallet_ton_network_mismatch";
                     return false;
                 }
 
-                normalizedAddress = ToCanonicalTonAddress(tonAddress);
+                normalizedAddress = ToCanonicalTonAddress(tonAddress, TelegramTonNetworkNames.IsTestnet(_payments.TelegramTon));
                 return true;
             }
             catch
@@ -579,7 +583,7 @@ public sealed class WalletService : IWalletService
         await _db.Database.MigrateAsync(ct);
     }
 
-    private static string? GetSavedPayoutAddress(MiniAppUser user, string assetCode)
+    private string? GetSavedPayoutAddress(MiniAppUser user, string assetCode)
     {
         var value = assetCode switch
         {
@@ -603,8 +607,17 @@ public sealed class WalletService : IWalletService
         user.WalletAddress = address;
     }
 
-    private static WalletSavedAddresses BuildSavedAddresses(MiniAppUser user)
-        => new(user.WalletAddress, user.TonWalletAddress);
+    private WalletSavedAddresses BuildSavedAddresses(MiniAppUser user)
+        => NormalizeSavedAddresses(new WalletSavedAddresses(user.WalletAddress, user.TonWalletAddress));
+
+    private WalletSavedAddresses NormalizeSavedAddresses(WalletSavedAddresses addresses)
+    {
+        var tonAddress = TryNormalizePayoutAddress(addresses.TonAddress, WithdrawalAssetCodes.Ton, out var normalizedTonAddress, out _)
+            ? normalizedTonAddress
+            : null;
+
+        return new WalletSavedAddresses(addresses.BitcoinAddress, tonAddress);
+    }
 
     private static string? GetHistoryPaymentMethod(string? assetCode)
     {
@@ -660,13 +673,16 @@ public sealed class WalletService : IWalletService
     private static decimal RoundAmount(decimal amount)
         => decimal.Round(amount, 2, MidpointRounding.AwayFromZero);
 
-    private static string ToCanonicalTonAddress(Address address)
+    private static bool LooksLikeFriendlyTonAddress(string value)
+        => !string.IsNullOrWhiteSpace(value) && !value.Contains(':', StringComparison.Ordinal);
+
+    private static string ToCanonicalTonAddress(Address address, bool testOnly)
     {
         var options = new AddressStringifyOptions(true, true, false, 0)
         {
             UrlSafe = true,
             Bounceable = false,
-            TestOnly = false,
+            TestOnly = testOnly,
             Workchain = null
         };
 

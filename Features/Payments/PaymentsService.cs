@@ -58,7 +58,7 @@ public sealed class PaymentsService : IPaymentsService
                 SupportsNativeTelegram: true,
                 SupportsAlternativeLink: true,
                 AssetCode: "TON",
-                Network: "TON"));
+                Network: TelegramTonNetworkNames.GetConfiguredNetwork(_options.TelegramTon)));
         }
 
         if (_options.Enabled && _options.BtcPay.Enabled)

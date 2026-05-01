@@ -192,7 +192,7 @@
   var paymentSystemsOptions = null;
   var selectedPaymentMethod = null;
   var selectedWithdrawAsset = 'BTC';
-  var withdrawalCapabilities = { bitcoin: true, ton: false };
+  var withdrawalCapabilities = { bitcoin: true, ton: false, tonNetwork: 'mainnet' };
   var savedWalletAddresses = { bitcoin: '', ton: '' };
   var debugPaymentVariant = 'default';
 
@@ -489,8 +489,11 @@
     if (normalized === 'wallet_request_failed') {
       return t('client.withdraw.serverError', 'Server could not create the withdrawal request. Please try again or contact support.');
     }
-    if (normalized === 'wallet_ton_testnet_not_supported') {
-      return t('client.withdraw.tonMainnetOnly', 'This TON wallet address is testnet-only. Use a mainnet TON address for withdrawals.');
+    if (normalized === 'wallet_ton_network_mismatch') {
+      return formatLocalized(
+        'client.withdraw.tonNetworkRequired',
+        'This TON wallet address belongs to a different TON network. Use a {0} TON address for withdrawals.',
+        getTonNetworkDisplayName(getConfiguredTonNetwork()));
     }
 
     if (/^<!doctype html>/i.test(normalized) || /<html/i.test(normalized)) {
@@ -3049,6 +3052,25 @@
     return String(methodKey || '').trim().toLowerCase() === 'telegram_ton';
   }
 
+  function normalizeTonNetworkName(value) {
+    return String(value || '').trim().toLowerCase() === 'testnet' ? 'testnet' : 'mainnet';
+  }
+
+  function getConfiguredTonNetwork() {
+    if (withdrawalCapabilities && withdrawalCapabilities.tonNetwork) {
+      return normalizeTonNetworkName(withdrawalCapabilities.tonNetwork);
+    }
+
+    var tonSystem = getPaymentSystemByKey('telegram_ton');
+    return normalizeTonNetworkName(tonSystem && tonSystem.network);
+  }
+
+  function getTonNetworkDisplayName(network) {
+    return normalizeTonNetworkName(network) === 'testnet'
+      ? t('client.network.testnet', 'testnet')
+      : t('client.network.mainnet', 'mainnet');
+  }
+
   function normalizeWithdrawAsset(assetCode) {
     var normalized = String(assetCode || '').trim().toUpperCase();
     if (normalized === 'TON' && withdrawalCapabilities.ton) return 'TON';
@@ -3181,6 +3203,12 @@
     return chain === '-3' || /testnet/i.test(chain);
   }
 
+  function isTonConnectAccountNetworkMismatch() {
+    if (!getTonConnectAccountAddress()) return false;
+    var expectsTestnet = getConfiguredTonNetwork() === 'testnet';
+    return isTonConnectTestnetAccount() !== expectsTestnet;
+  }
+
   function getTonConnectAccountAddress() {
     var account = getTonConnectAccount();
     return account && account.address ? String(account.address).trim() : '';
@@ -3210,6 +3238,7 @@
     var next = withdrawal && typeof withdrawal === 'object' ? withdrawal : {};
     withdrawalCapabilities.bitcoin = next.bitcoinEnabled !== false;
     withdrawalCapabilities.ton = !!next.tonEnabled;
+    withdrawalCapabilities.tonNetwork = normalizeTonNetworkName(next.tonNetwork || withdrawalCapabilities.tonNetwork);
     selectedWithdrawAsset = normalizeWithdrawAsset(selectedWithdrawAsset);
     renderWithdrawAssetOptions();
     renderWithdrawTonConnectPanel();
@@ -3233,8 +3262,11 @@
     }
 
     if (connectedAddress) {
-      if (isTonConnectTestnetAccount()) {
-        withdrawTonConnectStatusEl.textContent = t('client.withdraw.tonConnectTestnetUnsupported', 'Connected TON wallet is on testnet. Switch to mainnet or paste a mainnet TON address below.');
+      if (isTonConnectAccountNetworkMismatch()) {
+        withdrawTonConnectStatusEl.textContent = formatLocalized(
+          'client.withdraw.tonConnectNetworkMismatch',
+          'Connected TON wallet is on a different TON network. Switch to {0} or paste a matching TON address below.',
+          getTonNetworkDisplayName(getConfiguredTonNetwork()));
         return;
       }
 
@@ -4753,8 +4785,11 @@
       return;
     }
 
-    if (usingConnectedTonAddress && isTonConnectTestnetAccount()) {
-      setWithdrawStatus(t('client.withdraw.tonMainnetOnly', 'This TON wallet address is testnet-only. Use a mainnet TON address for withdrawals.'));
+    if (usingConnectedTonAddress && isTonConnectAccountNetworkMismatch()) {
+      setWithdrawStatus(formatLocalized(
+        'client.withdraw.tonNetworkRequired',
+        'This TON wallet address belongs to a different TON network. Use a {0} TON address for withdrawals.',
+        getTonNetworkDisplayName(getConfiguredTonNetwork())));
       return;
     }
 

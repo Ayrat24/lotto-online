@@ -109,6 +109,27 @@ public sealed class TelegramTonOptions
     public string ExplorerBaseUrl { get; set; } = "https://tonviewer.com/transaction/";
 }
 
+public static class TelegramTonNetworkNames
+{
+    public const string Mainnet = "mainnet";
+    public const string Testnet = "testnet";
+
+    public static string GetConfiguredNetwork(TelegramTonOptions? options)
+        => ApiBaseUrlLooksLikeTestnet(options?.ApiBaseUrl) ? Testnet : Mainnet;
+
+    public static bool IsTestnet(TelegramTonOptions? options)
+        => string.Equals(GetConfiguredNetwork(options), Testnet, StringComparison.Ordinal);
+
+    public static bool ApiBaseUrlLooksLikeTestnet(string? apiBaseUrl)
+    {
+        var trimmed = (apiBaseUrl ?? string.Empty).Trim();
+        if (trimmed.Length == 0)
+            return false;
+
+        return trimmed.Contains("testnet", StringComparison.OrdinalIgnoreCase);
+    }
+}
+
 public sealed class PaymentsOpsOptions
 {
     public bool EnableReconciliation { get; set; }
@@ -201,7 +222,7 @@ public sealed class PaymentsOptionsValidator : IValidateOptions<PaymentsOptions>
             }
 
             if (LooksLikeTestnetFriendlyTonAddress(telegramTon.MerchantAddress)
-                && !ApiBaseUrlLooksLikeTestnet(telegramTon.ApiBaseUrl))
+                && !TelegramTonNetworkNames.ApiBaseUrlLooksLikeTestnet(telegramTon.ApiBaseUrl))
             {
                 errors.Add("Payments:TelegramTon:MerchantAddress looks like a TON testnet-friendly address (for example 0Q... or kQ...), but Payments:TelegramTon:ApiBaseUrl is not a testnet endpoint. Use a mainnet merchant address or set Payments:TelegramTon:ApiBaseUrl to https://testnet.toncenter.com/api/v2/ for testnet runs.");
             }
@@ -263,15 +284,6 @@ public sealed class PaymentsOptionsValidator : IValidateOptions<PaymentsOptions>
         var trimmed = (address ?? string.Empty).Trim();
         return trimmed.StartsWith("kQ", StringComparison.Ordinal)
             || trimmed.StartsWith("0Q", StringComparison.Ordinal);
-    }
-
-    private static bool ApiBaseUrlLooksLikeTestnet(string? apiBaseUrl)
-    {
-        var trimmed = (apiBaseUrl ?? string.Empty).Trim();
-        if (trimmed.Length == 0)
-            return false;
-
-        return trimmed.Contains("testnet", StringComparison.OrdinalIgnoreCase);
     }
 }
 

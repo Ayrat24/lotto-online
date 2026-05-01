@@ -5,6 +5,8 @@ using MiniApp.Admin;
 using MiniApp.Data;
 using MiniApp.Features.Auth;
 using MiniApp.Features.Localization;
+using MiniApp.Features.Payments;
+using TonSdk.Core;
 
 namespace MiniApp.Pages.Admin;
 
@@ -124,7 +126,7 @@ public sealed class WalletModel : LocalizedAdminPageModel
                 x.Reference))
             .ToArrayAsync(ct);
 
-        PendingWithdrawalRequests = await _db.WithdrawalRequests
+        PendingWithdrawalRequests = (await _db.WithdrawalRequests
             .AsNoTracking()
             .Where(x => x.Status == WithdrawalRequestStatus.Pending)
             .OrderBy(x => x.CreatedAtUtc)
@@ -143,9 +145,11 @@ public sealed class WalletModel : LocalizedAdminPageModel
                 x.ReviewedAtUtc,
                 x.ReviewedByAdmin,
                 x.PayoutLastError ?? x.ReviewNote))
-            .ToArrayAsync(ct);
+            .ToArrayAsync(ct))
+            .Select(x => x with { Number = NormalizeWithdrawalDisplayAddress(x.AssetCode, x.Number) })
+            .ToArray();
 
-        RecentWithdrawalRequests = await _db.WithdrawalRequests
+        RecentWithdrawalRequests = (await _db.WithdrawalRequests
             .AsNoTracking()
             .OrderByDescending(x => x.CreatedAtUtc)
             .Take(300)
@@ -163,7 +167,37 @@ public sealed class WalletModel : LocalizedAdminPageModel
                 x.ReviewedAtUtc,
                 x.ReviewedByAdmin,
                 x.PayoutLastError ?? x.ReviewNote))
-            .ToArrayAsync(ct);
+            .ToArrayAsync(ct))
+            .Select(x => x with { Number = NormalizeWithdrawalDisplayAddress(x.AssetCode, x.Number) })
+            .ToArray();
+    }
+
+    private string NormalizeWithdrawalDisplayAddress(string assetCode, string address)
+    {
+        if (!string.Equals(assetCode, WithdrawalAssetCodes.Ton, StringComparison.OrdinalIgnoreCase))
+            return address;
+
+        var trimmed = (address ?? string.Empty).Trim();
+        if (trimmed.Length == 0)
+            return trimmed;
+
+        try
+        {
+            var tonAddress = new Address(trimmed);
+            var options = new AddressStringifyOptions(true, true, false, 0)
+            {
+                UrlSafe = true,
+                Bounceable = false,
+                TestOnly = TelegramTonNetworkNames.ApiBaseUrlLooksLikeTestnet(_config["Payments:TelegramTon:ApiBaseUrl"]),
+                Workchain = null
+            };
+
+            return tonAddress.ToString(AddressType.Base64, options);
+        }
+        catch
+        {
+            return trimmed;
+        }
     }
 }
 
