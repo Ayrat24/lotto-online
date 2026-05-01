@@ -83,7 +83,12 @@ builder.Services.AddHttpClient<ITelegramTonClient, TelegramTonClient>((sp, http)
     http.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
 });
 builder.Services.AddSingleton<ITelegramTonRateService, TelegramTonRateService>();
-builder.Services.AddSingleton<ITelegramTonHotWalletService, TelegramTonHotWalletService>();
+builder.Services.AddHttpClient<ITelegramTonHotWalletService, TelegramTonHotWalletService>((sp, http) =>
+{
+    var options = sp.GetRequiredService<IOptions<PaymentsOptions>>().Value.TelegramTon;
+    var timeoutSeconds = options.RequestTimeoutSeconds <= 0 ? 15 : options.RequestTimeoutSeconds;
+    http.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
+});
 builder.Services.AddSingleton<TelegramTonWithdrawalWorkerState>();
 builder.Services.AddScoped<TelegramTonWithdrawalProcessor>();
 builder.Services.AddHostedService<TelegramTonRateRefreshHostedService>();

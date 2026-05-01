@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Options;
+using System.Globalization;
+using System.Text;
+using System.Text.Json;
 using TonSdk.Contracts;
-using TonSdk.Client;
 using TonSdk.Contracts.Wallet;
 using TonSdk.Core;
 using TonSdk.Core.Block;
@@ -11,11 +13,13 @@ namespace MiniApp.Features.Payments;
 
 public sealed class TelegramTonHotWalletService : ITelegramTonHotWalletService
 {
+    private readonly HttpClient _http;
     private readonly PaymentsOptions _options;
     private readonly ILogger<TelegramTonHotWalletService> _logger;
 
-    public TelegramTonHotWalletService(IOptions<PaymentsOptions> options, ILogger<TelegramTonHotWalletService> logger)
+    public TelegramTonHotWalletService(HttpClient http, IOptions<PaymentsOptions> options, ILogger<TelegramTonHotWalletService> logger)
     {
+        _http = http;
         _options = options.Value;
         _logger = logger;
     }
@@ -23,35 +27,29 @@ public sealed class TelegramTonHotWalletService : ITelegramTonHotWalletService
     public async Task<TelegramTonHotWalletStateResult> GetHotWalletStateAsync(CancellationToken ct)
     {
         TonHotWalletDiagnosticsContext? diagnostics = null;
+        TransferProbeResult transferProbe = new(false, null);
         try
         {
             diagnostics = BuildDiagnosticsContext();
             var context = CreateWalletContext(diagnostics);
-            using var client = CreateTonClient();
-
-            var isDeployed = await client.IsContractDeployed(context.Address);
-            var infoResult = await client.GetWalletInformation(context.Address);
-            if (!infoResult.HasValue)
-                return new TelegramTonHotWalletStateResult(false, "TON wallet information is unavailable.");
-
-            var info = infoResult.Value;
-
-            var balanceTon = info.Balance.ToDecimal();
-            var seqno = info.Seqno is { } value ? checked((int)value) : 0;
+            transferProbe = TryBuildTransferProbe(context, 0);
+            var info = await GetWalletInformationAsync(context.Address, ct);
 
             return new TelegramTonHotWalletStateResult(
                 true,
                 DerivedAddress: diagnostics.DerivedAddress,
                 ExpectedAddress: diagnostics.ExpectedAddress,
                 Address: context.Address.ToString(),
-                BalanceTon: balanceTon,
-                Seqno: seqno,
-                IsDeployed: isDeployed,
+                BalanceTon: info.BalanceTon,
+                Seqno: info.Seqno,
+                IsDeployed: info.IsDeployed,
                 Workchain: diagnostics.Workchain,
                 Revision: diagnostics.Revision,
                 SubwalletId: diagnostics.SubwalletId,
                 WalletVersion: diagnostics.WalletVersion,
-                NetworkGlobalId: diagnostics.NetworkGlobalId);
+                NetworkGlobalId: diagnostics.NetworkGlobalId,
+                CanSignTransferProbe: transferProbe.Success,
+                TransferProbeError: transferProbe.Error);
         }
         catch (Exception ex)
         {
@@ -65,7 +63,9 @@ public sealed class TelegramTonHotWalletService : ITelegramTonHotWalletService
                 Revision: diagnostics?.Revision,
                 SubwalletId: diagnostics?.SubwalletId,
                 WalletVersion: diagnostics?.WalletVersion,
-                NetworkGlobalId: diagnostics?.NetworkGlobalId);
+                NetworkGlobalId: diagnostics?.NetworkGlobalId,
+                CanSignTransferProbe: transferProbe.Success,
+                TransferProbeError: transferProbe.Error);
         }
     }
 
@@ -75,21 +75,14 @@ public sealed class TelegramTonHotWalletService : ITelegramTonHotWalletService
         {
             var context = CreateContext();
             var destination = new Address(request.DestinationAddress.Trim());
-
-            using var client = CreateTonClient();
-            var isDeployed = await client.IsContractDeployed(context.Address);
-            if (!isDeployed)
+            var walletInfo = await GetWalletInformationAsync(context.Address, ct);
+            if (!walletInfo.IsDeployed)
                 return new TelegramTonSendWithdrawalResult(false, "TON hot wallet is not deployed on-chain.");
 
-            var walletInfoResult = await client.GetWalletInformation(context.Address);
-            if (!walletInfoResult.HasValue)
+            if (walletInfo.Seqno is null)
                 return new TelegramTonSendWithdrawalResult(false, "TON wallet information is unavailable.");
 
-            var walletInfo = walletInfoResult.Value;
-
-            var currentSeqno = walletInfo.Seqno is { } seqnoValue
-                ? checked((int)seqnoValue)
-                : 0;
+            var currentSeqno = walletInfo.Seqno.Value;
             if (currentSeqno != request.Seqno)
             {
                 return new TelegramTonSendWithdrawalResult(
@@ -98,10 +91,10 @@ public sealed class TelegramTonHotWalletService : ITelegramTonHotWalletService
             }
 
             var seqno = currentSeqno;
-            var balanceTon = walletInfo.Balance.ToDecimal();
+            var balanceTon = walletInfo.BalanceTon;
             var minReserveTon = Math.Max(_options.TelegramTon.HotWalletMinReserveTon, 0m);
-            var availableBalanceText = balanceTon.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            var requiredBalanceText = (request.AmountTon + minReserveTon).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var availableBalanceText = balanceTon.ToString(CultureInfo.InvariantCulture);
+            var requiredBalanceText = (request.AmountTon + minReserveTon).ToString(CultureInfo.InvariantCulture);
             if (balanceTon < request.AmountTon + minReserveTon)
             {
                 return new TelegramTonSendWithdrawalResult(
@@ -130,15 +123,13 @@ public sealed class TelegramTonHotWalletService : ITelegramTonHotWalletService
                 checked((uint)seqno),
                 request.ValidForSeconds);
 
-            var resultValue = await client.SendBoc(signed.Cell);
-            if (!resultValue.HasValue || string.IsNullOrWhiteSpace(resultValue.Value.Hash))
+            var hash = await SendBocAsync(signed.Cell, ct);
+            if (string.IsNullOrWhiteSpace(hash))
                 return new TelegramTonSendWithdrawalResult(false, "TON wallet broadcast did not return a message hash.");
-
-            var result = resultValue.Value;
 
             return new TelegramTonSendWithdrawalResult(
                 true,
-                ExternalMessageHash: result.Hash,
+                ExternalMessageHash: hash,
                 Seqno: seqno,
                 SubmittedAtUtc: DateTimeOffset.UtcNow);
         }
@@ -155,43 +146,36 @@ public sealed class TelegramTonHotWalletService : ITelegramTonHotWalletService
         {
             var context = CreateContext();
             var normalizedDestination = NormalizeAddress(request.DestinationAddress);
+            var transactions = await GetTransactionsAsync(context.Address.ToString(), Math.Clamp(request.SearchLimit, 1, 100), ct);
 
-            using var client = CreateTonClient();
-            var transactions = await client.GetTransactions(
-                context.Address,
-                checked((uint)Math.Clamp(request.SearchLimit, 1, 100)),
-                null,
-                null,
-                null,
-                true);
-
-            foreach (var tx in transactions ?? [])
+            foreach (var tx in transactions)
             {
-                var observedAtUtc = DateTimeOffset.FromUnixTimeSeconds(tx.UTime);
-                if (observedAtUtc < request.CreatedAfterUtc.AddMinutes(-2))
+                if (tx.ObservedAtUtc is null)
                     continue;
 
-                foreach (var outMsg in tx.OutMsgs ?? [])
+                if (tx.ObservedAtUtc.Value < request.CreatedAfterUtc.AddMinutes(-2))
+                    continue;
+
+                foreach (var outMsg in tx.OutMessages)
                 {
-                    if (outMsg.Destination is null)
+                    if (string.IsNullOrWhiteSpace(outMsg.DestinationAddress))
                         continue;
 
-                    if (!string.Equals(NormalizeAddress(outMsg.Destination.ToString()), normalizedDestination, StringComparison.Ordinal))
+                    if (!string.Equals(NormalizeAddress(outMsg.DestinationAddress), normalizedDestination, StringComparison.Ordinal))
                         continue;
 
                     if (!string.Equals((outMsg.Message ?? string.Empty).Trim(), request.Memo.Trim(), StringComparison.Ordinal))
                         continue;
 
-                    var amountTon = outMsg.Value.ToDecimal();
-                    if (amountTon + 0.000000001m < request.AmountTon)
+                    if (outMsg.ValueTon + 0.000000001m < request.AmountTon)
                         continue;
 
                     return new TelegramTonOutgoingTransferLookupResult(
                         true,
                         true,
-                        TransactionHash: tx.TransactionId.Hash,
-                        ObservedAtUtc: observedAtUtc,
-                        AmountTon: amountTon);
+                        TransactionHash: tx.TransactionHash,
+                        ObservedAtUtc: tx.ObservedAtUtc.Value,
+                        AmountTon: outMsg.ValueTon);
                 }
             }
 
@@ -250,27 +234,15 @@ public sealed class TelegramTonHotWalletService : ITelegramTonHotWalletService
         return diagnostics.Context;
     }
 
-    private TonClient CreateTonClient()
+    private string GetNormalizedApiBaseUrl()
     {
-        var telegramTon = _options.TelegramTon;
-        var endpoint = telegramTon.ApiBaseUrl.Trim();
-        if (string.IsNullOrWhiteSpace(endpoint))
+        var endpoint = (_options.TelegramTon.ApiBaseUrl ?? string.Empty).Trim();
+        if (endpoint.Length == 0)
             endpoint = "https://toncenter.com/api/v2/";
+        if (!endpoint.EndsWith("/", StringComparison.Ordinal))
+            endpoint += "/";
 
-        return new TonClient(
-            TonClientType.HTTP_TONCENTERAPIV2,
-            new HttpParameters
-            {
-                Endpoint = endpoint,
-                ApiKey = string.IsNullOrWhiteSpace(telegramTon.ApiKey) ? null : telegramTon.ApiKey.Trim(),
-                Timeout = GetTonSdkTimeoutMilliseconds(telegramTon.RequestTimeoutSeconds)
-            });
-    }
-
-    private static int GetTonSdkTimeoutMilliseconds(int requestTimeoutSeconds)
-    {
-        var timeoutSeconds = requestTimeoutSeconds <= 0 ? 15 : requestTimeoutSeconds;
-        return checked(timeoutSeconds * 1000);
+        return endpoint;
     }
 
     private static string NormalizeAddress(string address)
@@ -287,7 +259,338 @@ public sealed class TelegramTonHotWalletService : ITelegramTonHotWalletService
     private static string ToNanoString(decimal amountTon)
     {
         var nanos = decimal.Round(amountTon * 1_000_000_000m, 0, MidpointRounding.AwayFromZero);
-        return nanos.ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+        return nanos.ToString("0", CultureInfo.InvariantCulture);
+    }
+
+    private static TransferProbeResult TryBuildTransferProbe(TonHotWalletContext context, int seqno)
+    {
+        try
+        {
+            var body = new CellBuilder(128)
+                .StoreUInt(0, 32, true)
+                .StoreString("TON-PROBE", true)
+                .Build();
+
+            var message = new InternalMessage(new InternalMessageOptions
+            {
+                Info = new IntMsgInfo(new IntMsgInfoOptions
+                {
+                    Bounce = false,
+                    Dest = context.Address,
+                    Value = new Coins("1", new CoinsOptions(true, 9))
+                }),
+                Body = body
+            });
+
+            _ = context.CreateSignedTransferMessage(
+                [new WalletTransfer { Message = message, Mode = 3 }],
+                checked((uint)Math.Max(seqno, 0)),
+                600);
+
+            return new TransferProbeResult(true, null);
+        }
+        catch (Exception ex)
+        {
+            return new TransferProbeResult(false, FormatExceptionMessage(ex));
+        }
+    }
+
+    private async Task<ToncenterWalletInformation> GetWalletInformationAsync(Address walletAddress, CancellationToken ct)
+    {
+        using var document = await SendToncenterGetAsync(
+            "getWalletInformation?address=" + Uri.EscapeDataString(walletAddress.ToString()),
+            ct);
+
+        var root = document.RootElement;
+        if (!root.TryGetProperty("result", out var result) || result.ValueKind != JsonValueKind.Object)
+            throw new InvalidOperationException("TON wallet information response did not contain a result object.");
+
+        var balanceNanotons = TryGetDecimal(result, "balance") ?? 0m;
+        var accountState = TryGetString(result, "account_state");
+        var isWallet = TryGetBoolean(result, "wallet");
+        var isDeployed = IsTonAccountDeployed(accountState, isWallet);
+        var seqno = TryGetInt32(result, "seqno");
+
+        return new ToncenterWalletInformation(
+            decimal.Round(balanceNanotons / 1_000_000_000m, 9, MidpointRounding.AwayFromZero),
+            seqno,
+            isDeployed,
+            accountState,
+            isWallet);
+    }
+
+    private async Task<string> SendBocAsync(Cell cell, CancellationToken ct)
+    {
+        var boc = Convert.ToBase64String(BagOfCells.SerializeBoc(cell, false, true).ToBytes(false));
+        using var document = await SendToncenterPostAsync("sendBocReturnHash", new { boc }, ct);
+
+        var root = document.RootElement;
+        if (!root.TryGetProperty("result", out var result))
+            return Convert.ToBase64String(cell.Hash.ToBytes(false));
+
+        return result.ValueKind switch
+        {
+            JsonValueKind.String => result.GetString() ?? Convert.ToBase64String(cell.Hash.ToBytes(false)),
+            JsonValueKind.Object => TryGetString(result, "hash")
+                ?? TryGetString(result, "message_hash")
+                ?? Convert.ToBase64String(cell.Hash.ToBytes(false)),
+            _ => Convert.ToBase64String(cell.Hash.ToBytes(false))
+        };
+    }
+
+    private async Task<IReadOnlyList<ToncenterTransaction>> GetTransactionsAsync(string walletAddress, int limit, CancellationToken ct)
+    {
+        using var document = await SendToncenterGetAsync(
+            "getTransactions?address=" + Uri.EscapeDataString(walletAddress.Trim())
+            + "&limit=" + Math.Clamp(limit, 1, 100).ToString(CultureInfo.InvariantCulture)
+            + "&archival=true",
+            ct);
+
+        var root = document.RootElement;
+        if (!root.TryGetProperty("result", out var result) || result.ValueKind != JsonValueKind.Array)
+            return Array.Empty<ToncenterTransaction>();
+
+        var transactions = new List<ToncenterTransaction>();
+        foreach (var tx in result.EnumerateArray())
+        {
+            if (tx.ValueKind != JsonValueKind.Object)
+                continue;
+
+            var outMessages = new List<ToncenterOutMessage>();
+            if (tx.TryGetProperty("out_msgs", out var outMsgs) && outMsgs.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var outMsg in outMsgs.EnumerateArray())
+                {
+                    if (outMsg.ValueKind != JsonValueKind.Object)
+                        continue;
+
+                    var valueNanotons = TryGetDecimal(outMsg, "value") ?? 0m;
+                    outMessages.Add(new ToncenterOutMessage(
+                        TryGetString(outMsg, "destination"),
+                        ExtractTonMessageText(outMsg),
+                        decimal.Round(valueNanotons / 1_000_000_000m, 9, MidpointRounding.AwayFromZero)));
+                }
+            }
+
+            transactions.Add(new ToncenterTransaction(
+                ExtractTransactionHash(tx),
+                TryGetUnixTime(tx, "utime"),
+                outMessages));
+        }
+
+        return transactions;
+    }
+
+    private async Task<JsonDocument> SendToncenterGetAsync(string relativePathAndQuery, CancellationToken ct)
+    {
+        using var request = CreateToncenterRequest(HttpMethod.Get, relativePathAndQuery, null);
+        var response = await _http.SendAsync(request, ct);
+        return await ParseToncenterResponseAsync(response, ct);
+    }
+
+    private async Task<JsonDocument> SendToncenterPostAsync(string relativePath, object body, CancellationToken ct)
+    {
+        using var request = CreateToncenterRequest(HttpMethod.Post, relativePath, body);
+        var response = await _http.SendAsync(request, ct);
+        return await ParseToncenterResponseAsync(response, ct);
+    }
+
+    private HttpRequestMessage CreateToncenterRequest(HttpMethod method, string relativePathAndQuery, object? body)
+    {
+        var request = new HttpRequestMessage(method, new Uri(new Uri(GetNormalizedApiBaseUrl(), UriKind.Absolute), relativePathAndQuery));
+        var apiKey = (_options.TelegramTon.ApiKey ?? string.Empty).Trim();
+        if (apiKey.Length > 0)
+            request.Headers.Add("X-API-Key", apiKey);
+
+        if (body is not null)
+        {
+            var json = JsonSerializer.Serialize(body);
+            request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+        }
+
+        return request;
+    }
+
+    private static async Task<JsonDocument> ParseToncenterResponseAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        var body = await response.Content.ReadAsStringAsync(ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Toncenter request failed with HTTP {(int)response.StatusCode}: {ExtractToncenterError(body)}");
+        }
+
+        var document = JsonDocument.Parse(body);
+        var root = document.RootElement;
+        if (root.ValueKind != JsonValueKind.Object)
+        {
+            document.Dispose();
+            throw new InvalidOperationException("Toncenter response is not a JSON object.");
+        }
+
+        if (root.TryGetProperty("ok", out var okProp)
+            && okProp.ValueKind == JsonValueKind.False)
+        {
+            var error = TryGetString(root, "error")
+                ?? TryGetString(root, "description")
+                ?? ExtractToncenterError(body);
+            document.Dispose();
+            throw new InvalidOperationException("Toncenter API error: " + error);
+        }
+
+        return document;
+    }
+
+    private static string ExtractToncenterError(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+            return "Empty response body.";
+
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            var root = document.RootElement;
+            return TryGetString(root, "error")
+                ?? TryGetString(root, "description")
+                ?? body.Trim();
+        }
+        catch
+        {
+            return body.Trim();
+        }
+    }
+
+    private static string? ExtractTonMessageText(JsonElement message)
+    {
+        var direct = TryGetString(message, "message") ?? TryGetString(message, "comment");
+        if (!string.IsNullOrWhiteSpace(direct))
+            return NormalizeText(direct);
+
+        if (message.TryGetProperty("msg_data", out var msgData) && msgData.ValueKind == JsonValueKind.Object)
+        {
+            var encoded = TryGetString(msgData, "text");
+            if (!string.IsNullOrWhiteSpace(encoded))
+            {
+                var decoded = TryDecodeBase64Text(encoded);
+                return NormalizeText(decoded ?? encoded);
+            }
+        }
+
+        return null;
+    }
+
+    private static string? NormalizeText(string? value)
+    {
+        var normalized = (value ?? string.Empty).Trim().TrimEnd('\0');
+        return normalized.Length == 0 ? null : normalized;
+    }
+
+    private static string? TryDecodeBase64Text(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        try
+        {
+            var bytes = Convert.FromBase64String(value);
+            var decoded = Encoding.UTF8.GetString(bytes).TrimEnd('\0');
+            return string.IsNullOrWhiteSpace(decoded) ? null : decoded;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string? ExtractTransactionHash(JsonElement tx)
+    {
+        if (tx.TryGetProperty("transaction_id", out var txId) && txId.ValueKind == JsonValueKind.Object)
+            return TryGetString(txId, "hash");
+
+        return TryGetString(tx, "hash") ?? TryGetString(tx, "id");
+    }
+
+    private static DateTimeOffset? TryGetUnixTime(JsonElement root, string name)
+    {
+        if (!root.TryGetProperty(name, out var prop))
+            return null;
+
+        if (prop.ValueKind == JsonValueKind.Number && prop.TryGetInt64(out var numeric))
+            return DateTimeOffset.FromUnixTimeSeconds(numeric);
+
+        if (prop.ValueKind == JsonValueKind.String
+            && long.TryParse(prop.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out numeric))
+        {
+            return DateTimeOffset.FromUnixTimeSeconds(numeric);
+        }
+
+        return null;
+    }
+
+    private static string? TryGetString(JsonElement root, string name)
+    {
+        if (root.TryGetProperty(name, out var prop) && prop.ValueKind == JsonValueKind.String)
+            return prop.GetString();
+
+        return null;
+    }
+
+    private static bool? TryGetBoolean(JsonElement root, string name)
+    {
+        if (!root.TryGetProperty(name, out var prop))
+            return null;
+
+        return prop.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.String when bool.TryParse(prop.GetString(), out var parsed) => parsed,
+            _ => null
+        };
+    }
+
+    private static int? TryGetInt32(JsonElement root, string name)
+    {
+        if (!root.TryGetProperty(name, out var prop))
+            return null;
+
+        if (prop.ValueKind == JsonValueKind.Number && prop.TryGetInt32(out var numeric))
+            return numeric;
+
+        if (prop.ValueKind == JsonValueKind.String
+            && int.TryParse(prop.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out numeric))
+        {
+            return numeric;
+        }
+
+        return null;
+    }
+
+    private static decimal? TryGetDecimal(JsonElement root, string name)
+    {
+        if (!root.TryGetProperty(name, out var prop))
+            return null;
+
+        if (prop.ValueKind == JsonValueKind.Number && prop.TryGetDecimal(out var numeric))
+            return numeric;
+
+        if (prop.ValueKind == JsonValueKind.String
+            && decimal.TryParse(prop.GetString(), NumberStyles.Number, CultureInfo.InvariantCulture, out numeric))
+        {
+            return numeric;
+        }
+
+        return null;
+    }
+
+    private static bool IsTonAccountDeployed(string? accountState, bool? wallet)
+    {
+        var normalized = (accountState ?? string.Empty).Trim().ToLowerInvariant();
+        if (normalized is "uninitialized" or "nonexist")
+            return false;
+        if (wallet == true)
+            return true;
+        return normalized is "active" or "frozen";
     }
 
     private static string FormatExceptionMessage(Exception ex)
@@ -400,6 +703,25 @@ public sealed class TelegramTonHotWalletService : ITelegramTonHotWalletService
         Address Address,
         Func<WalletTransfer[], uint, int, ExternalInMessage> CreateSignedTransferMessage);
 
+    private sealed record TransferProbeResult(bool Success, string? Error);
+
+    private sealed record ToncenterWalletInformation(
+        decimal BalanceTon,
+        int? Seqno,
+        bool IsDeployed,
+        string? AccountState,
+        bool? IsWallet);
+
+    private sealed record ToncenterTransaction(
+        string? TransactionHash,
+        DateTimeOffset? ObservedAtUtc,
+        IReadOnlyList<ToncenterOutMessage> OutMessages);
+
+    private sealed record ToncenterOutMessage(
+        string? DestinationAddress,
+        string? Message,
+        decimal ValueTon);
+
     private sealed record TonHotWalletDiagnosticsContext(
         TonHotWalletContext Context,
         string DerivedAddress,
@@ -410,9 +732,4 @@ public sealed class TelegramTonHotWalletService : ITelegramTonHotWalletService
         string WalletVersion,
         int? NetworkGlobalId);
 }
-
-
-
-
-
 

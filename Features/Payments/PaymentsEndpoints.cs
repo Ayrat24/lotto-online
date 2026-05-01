@@ -688,6 +688,8 @@ public static class PaymentsEndpoints
                 issues.Add("Hot wallet is not deployed on-chain.");
             if (hotWalletState.Seqno is null)
                 issues.Add("Hot wallet seqno is unavailable.");
+            if (!hotWalletState.CanSignTransferProbe)
+                issues.Add("Hot wallet transfer-signing probe failed: " + (hotWalletState.TransferProbeError ?? "Unknown signing error."));
         }
 
         return issues;
@@ -725,6 +727,8 @@ public static class PaymentsEndpoints
                 blockingReasons.Add("Hot wallet is not deployed on-chain.");
             if (hotWalletState.Seqno is null)
                 blockingReasons.Add("Hot wallet seqno is unavailable.");
+            if (!hotWalletState.CanSignTransferProbe)
+                blockingReasons.Add(hotWalletState.TransferProbeError ?? "Hot wallet transfer-signing probe failed.");
         }
 
         blockingReasons.AddRange(oldestQueuedRequest.Issues);

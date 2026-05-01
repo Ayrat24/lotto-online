@@ -30,7 +30,9 @@ public sealed record TelegramTonHotWalletStateResult(
     int? Revision = null,
     int? SubwalletId = null,
     string? WalletVersion = null,
-    int? NetworkGlobalId = null);
+    int? NetworkGlobalId = null,
+    bool CanSignTransferProbe = false,
+    string? TransferProbeError = null);
 
 public sealed record TelegramTonSendWithdrawalResult(
     bool Success,
