@@ -353,7 +353,7 @@ public sealed class TelegramTonHotWalletService : ITelegramTonHotWalletService
 
     private async Task<string> SendBocAsync(Cell cell, CancellationToken ct)
     {
-        var boc = Convert.ToBase64String(BagOfCells.SerializeBoc(cell, false, true).ToBytes(false));
+        var boc = SerializeBocForToncenter(cell);
         using var document = await SendToncenterPostAsync("sendBocReturnHash", new { boc }, ct);
 
         var root = document.RootElement;
@@ -368,6 +368,21 @@ public sealed class TelegramTonHotWalletService : ITelegramTonHotWalletService
                 ?? Convert.ToBase64String(cell.Hash.ToBytes(false)),
             _ => Convert.ToBase64String(cell.Hash.ToBytes(false))
         };
+    }
+
+    private static string SerializeBocForToncenter(Cell cell)
+    {
+        var bytes = BagOfCells.SerializeBoc(cell, false, true).ToBytes(true);
+        if (bytes.Length < 4
+            || bytes[0] != 0xB5
+            || bytes[1] != 0xEE
+            || bytes[2] != 0x9C
+            || bytes[3] != 0x72)
+        {
+            throw new InvalidOperationException("Serialized TON message does not contain a valid BOC header.");
+        }
+
+        return Convert.ToBase64String(bytes);
     }
 
     private async Task<IReadOnlyList<ToncenterTransaction>> GetTransactionsAsync(string walletAddress, int limit, CancellationToken ct)
