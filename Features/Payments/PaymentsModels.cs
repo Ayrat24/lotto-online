@@ -143,3 +143,34 @@ public sealed record TonConnectDiagnosticsView(
     TonConnectManifestView? AppManifest,
     IReadOnlyList<TonConnectProbeView> Probes);
 
+public sealed record TonWithdrawalWorkerDiagnosticsView(
+    DateTimeOffset GeneratedAtUtc,
+    bool PaymentsEnabled,
+    bool TelegramTonEnabled,
+    bool ServerWithdrawalsEnabled,
+    string ConfiguredNetwork,
+    string ApiBaseUrl,
+    TelegramTonHotWalletStateResult HotWallet,
+    int QueuedCount,
+    int RetryPendingCount,
+    int SendingCount,
+    int SubmittedCount,
+    int ConfirmedCount,
+    IReadOnlyList<TonWithdrawalRequestDiagnosticView> RecentRequests);
+
+public sealed record TonWithdrawalRequestDiagnosticView(
+    long Id,
+    long UserId,
+    long TelegramUserId,
+    decimal AmountUsd,
+    decimal? AmountTon,
+    string PayoutAddress,
+    string Status,
+    int AttemptCount,
+    int? Seqno,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset? LastAttemptAtUtc,
+    DateTimeOffset? SubmittedAtUtc,
+    DateTimeOffset? ConfirmedAtUtc,
+    string? LastError);
+

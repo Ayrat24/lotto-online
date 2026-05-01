@@ -68,9 +68,13 @@ public sealed class TelegramTonOptions
 
     public int HotWalletWorkchain { get; set; } = 0;
 
+    public string HotWalletVersion { get; set; } = TelegramTonHotWalletVersions.W5R1;
+
     public int HotWalletRevision { get; set; } = 2;
 
     public int HotWalletSubwalletId { get; set; } = 698983191;
+
+    public int HotWalletNetworkGlobalId { get; set; }
 
     public decimal HotWalletMinReserveTon { get; set; } = 0.2m;
 
@@ -109,6 +113,30 @@ public sealed class TelegramTonOptions
     public string ExplorerBaseUrl { get; set; } = "https://tonviewer.com/transaction/";
 }
 
+public static class TelegramTonHotWalletVersions
+{
+    public const string V4 = "v4";
+    public const string W5R1 = "w5r1";
+
+    public static string Normalize(string? value)
+    {
+        var normalized = (value ?? string.Empty).Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "" => W5R1,
+            "v4" or "walletv4" or "wallet_v4" => V4,
+            "w5" or "w5r1" or "walletv5" or "wallet_v5" or "walletv5r1" or "wallet_v5r1" => W5R1,
+            _ => string.Empty
+        };
+    }
+
+    public static bool UsesRevision(string? value)
+        => string.Equals(Normalize(value), V4, StringComparison.Ordinal);
+
+    public static bool UsesNetworkGlobalId(string? value)
+        => string.Equals(Normalize(value), W5R1, StringComparison.Ordinal);
+}
+
 public static class TelegramTonNetworkNames
 {
     public const string Mainnet = "mainnet";
@@ -128,6 +156,15 @@ public static class TelegramTonNetworkNames
 
         return trimmed.Contains("testnet", StringComparison.OrdinalIgnoreCase);
     }
+}
+
+public static class TelegramTonNetworkGlobalIds
+{
+    public const int Mainnet = -239;
+    public const int Testnet = -3;
+
+    public static int GetDefault(TelegramTonOptions? options)
+        => TelegramTonNetworkNames.IsTestnet(options) ? Testnet : Mainnet;
 }
 
 public sealed class PaymentsOpsOptions
@@ -185,6 +222,12 @@ public sealed class PaymentsOptionsValidator : IValidateOptions<PaymentsOptions>
 
         if (telegramTon.Enabled)
         {
+            var normalizedHotWalletVersion = TelegramTonHotWalletVersions.Normalize(telegramTon.HotWalletVersion);
+            if (normalizedHotWalletVersion.Length == 0)
+            {
+                errors.Add("Payments:TelegramTon:HotWalletVersion must be v4 or w5r1.");
+            }
+
             if (!string.IsNullOrWhiteSpace(telegramTon.TwaReturnUrl)
                 && !Uri.TryCreate(telegramTon.TwaReturnUrl, UriKind.Absolute, out _))
             {
@@ -248,8 +291,11 @@ public sealed class PaymentsOptionsValidator : IValidateOptions<PaymentsOptions>
             if (telegramTon.HotWalletSubwalletId < 0)
                 errors.Add("Payments:TelegramTon:HotWalletSubwalletId must be zero or greater.");
 
-            if (telegramTon.HotWalletRevision <= 0)
+            if (TelegramTonHotWalletVersions.UsesRevision(normalizedHotWalletVersion)
+                && telegramTon.HotWalletRevision <= 0)
+            {
                 errors.Add("Payments:TelegramTon:HotWalletRevision must be greater than 0.");
+            }
 
             if (telegramTon.HotWalletMinReserveTon < 0m)
                 errors.Add("Payments:TelegramTon:HotWalletMinReserveTon must be zero or greater.");

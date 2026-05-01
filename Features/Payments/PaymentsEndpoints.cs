@@ -1,6 +1,8 @@
 using System.Net;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using MiniApp.Admin;
 using MiniApp.Data;
 using MiniApp.Features.Auth;
@@ -34,6 +36,17 @@ public static class PaymentsEndpoints
                 return Results.BadRequest(new { ok = false, error = result.Error ?? "Failed to load TON deposit diagnostics." });
 
             return Results.Ok(new { ok = true, deposits = result.Deposits });
+        });
+
+        endpoints.MapGet("/api/admin/payments/ton-withdrawals/diagnostics", [Authorize(Policy = AdminAuth.PolicyName)] async (
+            int? limit,
+            AppDbContext db,
+            IOptions<PaymentsOptions> options,
+            ITelegramTonHotWalletService hotWallet,
+            CancellationToken ct) =>
+        {
+            var diagnostics = await BuildTonWithdrawalDiagnosticsAsync(db, options.Value, hotWallet, limit ?? 25, ct);
+            return Results.Ok(new { ok = true, diagnostics });
         });
 
         endpoints.MapPost("/api/admin/payments/ton-deposits/{depositId:long}/reconcile", [Authorize(Policy = AdminAuth.PolicyName)] async (
@@ -499,5 +512,60 @@ public static class PaymentsEndpoints
         };
 
     private sealed record TonConnectProbeResult(TonConnectProbeView View, string? Body);
+
+    private static async Task<TonWithdrawalWorkerDiagnosticsView> BuildTonWithdrawalDiagnosticsAsync(
+        AppDbContext db,
+        PaymentsOptions options,
+        ITelegramTonHotWalletService hotWallet,
+        int limit,
+        CancellationToken ct)
+    {
+        var take = Math.Clamp(limit, 1, 100);
+        var telegramTon = options.TelegramTon ?? new TelegramTonOptions();
+
+        var requests = await db.WithdrawalRequests
+            .AsNoTracking()
+            .Include(x => x.User)
+            .Where(x => x.AssetCode == WithdrawalAssetCodes.Ton)
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .Take(take)
+            .Select(x => new TonWithdrawalRequestDiagnosticView(
+                x.Id,
+                x.UserId,
+                x.User.TelegramUserId,
+                x.Amount,
+                x.AssetAmount,
+                x.Number,
+                string.IsNullOrWhiteSpace(x.ExternalPayoutState) ? x.Status.ToString() : x.ExternalPayoutState!,
+                x.PayoutAttemptCount,
+                x.PayoutSeqno,
+                x.CreatedAtUtc,
+                x.PayoutLastAttemptAtUtc,
+                x.PayoutSubmittedAtUtc,
+                x.PayoutConfirmedAtUtc,
+                x.PayoutLastError ?? x.ReviewNote))
+            .ToArrayAsync(ct);
+
+        var statuses = requests
+            .Select(x => (x.Status ?? string.Empty).Trim().ToLowerInvariant())
+            .ToArray();
+
+        var hotWalletState = await hotWallet.GetHotWalletStateAsync(ct);
+
+        return new TonWithdrawalWorkerDiagnosticsView(
+            DateTimeOffset.UtcNow,
+            options.Enabled,
+            telegramTon.Enabled,
+            telegramTon.ServerWithdrawalsEnabled,
+            TelegramTonNetworkNames.GetConfiguredNetwork(telegramTon),
+            telegramTon.ApiBaseUrl,
+            hotWalletState,
+            statuses.Count(x => x == TonWithdrawalPayoutStates.Queued),
+            statuses.Count(x => x == TonWithdrawalPayoutStates.RetryPending),
+            statuses.Count(x => x == TonWithdrawalPayoutStates.Sending),
+            statuses.Count(x => x == TonWithdrawalPayoutStates.Submitted),
+            statuses.Count(x => x == TonWithdrawalPayoutStates.Confirmed),
+            requests);
+    }
 }
 

@@ -23,7 +23,14 @@ public sealed record TelegramTonHotWalletStateResult(
     string? Address = null,
     decimal? BalanceTon = null,
     int? Seqno = null,
-    bool IsDeployed = false);
+    bool IsDeployed = false,
+    string? DerivedAddress = null,
+    string? ExpectedAddress = null,
+    int? Workchain = null,
+    int? Revision = null,
+    int? SubwalletId = null,
+    string? WalletVersion = null,
+    int? NetworkGlobalId = null);
 
 public sealed record TelegramTonSendWithdrawalResult(
     bool Success,
