@@ -63,7 +63,7 @@ services:
       Payments__TelegramTon__HotWalletWorkchain: ${TELEGRAMTON_HOT_WALLET_WORKCHAIN:-${Payments__TelegramTon__HotWalletWorkchain:-0}}
       Payments__TelegramTon__HotWalletVersion: ${TELEGRAMTON_HOT_WALLET_VERSION:-${Payments__TelegramTon__HotWalletVersion:-w5r1}}
       Payments__TelegramTon__HotWalletRevision: ${TELEGRAMTON_HOT_WALLET_REVISION:-${Payments__TelegramTon__HotWalletRevision:-2}}
-      Payments__TelegramTon__HotWalletSubwalletId: ${TELEGRAMTON_HOT_WALLET_SUBWALLET_ID:-${Payments__TelegramTon__HotWalletSubwalletId:-698983191}}
+      Payments__TelegramTon__HotWalletSubwalletId: ${TELEGRAMTON_HOT_WALLET_SUBWALLET_ID:-${Payments__TelegramTon__HotWalletSubwalletId:-0}}
       Payments__TelegramTon__HotWalletNetworkGlobalId: ${TELEGRAMTON_HOT_WALLET_NETWORK_GLOBAL_ID:-${Payments__TelegramTon__HotWalletNetworkGlobalId:-0}}
       Payments__TelegramTon__HotWalletMinReserveTon: ${TELEGRAMTON_HOT_WALLET_MIN_RESERVE_TON:-${Payments__TelegramTon__HotWalletMinReserveTon:-0.2}}
       Payments__TelegramTon__HotWalletExpectedAddress: ${TELEGRAMTON_HOT_WALLET_EXPECTED_ADDRESS:-${Payments__TelegramTon__HotWalletExpectedAddress:-}}

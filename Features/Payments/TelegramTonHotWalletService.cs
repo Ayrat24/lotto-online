@@ -350,6 +350,13 @@ public sealed class TelegramTonHotWalletService : ITelegramTonHotWalletService
         int workchain,
         uint subwalletId)
     {
+        if (subwalletId > TelegramTonHotWalletVersions.W5R1MaxSubwalletId)
+        {
+            throw new InvalidOperationException(
+                $"Payments:TelegramTon:HotWalletSubwalletId={subwalletId} is invalid for W5 wallets."
+                + $" W5 subwallet ids must be between 0 and {TelegramTonHotWalletVersions.W5R1MaxSubwalletId}.");
+        }
+
         var networkGlobalId = telegramTon.HotWalletNetworkGlobalId != 0
             ? telegramTon.HotWalletNetworkGlobalId
             : TelegramTonNetworkGlobalIds.GetDefault(telegramTon);

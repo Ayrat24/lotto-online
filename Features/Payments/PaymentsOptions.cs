@@ -117,6 +117,7 @@ public static class TelegramTonHotWalletVersions
 {
     public const string V4 = "v4";
     public const string W5R1 = "w5r1";
+    public const int W5R1MaxSubwalletId = 255;
 
     public static string Normalize(string? value)
     {
@@ -290,6 +291,12 @@ public sealed class PaymentsOptionsValidator : IValidateOptions<PaymentsOptions>
 
             if (telegramTon.HotWalletSubwalletId < 0)
                 errors.Add("Payments:TelegramTon:HotWalletSubwalletId must be zero or greater.");
+
+            if (TelegramTonHotWalletVersions.UsesNetworkGlobalId(normalizedHotWalletVersion)
+                && telegramTon.HotWalletSubwalletId > TelegramTonHotWalletVersions.W5R1MaxSubwalletId)
+            {
+                errors.Add($"Payments:TelegramTon:HotWalletSubwalletId must be between 0 and {TelegramTonHotWalletVersions.W5R1MaxSubwalletId} for W5 wallets.");
+            }
 
             if (TelegramTonHotWalletVersions.UsesRevision(normalizedHotWalletVersion)
                 && telegramTon.HotWalletRevision <= 0)
