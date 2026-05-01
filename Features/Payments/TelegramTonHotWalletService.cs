@@ -69,6 +69,38 @@ public sealed class TelegramTonHotWalletService : ITelegramTonHotWalletService
         }
     }
 
+    public async Task<TelegramTonDeployHotWalletResult> DeployHotWalletAsync(CancellationToken ct)
+    {
+        try
+        {
+            var context = CreateContext();
+            var walletInfo = await GetWalletInformationAsync(context.Address, ct);
+            if (walletInfo.IsDeployed)
+            {
+                return new TelegramTonDeployHotWalletResult(
+                    false,
+                    "TON hot wallet is already deployed on-chain.",
+                    AlreadyDeployed: true);
+            }
+
+            if (walletInfo.BalanceTon <= 0m)
+                return new TelegramTonDeployHotWalletResult(false, "TON hot wallet balance is zero. Fund the address before deploying it.");
+
+            var deploy = context.CreateDeployMessage();
+            var hash = await SendBocAsync(deploy.Cell, ct);
+            return new TelegramTonDeployHotWalletResult(
+                true,
+                ExternalMessageHash: hash,
+                SubmittedAtUtc: DateTimeOffset.UtcNow,
+                AlreadyDeployed: false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to deploy Telegram TON hot wallet.");
+            return new TelegramTonDeployHotWalletResult(false, FormatExceptionMessage(ex));
+        }
+    }
+
     public async Task<TelegramTonSendWithdrawalResult> SendWithdrawalAsync(TelegramTonSendWithdrawalRequest request, CancellationToken ct)
     {
         try
@@ -632,6 +664,7 @@ public sealed class TelegramTonHotWalletService : ITelegramTonHotWalletService
         return new TonHotWalletDiagnosticsContext(
             new TonHotWalletContext(
                 wallet.Address,
+                () => wallet.CreateDeployMessage().Sign(mnemonic.Keys.PrivateKey, false),
                 (transfers, seqno, validForSeconds) =>
                 {
                     var validUntil = checked((uint)DateTimeOffset.UtcNow.AddSeconds(Math.Max(validForSeconds, 30)).ToUnixTimeSeconds());
@@ -685,6 +718,7 @@ public sealed class TelegramTonHotWalletService : ITelegramTonHotWalletService
         return new TonHotWalletDiagnosticsContext(
             new TonHotWalletContext(
                 wallet.Address,
+                () => wallet.CreateDeployMessage(mnemonic.Keys.PrivateKey),
                 (transfers, seqno, validForSeconds) => wallet.CreateTransferMessage(
                     transfers,
                     seqno,
@@ -701,6 +735,7 @@ public sealed class TelegramTonHotWalletService : ITelegramTonHotWalletService
 
     private sealed record TonHotWalletContext(
         Address Address,
+        Func<ExternalInMessage> CreateDeployMessage,
         Func<WalletTransfer[], uint, int, ExternalInMessage> CreateSignedTransferMessage);
 
     private sealed record TransferProbeResult(bool Success, string? Error);

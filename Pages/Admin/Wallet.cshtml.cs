@@ -46,6 +46,7 @@ public sealed class WalletModel : LocalizedAdminPageModel
     private readonly IConfiguration _config;
     private readonly IWebHostEnvironment _env;
     private readonly IWalletService _wallet;
+    private readonly ITelegramTonHotWalletService _hotWallet;
     private readonly TelegramTonWithdrawalProcessor _tonWithdrawalProcessor;
     private readonly ILogger<WalletModel> _logger;
 
@@ -54,6 +55,7 @@ public sealed class WalletModel : LocalizedAdminPageModel
         IConfiguration config,
         IWebHostEnvironment env,
         IWalletService wallet,
+        ITelegramTonHotWalletService hotWallet,
         TelegramTonWithdrawalProcessor tonWithdrawalProcessor,
         ILogger<WalletModel> logger,
         ILocalizationService localization)
@@ -63,6 +65,7 @@ public sealed class WalletModel : LocalizedAdminPageModel
         _config = config;
         _env = env;
         _wallet = wallet;
+        _hotWallet = hotWallet;
         _tonWithdrawalProcessor = tonWithdrawalProcessor;
         _logger = logger;
     }
@@ -72,6 +75,7 @@ public sealed class WalletModel : LocalizedAdminPageModel
     public IReadOnlyList<WalletTransactionRow> Transactions { get; private set; } = Array.Empty<WalletTransactionRow>();
     public IReadOnlyList<WithdrawalRequestRow> PendingWithdrawalRequests { get; private set; } = Array.Empty<WithdrawalRequestRow>();
     public IReadOnlyList<WithdrawalRequestRow> RecentWithdrawalRequests { get; private set; } = Array.Empty<WithdrawalRequestRow>();
+    public TelegramTonHotWalletStateResult? HotWalletState { get; private set; }
 
     public string? StatusMessage { get; private set; }
     public bool StatusIsError { get; private set; }
@@ -149,6 +153,18 @@ public sealed class WalletModel : LocalizedAdminPageModel
         return RedirectToPage();
     }
 
+    public async Task<IActionResult> OnPostDeployTonHotWalletAsync(CancellationToken ct)
+    {
+        var result = await _hotWallet.DeployHotWalletAsync(ct);
+        FlashMessage = result.Success
+            ? await GetTextAsync("admin.wallet.flash.deployTonSuccess", "Submitted TON hot wallet deployment message.", ct)
+            : result.AlreadyDeployed
+                ? await GetTextAsync("admin.wallet.flash.deployTonAlreadyDeployed", "TON hot wallet is already deployed.", ct)
+                : result.Error ?? await GetTextAsync("admin.wallet.flash.deployTonFailed", "Failed to deploy TON hot wallet.", ct);
+        FlashIsError = !result.Success && !result.AlreadyDeployed;
+        return RedirectToPage();
+    }
+
     private async Task LoadAsync(CancellationToken ct)
     {
         if (LocalDebugMode.TryGetDebugTelegramUserId(HttpContext, _config, _env, out var debugTelegramUserId))
@@ -156,6 +172,7 @@ public sealed class WalletModel : LocalizedAdminPageModel
 
         var serverWallet = await _wallet.EnsureServerWalletAsync(ct);
         ServerBalance = serverWallet.Balance;
+        HotWalletState = await _hotWallet.GetHotWalletStateAsync(ct);
 
         Transactions = await _db.WalletTransactions
             .AsNoTracking()
@@ -266,6 +283,9 @@ public sealed class WalletModel : LocalizedAdminPageModel
             or TonWithdrawalPayoutStates.Sending
             or TonWithdrawalPayoutStates.Submitted;
     }
+
+    public bool CanDeployTonHotWallet()
+        => HotWalletState is { Success: true, IsDeployed: false, CanSignTransferProbe: true };
 }
 
 

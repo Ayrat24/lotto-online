@@ -4,6 +4,8 @@ public interface ITelegramTonHotWalletService
 {
     Task<TelegramTonHotWalletStateResult> GetHotWalletStateAsync(CancellationToken ct);
 
+    Task<TelegramTonDeployHotWalletResult> DeployHotWalletAsync(CancellationToken ct);
+
     Task<TelegramTonSendWithdrawalResult> SendWithdrawalAsync(TelegramTonSendWithdrawalRequest request, CancellationToken ct);
 
     Task<TelegramTonOutgoingTransferLookupResult> TryFindOutgoingTransferAsync(TelegramTonOutgoingTransferLookupRequest request, CancellationToken ct);
@@ -33,6 +35,13 @@ public sealed record TelegramTonHotWalletStateResult(
     int? NetworkGlobalId = null,
     bool CanSignTransferProbe = false,
     string? TransferProbeError = null);
+
+public sealed record TelegramTonDeployHotWalletResult(
+    bool Success,
+    string? Error = null,
+    string? ExternalMessageHash = null,
+    DateTimeOffset? SubmittedAtUtc = null,
+    bool AlreadyDeployed = false);
 
 public sealed record TelegramTonSendWithdrawalResult(
     bool Success,

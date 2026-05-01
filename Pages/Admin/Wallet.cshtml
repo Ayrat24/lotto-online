@@ -20,6 +20,43 @@
 
 <div class="card mt-3">
     <div class="card-body">
+        <h5 class="card-title">@Model.T("admin.wallet.hotWallet.title", "TON hot wallet")</h5>
+        @if (Model.HotWalletState is null)
+        {
+            <div class="alert alert-secondary mb-0">@Model.T("admin.wallet.hotWallet.unavailable", "TON hot wallet diagnostics are unavailable.")</div>
+        }
+        else
+        {
+            <dl class="row mb-3">
+                <dt class="col-sm-3">@Model.T("admin.wallet.hotWallet.address", "Address")</dt>
+                <dd class="col-sm-9"><code>@(Model.HotWalletState.Address ?? "-")</code></dd>
+                <dt class="col-sm-3">@Model.T("admin.wallet.hotWallet.version", "Wallet version")</dt>
+                <dd class="col-sm-9">@(Model.HotWalletState.WalletVersion ?? "-")</dd>
+                <dt class="col-sm-3">@Model.T("admin.wallet.hotWallet.subwalletId", "Subwallet id")</dt>
+                <dd class="col-sm-9">@(Model.HotWalletState.SubwalletId?.ToString() ?? "-")</dd>
+                <dt class="col-sm-3">@Model.T("admin.wallet.hotWallet.deployed", "Deployment")</dt>
+                <dd class="col-sm-9">@(Model.HotWalletState.IsDeployed ? Model.T("admin.wallet.hotWallet.deployedYes", "Deployed") : Model.T("admin.wallet.hotWallet.deployedNo", "Not deployed"))</dd>
+                <dt class="col-sm-3">@Model.T("admin.wallet.hotWallet.signing", "Signing probe")</dt>
+                <dd class="col-sm-9">@(Model.HotWalletState.CanSignTransferProbe ? Model.T("admin.wallet.hotWallet.signingOk", "OK") : (Model.HotWalletState.TransferProbeError ?? Model.T("admin.wallet.hotWallet.signingFailed", "Failed")))</dd>
+            </dl>
+
+            @if (Model.CanDeployTonHotWallet())
+            {
+                <form method="post" asp-page-handler="DeployTonHotWallet" onsubmit="return confirm('@Model.T("admin.wallet.confirm.deployTonPrompt", "Deploy the TON hot wallet on-chain now?")');">
+                    @Html.AntiForgeryToken()
+                    <button class="btn btn-warning" type="submit">@Model.T("admin.wallet.action.deployTon", "Deploy TON hot wallet")</button>
+                </form>
+            }
+            else if (Model.HotWalletState.Success && !Model.HotWalletState.IsDeployed)
+            {
+                <div class="alert alert-warning mb-0">@(Model.HotWalletState.Error ?? Model.HotWalletState.TransferProbeError ?? Model.T("admin.wallet.hotWallet.deployBlocked", "Hot wallet deployment is blocked by the current diagnostics state."))</div>
+            }
+        }
+    </div>
+</div>
+
+<div class="card mt-3">
+    <div class="card-body">
         <h5 class="card-title">@Model.T("admin.wallet.withdrawals.pendingTitle", "Withdrawal requests")</h5>
 
         @if (Model.PendingWithdrawalRequests.Count == 0)
