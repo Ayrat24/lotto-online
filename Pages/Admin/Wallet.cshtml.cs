@@ -35,6 +35,8 @@ public sealed class WalletModel : LocalizedAdminPageModel
         string Number,
         string? ExternalPayoutId,
         string Status,
+        string ReviewStatus,
+        string? RawPayoutState,
         DateTimeOffset CreatedAtUtc,
         DateTimeOffset? ReviewedAtUtc,
         string? ReviewedByAdmin,
@@ -124,6 +126,29 @@ public sealed class WalletModel : LocalizedAdminPageModel
         return RedirectToPage();
     }
 
+    public async Task<IActionResult> OnPostRefreshTonWithdrawalAsync(long id, CancellationToken ct)
+    {
+        var result = await _tonWithdrawalProcessor.ProcessRequestAsync(id, ct);
+
+        FlashMessage = result.Type switch
+        {
+            TelegramTonWithdrawalManualProcessResultType.Processed
+                => string.Format(await GetTextAsync("admin.wallet.flash.refreshTonProcessed", "Processed TON withdrawal request #{0}.", ct), id),
+            TelegramTonWithdrawalManualProcessResultType.NoChange
+                => string.Format(await GetTextAsync("admin.wallet.flash.refreshTonNoChange", "Checked TON withdrawal request #{0}, but no new status was found yet.", ct), id),
+            TelegramTonWithdrawalManualProcessResultType.NotFound
+                => string.Format(await GetTextAsync("admin.wallet.flash.refreshTonNotFound", "TON withdrawal request #{0} was not found.", ct), id),
+            TelegramTonWithdrawalManualProcessResultType.Disabled
+                => await GetTextAsync("admin.wallet.flash.refreshTonDisabled", "Server-executed TON withdrawals are disabled right now.", ct),
+            _ => string.Format(await GetTextAsync("admin.wallet.flash.refreshTonNotEligible", "TON withdrawal request #{0} is not in a retryable state.", ct), id)
+        };
+
+        FlashIsError = result.Type is TelegramTonWithdrawalManualProcessResultType.NotFound
+            or TelegramTonWithdrawalManualProcessResultType.NotEligible
+            or TelegramTonWithdrawalManualProcessResultType.Disabled;
+        return RedirectToPage();
+    }
+
     private async Task LoadAsync(CancellationToken ct)
     {
         if (LocalDebugMode.TryGetDebugTelegramUserId(HttpContext, _config, _env, out var debugTelegramUserId))
@@ -164,6 +189,8 @@ public sealed class WalletModel : LocalizedAdminPageModel
                 x.Number,
                 x.ExternalPayoutId,
                 x.Status.ToString(),
+                x.Status.ToString(),
+                x.ExternalPayoutState,
                 x.CreatedAtUtc,
                 x.ReviewedAtUtc,
                 x.ReviewedByAdmin,
@@ -186,6 +213,8 @@ public sealed class WalletModel : LocalizedAdminPageModel
                 x.Number,
                 x.ExternalPayoutId,
                 string.IsNullOrWhiteSpace(x.ExternalPayoutState) ? x.Status.ToString() : x.ExternalPayoutState!,
+                x.Status.ToString(),
+                x.ExternalPayoutState,
                 x.CreatedAtUtc,
                 x.ReviewedAtUtc,
                 x.ReviewedByAdmin,
@@ -221,6 +250,21 @@ public sealed class WalletModel : LocalizedAdminPageModel
         {
             return trimmed;
         }
+    }
+
+    public bool CanRefreshTonWithdrawal(WithdrawalRequestRow request)
+    {
+        if (!string.Equals(request.AssetCode, WithdrawalAssetCodes.Ton, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        if (!string.Equals(request.ReviewStatus, WithdrawalRequestStatus.Confirmed.ToString(), StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var payoutState = (request.RawPayoutState ?? string.Empty).Trim().ToLowerInvariant();
+        return payoutState is TonWithdrawalPayoutStates.Queued
+            or TonWithdrawalPayoutStates.RetryPending
+            or TonWithdrawalPayoutStates.Sending
+            or TonWithdrawalPayoutStates.Submitted;
     }
 }
 

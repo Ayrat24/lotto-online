@@ -108,6 +108,7 @@
                         <th>@Model.T("admin.wallet.table.reviewedUtc", "Reviewed (UTC)")</th>
                         <th>@Model.T("admin.wallet.table.admin", "Admin")</th>
                         <th>@Model.T("admin.wallet.table.note", "Note")</th>
+                        <th>@Model.T("admin.wallet.table.actions", "Actions")</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -131,6 +132,19 @@
                             <td>@(wr.ReviewedAtUtc?.ToString("u") ?? "-")</td>
                             <td>@(string.IsNullOrWhiteSpace(wr.ReviewedByAdmin) ? "-" : wr.ReviewedByAdmin)</td>
                             <td>@(string.IsNullOrWhiteSpace(wr.ReviewNote) ? "-" : wr.ReviewNote)</td>
+                            <td>
+                                @if (Model.CanRefreshTonWithdrawal(wr))
+                                {
+                                    <form method="post" asp-page-handler="RefreshTonWithdrawal" asp-route-id="@wr.Id" onsubmit="return confirm('@string.Format(Model.T("admin.wallet.confirm.refreshTonPrompt", "Retry or refresh TON withdrawal request #{0} now?"), wr.Id)');">
+                                        @Html.AntiForgeryToken()
+                                        <button class="btn btn-sm btn-outline-primary" type="submit">@Model.T("admin.wallet.action.refreshTon", "Retry / refresh")</button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">-</span>
+                                }
+                            </td>
                         </tr>
                     }
                     </tbody>

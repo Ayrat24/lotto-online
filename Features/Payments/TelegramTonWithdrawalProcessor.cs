@@ -4,6 +4,19 @@ using MiniApp.Data;
 
 namespace MiniApp.Features.Payments;
 
+public enum TelegramTonWithdrawalManualProcessResultType
+{
+    Processed = 0,
+    NoChange = 1,
+    NotFound = 2,
+    NotEligible = 3,
+    Disabled = 4
+}
+
+public sealed record TelegramTonWithdrawalManualProcessResult(
+    TelegramTonWithdrawalManualProcessResultType Type,
+    string? DiagnosticMessage = null);
+
 public sealed class TelegramTonWithdrawalProcessor
 {
     private readonly AppDbContext _db;
@@ -43,6 +56,54 @@ public sealed class TelegramTonWithdrawalProcessor
         return 0;
     }
 
+    public async Task<TelegramTonWithdrawalManualProcessResult> ProcessRequestAsync(long withdrawalRequestId, CancellationToken ct)
+    {
+        if (!_options.Enabled || !_options.TelegramTon.Enabled || !_options.TelegramTon.ServerWithdrawalsEnabled)
+        {
+            return new TelegramTonWithdrawalManualProcessResult(
+                TelegramTonWithdrawalManualProcessResultType.Disabled,
+                "Server-executed TON withdrawals are disabled.");
+        }
+
+        var request = await _db.WithdrawalRequests
+            .Include(x => x.User)
+            .SingleOrDefaultAsync(x => x.Id == withdrawalRequestId, ct);
+        if (request is null)
+        {
+            return new TelegramTonWithdrawalManualProcessResult(
+                TelegramTonWithdrawalManualProcessResultType.NotFound,
+                $"Withdrawal request {withdrawalRequestId} was not found.");
+        }
+
+        if (!string.Equals(request.AssetCode, WithdrawalAssetCodes.Ton, StringComparison.OrdinalIgnoreCase)
+            || request.Status != WithdrawalRequestStatus.Confirmed)
+        {
+            return new TelegramTonWithdrawalManualProcessResult(
+                TelegramTonWithdrawalManualProcessResultType.NotEligible,
+                "Only confirmed TON withdrawals can be refreshed from history.");
+        }
+
+        var payoutState = NormalizePayoutState(request.ExternalPayoutState);
+        var changed = payoutState switch
+        {
+            TonWithdrawalPayoutStates.Queued or TonWithdrawalPayoutStates.RetryPending
+                => await SubmitQueuedWithdrawalAsync(request, ct),
+            TonWithdrawalPayoutStates.Sending
+                => await RefreshSendingWithdrawalAsync(request, ct),
+            TonWithdrawalPayoutStates.Submitted
+                => await ReconcileSubmittedWithdrawalAsync(request, ct),
+            _ => false
+        };
+
+        return payoutState is TonWithdrawalPayoutStates.Queued or TonWithdrawalPayoutStates.RetryPending or TonWithdrawalPayoutStates.Sending or TonWithdrawalPayoutStates.Submitted
+            ? new TelegramTonWithdrawalManualProcessResult(
+                changed ? TelegramTonWithdrawalManualProcessResultType.Processed : TelegramTonWithdrawalManualProcessResultType.NoChange,
+                changed ? $"Processed TON withdrawal request {withdrawalRequestId}." : $"No new TON withdrawal state change was detected for request {withdrawalRequestId}.")
+            : new TelegramTonWithdrawalManualProcessResult(
+                TelegramTonWithdrawalManualProcessResultType.NotEligible,
+                $"TON withdrawal request {withdrawalRequestId} is not in a retryable state.");
+    }
+
     private async Task<bool> RecoverStaleSendingWithdrawalAsync(CancellationToken ct)
     {
         var staleBeforeUtc = DateTimeOffset.UtcNow.AddMinutes(-2);
@@ -59,6 +120,11 @@ public sealed class TelegramTonWithdrawalProcessor
         if (request is null)
             return false;
 
+        return await RecoverSendingWithdrawalAsync(request, ct);
+    }
+
+    private async Task<bool> RecoverSendingWithdrawalAsync(WithdrawalRequest request, CancellationToken ct)
+    {
         var walletState = await _hotWallet.GetHotWalletStateAsync(ct);
         if (walletState.Success
             && request.PayoutSeqno is { } reservedSeqno
@@ -98,6 +164,11 @@ public sealed class TelegramTonWithdrawalProcessor
         if (request is null)
             return false;
 
+        return await SubmitQueuedWithdrawalAsync(request, ct);
+    }
+
+    private async Task<bool> SubmitQueuedWithdrawalAsync(WithdrawalRequest request, CancellationToken ct)
+    {
         if (request.AssetAmount is null || request.AssetAmount <= 0m || string.IsNullOrWhiteSpace(request.PayoutMemo))
         {
             await FailAndRefundAsync(request, "TON payout details are incomplete. Funds were returned to the user.", ct);
@@ -164,6 +235,23 @@ public sealed class TelegramTonWithdrawalProcessor
             .FirstOrDefaultAsync(ct);
 
         if (request is null || request.AssetAmount is null || string.IsNullOrWhiteSpace(request.PayoutMemo))
+            return false;
+
+        return await ReconcileSubmittedWithdrawalAsync(request, ct);
+    }
+
+    private async Task<bool> RefreshSendingWithdrawalAsync(WithdrawalRequest request, CancellationToken ct)
+    {
+        var staleBeforeUtc = DateTimeOffset.UtcNow.AddMinutes(-2);
+        if (request.PayoutLastAttemptAtUtc != null && request.PayoutLastAttemptAtUtc <= staleBeforeUtc)
+            return await RecoverSendingWithdrawalAsync(request, ct);
+
+        return await ReconcileSubmittedWithdrawalAsync(request, ct);
+    }
+
+    private async Task<bool> ReconcileSubmittedWithdrawalAsync(WithdrawalRequest request, CancellationToken ct)
+    {
+        if (request.AssetAmount is null || string.IsNullOrWhiteSpace(request.PayoutMemo))
             return false;
 
         var lookup = await _hotWallet.TryFindOutgoingTransferAsync(new TelegramTonOutgoingTransferLookupRequest(
@@ -314,6 +402,9 @@ public sealed class TelegramTonWithdrawalProcessor
 
         return error.Length <= 512 ? error : error[..512];
     }
+
+    private static string NormalizePayoutState(string? payoutState)
+        => (payoutState ?? string.Empty).Trim().ToLowerInvariant();
 }
 
 
