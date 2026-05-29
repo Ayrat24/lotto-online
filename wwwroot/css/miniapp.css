@@ -55,6 +55,7 @@ body {
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
 body.app-loading {
@@ -681,7 +682,7 @@ body.app-loading .loading-shell {
   padding: 6px 10px;
   border-radius: 100px;
   background: #FAFAF7;
-  border: 1px solid rgba(15, 15, 20, 0.06);
+  border: 1px solid #F0F0F0;
   color: var(--muted);
   font-size: 12px;
   font-weight: 600;
@@ -705,6 +706,12 @@ body.app-loading .loading-shell {
 }
 
 .offer-card {
+  position: relative;
+  min-height: 88px;
+  box-sizing: border-box;
+}
+
+.offer-card-inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -717,29 +724,47 @@ body.app-loading .loading-shell {
   transition: transform 0.16s ease, box-shadow 0.16s ease;
   min-height: 88px;
   box-sizing: border-box;
+  position: relative;
+  overflow: visible;
 }
 
-.offer-card:active {
+.offer-card-inner:active {
   transform: scale(0.99);
 }
 
-.offer-card-featured {
+.offer-card-featured .offer-card-inner {
   background: var(--yellow);
   border-color: transparent;
 }
 
-.offer-card-featured .offer-card-title,
-.offer-card-featured .offer-card-subtitle {
-  color: #000000;
+/* Holes on sides - rounded squares protruding from left/right edges */
+.offer-card-hole-left,
+.offer-card-hole-right {
+  position: absolute;
+  top: 36px;
+  width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  z-index: 1;
+  pointer-events: none;
 }
 
-.offer-card-featured .offer-card-price {
-  color: #000000;
+.offer-card-hole-left {
+  left: -8px;
 }
 
-.offer-card-featured .offer-card-cta {
-  background: #111111;
-  color: #ffffff;
+.offer-card-hole-right {
+  right: -8px;
+}
+
+.offer-card:not(.offer-card-featured) .offer-card-hole-left,
+.offer-card:not(.offer-card-featured) .offer-card-hole-right {
+  background: #F0F0F0;
+}
+
+.offer-card-featured .offer-card-hole-left,
+.offer-card-featured .offer-card-hole-right {
+  background: #FAFAF7;
 }
 
 .offer-card-left {
@@ -781,25 +806,16 @@ body.app-loading .loading-shell {
   line-height: 1.2;
 }
 
+.offer-card-featured .offer-card-title,
+.offer-card-featured .offer-card-subtitle {
+  color: #000000;
+}
+
 .offer-card-subtitle {
   font-size: 12px;
   font-weight: 400;
   color: var(--muted);
   line-height: 1.2;
-}
-
-.offer-card-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
-}
-
-.offer-card-price {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text);
-  white-space: nowrap;
 }
 
 .offer-card-cta {
@@ -816,10 +832,16 @@ body.app-loading .loading-shell {
   letter-spacing: 0;
   box-shadow: none;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .offer-card-cta:active {
   transform: scale(0.97);
+}
+
+.offer-card-featured .offer-card-cta {
+  background: #111111;
+  color: #ffffff;
 }
 
 /* =============================================
@@ -2549,15 +2571,9 @@ body.app-loading .loading-shell {
     gap: 8px;
   }
 
-  .offer-card {
+  .offer-card-inner {
     padding: 14px 16px;
     min-height: 78px;
-  }
-
-  .offer-card-icon {
-    width: 38px;
-    height: 38px;
-    font-size: 1.1rem;
   }
 
   .offer-card-title {
@@ -2566,10 +2582,6 @@ body.app-loading .loading-shell {
 
   .offer-card-subtitle {
     font-size: 11px;
-  }
-
-  .offer-card-price {
-    font-size: 14px;
   }
 
   .offer-card-cta {

@@ -259,7 +259,7 @@ public static class LocalDebugSeed
 
     private static async Task EnsureUserAsync(AppDbContext db, DebugUserSeed seed, DateTimeOffset now, CancellationToken ct)
     {
-        var user = await db.Users.SingleOrDefaultAsync(x => x.TelegramUserId == seed.TelegramUserId, ct);
+        var user = await db.Users.FirstOrDefaultAsync(x => x.TelegramUserId == seed.TelegramUserId, ct);
         if (user is not null)
         {
             user.Number ??= seed.Number;
