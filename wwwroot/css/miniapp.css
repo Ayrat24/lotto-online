@@ -1,32 +1,38 @@
 :root {
-  --app-header-height: clamp(72px, 10.5svh, 90px);
   --app-max-width: 820px;
   --space-1: 8px;
   --space-2: 12px;
   --space-3: 16px;
   --space-4: 20px;
   --space-5: 24px;
-  --radius-card: 18px;
+  --radius-card: 22px;
   --radius-control: 14px;
   --font-title: clamp(1.45rem, 2.7vw + 0.55rem, 2.1rem);
   --font-subtitle: clamp(0.94rem, 1.1vw + 0.68rem, 1.05rem);
   --font-button: clamp(0.92rem, 1vw + 0.64rem, 1rem);
   --control-min-height: 48px;
-  --bg: #0a0f18;
-  --bg-elev: #111826;
-  --bg-soft: #151d2c;
-  --line: rgba(255, 255, 255, 0.08);
-  --line-soft: rgba(255, 255, 255, 0.06);
-  --text: #eef3ff;
-  --muted: #95a3ba;
+  --bg: #ffffff;
+  --bg-elev: #f8f8fa;
+  --bg-soft: #f2f2f5;
+  --line: rgba(15, 15, 18, 0.06);
+  --line-soft: rgba(15, 15, 18, 0.04);
+  --text: #0F0F12;
+  --muted: #3F3F46;
+  --muted-light: #8A8A92;
   --button-bg: #161f29;
   --button-bg-strong: #1d2835;
-  --button-border: rgba(255, 255, 255, 0.08);
-  --pink: #ff6f98;
-  --pink-strong: #ff5f8d;
-  --green: #47d17b;
-  --amber: #f1be37;
-  --blue: #2190ff;
+  --button-border: rgba(15, 15, 18, 0.06);
+  --yellow: #FFB929;
+  --yellow-strong: #E09A1F;
+  --green: #1AA873;
+  --pink: #EF4444;
+  --orange: #F97316;
+  --purple: #7C3AED;
+  --blue: #3B82F6;
+  --card-shadow: 0px 2px 6px 0px rgba(15, 15, 20, 0.04), 0px 8px 24px 0px rgba(15, 15, 20, 0.06);
+  --card-shadow-strong: 0px 12px 28px 0px rgba(239, 68, 68, 0.27);
+  --tabbar-bg: rgba(255, 255, 255, 0.85);
+  --tabbar-shadow: 0px 2px 8px 0px rgba(15, 15, 20, 0.04), 0px 16px 40px 0px rgba(15, 15, 20, 0.08);
 
   --tg-theme-bg-color: var(--bg);
   --tg-theme-text-color: var(--text);
@@ -34,8 +40,7 @@
   --tg-theme-button-text-color: #ffffff;
 }
 
-html,
-body {
+html, body {
   min-height: 100svh;
 }
 
@@ -45,9 +50,11 @@ body {
 
 body {
   margin: 0;
-  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  background: radial-gradient(circle at 0 0, #171f31 0%, var(--bg) 36%), var(--bg);
+  font-family: 'Manrope', Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  background: var(--bg);
   color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body.app-loading {
@@ -81,7 +88,7 @@ body.app-ready .app-shell {
   z-index: 60;
   display: grid;
   place-items: stretch;
-  background: radial-gradient(circle at 0 0, #171f31 0%, var(--bg) 36%), var(--bg);
+  background: var(--bg);
   opacity: 0;
   visibility: hidden;
   transition: opacity 220ms ease, visibility 0s linear 220ms;
@@ -115,14 +122,14 @@ body.app-loading .loading-shell {
   gap: var(--space-2);
   padding: var(--space-3);
   border-radius: var(--radius-card);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(15, 15, 18, 0.06);
+  background: rgba(15, 15, 18, 0.03);
 }
 
 .loading-shell-hero {
   padding: 14px 16px 16px;
-  background: linear-gradient(135deg, rgba(103, 0, 25, 0.9), rgba(79, 0, 22, 0.95));
-  border-color: rgba(255, 111, 152, 0.16);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.9), rgba(249, 115, 22, 0.95));
+  border-color: rgba(239, 68, 68, 0.16);
 }
 
 .loading-shell-main,
@@ -147,7 +154,7 @@ body.app-loading .loading-shell {
   position: relative;
   overflow: hidden;
   border-radius: 12px;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.05));
+  background: linear-gradient(90deg, rgba(15, 15, 18, 0.05), rgba(15, 15, 18, 0.11), rgba(15, 15, 18, 0.05));
   animation: loadingPulse 1.3s ease-in-out infinite alternate;
 }
 
@@ -155,7 +162,7 @@ body.app-loading .loading-shell {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(110deg, transparent 20%, rgba(255, 255, 255, 0.08) 40%, transparent 60%);
+  background: linear-gradient(110deg, transparent 20%, rgba(15, 15, 18, 0.08) 40%, transparent 60%);
   transform: translateX(-110%);
   animation: loadingSweep 1.8s linear infinite;
 }
@@ -188,7 +195,7 @@ body.app-loading .loading-shell {
   margin: 0 auto;
   padding: 10px 10px calc(10px + env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
-  background: linear-gradient(180deg, rgba(10, 15, 24, 0.2), rgba(10, 15, 24, 0.95) 45%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.95) 45%);
   backdrop-filter: blur(10px);
   border-top: 1px solid var(--line-soft);
 }
@@ -213,33 +220,14 @@ body.app-loading .loading-shell {
   }
 }
 
+/* =============================================
+   CONTAINER & LAYOUT
+   ============================================= */
 .container {
   box-sizing: border-box;
   max-width: var(--app-max-width);
   margin: 0 auto;
-  padding: var(--space-3) var(--space-3) calc(92px + env(safe-area-inset-bottom, 0px));
-}
-
-.app-fixed-header {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 45;
-  padding: calc(6px + env(safe-area-inset-top, 0px)) var(--space-2) var(--space-1);
-  box-sizing: border-box;
-  background: linear-gradient(180deg, rgba(10, 15, 24, 0.96), rgba(10, 15, 24, 0.86));
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--line-soft);
-}
-
-.app-fixed-header-inner {
-  max-width: var(--app-max-width);
-  margin: 0 auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
+  padding: 0 var(--space-3) calc(92px + env(safe-area-inset-bottom, 0px));
 }
 
 .app-shell,
@@ -250,7 +238,7 @@ body.app-loading .loading-shell {
 }
 
 .app-shell {
-  padding-top: calc(var(--space-3) + var(--app-header-height) + env(safe-area-inset-top, 0px));
+  padding-top: calc(20px + env(safe-area-inset-top, 0px));
 }
 
 .muted {
@@ -274,479 +262,636 @@ body.app-loading .loading-shell {
   border-radius: 10px;
   border: 1px solid rgba(241, 190, 55, 0.4);
   background: rgba(241, 190, 55, 0.12);
-  color: #ffe598;
+  color: #8a6d00;
   font-size: 0.8rem;
   font-weight: 700;
   padding: 8px 10px;
 }
 
 .card {
-  background: linear-gradient(180deg, #121a29, #0f1624);
-  border: 1px solid var(--line-soft);
+  background: var(--bg);
+  border: 1px solid var(--line);
   border-radius: var(--radius-card);
   padding: var(--space-3);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--card-shadow);
 }
 
-.news-banner-section {
-  padding: 14px;
-  overflow: hidden;
-}
-
-.news-banner-header {
-  margin-bottom: 10px;
-}
-
-.news-banner-title {
-  font-size: 1.1rem;
-}
-
-.news-banner-carousel {
-  overflow: hidden;
-  touch-action: pan-y;
-  user-select: none;
-  -webkit-user-select: none;
-  cursor: grab;
-}
-
-.news-banner-carousel.news-banner-carousel-dragging {
-  cursor: grabbing;
-}
-
-.news-banner-carousel.news-banner-carousel-dragging,
-.news-banner-carousel.news-banner-carousel-dragging * {
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-.news-banner-track {
-  display: flex;
-  transition: transform 260ms ease;
-  will-change: transform;
-}
-
-.news-banner-carousel.news-banner-carousel-dragging .news-banner-track {
-  transition: none;
-}
-
-.news-banner-slide {
-  flex: 0 0 100%;
-  min-width: 100%;
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-.news-banner-slide-actionable {
-  width: 100%;
-  min-height: 0;
-  padding: 0;
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-  cursor: pointer;
-}
-
-.news-banner-slide-actionable:active {
-  transform: scale(0.994);
-}
-
-.news-banner-image {
-  display: block;
-  width: 100%;
-  aspect-ratio: 2 / 1;
-  object-fit: cover;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: #0c1320;
-  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.28);
-  user-select: none;
-  -webkit-user-select: none;
-  -webkit-user-drag: none;
-}
-
-.news-banner-dots {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.news-banner-dot {
-  width: 10px;
-  min-width: 10px;
-  min-height: 10px;
-  height: 10px;
-  padding: 0;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
-  border: 0;
-  box-shadow: none;
-}
-
-.news-banner-dot-active {
-  background: var(--button-bg);
-  transform: scale(1.18);
-}
-
+/* =============================================
+   TOPBAR / BRAND ROW (Figma: Brand row)
+   ============================================= */
 .topbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 2px 4px 10px;
-  border-bottom: 1px solid var(--line-soft);
+  padding: 4px 20px 20px;
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
-.brand-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
+.brand-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 14.5px;
   display: grid;
   place-items: center;
   font-size: 1.1rem;
-  background: linear-gradient(135deg, #ff78a4, #ff628e);
-  color: #20131d;
+  font-weight: 800;
+  background: linear-gradient(135deg, #F4B940 0%, #E09A1F 100%);
+  color: #ffffff;
+  box-shadow: 0px 1.6px 4.8px 0px rgba(224, 154, 31, 0.1), 0px 8.1px 24.2px 0px rgba(244, 185, 64, 0.28);
 }
 
-.brand-title {
-  font-size: 2rem;
-  font-weight: 800;
-  letter-spacing: 0.01em;
-  color: #ff739d;
+.brand-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.brand-name {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.33%;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.brand-subtitle {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+  line-height: 1.2;
 }
 
 .balance-block {
-  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
 }
 
 .balance-label {
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-size: 0.66rem;
-  color: #9eabc3;
-  font-weight: 700;
+  letter-spacing: 0.1em;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted-light);
 }
 
 .balance-value {
-  font-size: 1.45rem;
-  color: #45dc87;
-  font-weight: 900;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -1.67%;
+  color: var(--green);
 }
 
-.draw-card-list {
+/* =============================================
+   NEWS BANNER (Figma: News)
+   ============================================= */
+.news-banner-section {
+  padding: 0 20px 10px;
+}
+
+.news-banner-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -1.67%;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+
+.news-banner-card {
+  position: relative;
+  width: 100%;
+  height: 158px;
+  border-radius: 22px;
+  background: linear-gradient(26deg, #1B1B1B 0%, #393939 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+}
+
+.news-banner-image {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.6;
+}
+
+.news-banner-content {
+  position: relative;
+  z-index: 1;
+  padding: 21px;
   display: flex;
-  gap: 10px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-  scroll-snap-type: x proximity;
-  -webkit-overflow-scrolling: touch;
-  user-select: none;
-  -webkit-user-select: none;
-  cursor: grab;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
 }
 
-.draw-card-list.draw-card-list-dragging {
-  cursor: grabbing;
-  scroll-snap-type: none;
+.news-banner-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 100px;
+  background: var(--yellow);
+  width: fit-content;
+  margin-bottom: auto;
 }
 
-.draw-card-list.draw-card-list-dragging,
-.draw-card-list.draw-card-list-dragging * {
-  user-select: none;
-  -webkit-user-select: none;
+.news-banner-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: #000000;
 }
 
+.news-banner-badge-text {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 4%;
+  color: #000000;
+  text-transform: uppercase;
+}
+
+.news-banner-headline {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 21.25px;
+  letter-spacing: -1.76%;
+  color: #ffffff;
+  margin: 0 0 4px;
+}
+
+.news-banner-description {
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 18.2px;
+  color: #8E8E8E;
+  margin: 0;
+}
+
+.news-banner-dots {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.news-banner-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.25);
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.news-banner-dot-active {
+  width: 18px;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+/* =============================================
+   SEGMENTED TABS (Figma: Segmented:margin)
+   ============================================= */
 .draw-sort-tabs-section {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
+  padding: 20px 20px 4px;
 }
 
 .draw-sort-tabs {
   display: flex;
-  flex-wrap: nowrap;
-  gap: 10px;
+  gap: 6px;
   overflow-x: auto;
-  overflow-y: hidden;
-  max-width: 100%;
-  min-width: 0;
-  padding-bottom: 2px;
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior-x: contain;
-  touch-action: pan-x;
   scrollbar-width: none;
   user-select: none;
   -webkit-user-select: none;
-  cursor: grab;
 }
 
 .draw-sort-tabs::-webkit-scrollbar {
   display: none;
 }
 
-.draw-sort-tabs-dragging {
-  cursor: grabbing;
-}
-
-.draw-sort-tabs-dragging,
-.draw-sort-tabs-dragging * {
-  user-select: none;
-  -webkit-user-select: none;
-}
-
 .draw-sort-tab {
   flex: 0 0 auto;
-  width: auto;
   min-width: max-content;
-  min-height: 0;
-  padding: 10px 14px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: #f1f5ff;
-  font-size: 0.76rem;
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid rgba(15, 15, 20, 0.06);
+  color: var(--muted-light);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.83%;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
   box-shadow: none;
+  text-transform: none;
+  min-height: 0;
 }
 
 .draw-sort-tab-active {
-  background: linear-gradient(180deg, #ffd455, #f1be37);
-  border-color: rgba(255, 212, 85, 0.7);
-  color: #302102;
+  background: var(--yellow);
+  border-color: rgba(15, 15, 20, 0.06);
+  color: var(--text);
+  font-weight: 700;
+  box-shadow: 0px 1px 2px 0px rgba(15, 15, 20, 0.04), 0px 4px 20px 0px rgba(15, 15, 20, 0.04);
 }
 
-.draw-card-list::-webkit-scrollbar {
-  height: 6px;
-}
-
-.draw-card-list::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.14);
-  border-radius: 999px;
-}
-
-.draw-card {
-  --draw-card-bg-start: #f1be37;
-  --draw-card-bg-end: #c88a00;
-  --draw-card-fg: #ffffff;
-  --draw-card-muted: rgba(255, 255, 255, 0.92);
-  --draw-card-chip-bg: rgba(255, 255, 255, 0.18);
-  --draw-card-chip-color: #ffffff;
-  --draw-card-status-bg: rgba(255, 255, 255, 0.14);
-  --draw-card-status-color: rgba(255, 255, 255, 0.96);
-  --draw-card-cost-bg: rgba(255, 255, 255, 0.98);
-  --draw-card-cost-color: #12161d;
-  display: grid;
-  gap: 7px;
-  min-height: 126px;
-  padding: 11px 12px;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: linear-gradient(135deg, var(--draw-card-bg-start) 0%, var(--draw-card-bg-end) 100%);
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.2);
-  cursor: pointer;
-  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+/* =============================================
+   DRAW CARDS (Figma: Draw cards)
+   ============================================= */
+.draw-card-list {
+  display: flex;
+  gap: 12px;
+  padding: 14px 20px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
   user-select: none;
   -webkit-user-select: none;
 }
 
-.draw-card:hover {
-  border-color: rgba(255, 255, 255, 0.18);
+.draw-card-list::-webkit-scrollbar {
+  display: none;
 }
 
-.draw-card-compact {
-  flex: 0 0 174px;
-  scroll-snap-align: start;
+.draw-card {
+  --draw-card-bg-start: #EF4444;
+  --draw-card-bg-end: #F97316;
+  --draw-card-shadow: 0px 12px 28px 0px rgba(239, 68, 68, 0.27);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  flex: 1;
+  min-width: 0;
+  height: 178px;
+  padding: 16px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, var(--draw-card-bg-start) 0%, var(--draw-card-bg-end) 100%);
+  box-shadow: var(--draw-card-shadow), inset 0px 1px 0px 0px rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+  color: #ffffff;
+  position: relative;
+  overflow: hidden;
 }
 
-.featured-draw-card {
-  width: 100%;
-  min-height: 146px;
+.draw-card:active {
+  transform: scale(0.98);
 }
 
-.draw-card-selected {
-  border-color: rgba(255, 255, 255, 0.48);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18), 0 12px 24px rgba(0, 0, 0, 0.24);
+.draw-card-theme-red {
+  --draw-card-bg-start: #EF4444;
+  --draw-card-bg-end: #F97316;
+  --draw-card-shadow: 0px 12px 28px 0px rgba(239, 68, 68, 0.27);
 }
 
-.draw-card-unavailable {
-  opacity: 0.74;
+.draw-card-theme-purple {
+  --draw-card-bg-start: #7C3AED;
+  --draw-card-bg-end: #3B82F6;
+  --draw-card-shadow: 0px 12px 28px 0px rgba(124, 58, 237, 0.27);
 }
 
 .draw-card-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
 }
 
 .draw-card-title {
-  font-size: 0.88rem;
-  font-weight: 800;
+  font-size: 13px;
+  font-weight: 700;
   line-height: 1.2;
-  color: var(--draw-card-fg);
+  opacity: 0.9;
 }
 
 .draw-card-timer {
   flex: 0 0 auto;
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: var(--draw-card-chip-bg);
-  color: var(--draw-card-chip-color);
-  font-size: 0.78rem;
-  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 100px;
+  background: rgba(255, 255, 255, 0.22);
+  font-size: 11px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .draw-card-timer-closed {
   background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.8);
+  opacity: 0.8;
 }
 
-.draw-card-status {
-  display: inline-flex;
-  justify-self: start;
-  padding: 3px 7px;
-  border-radius: 999px;
-  background: var(--draw-card-status-bg);
-  color: var(--draw-card-status-color);
-  font-size: 0.63rem;
+.draw-card-prize-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.draw-card-prize-label {
+  font-size: 11px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.draw-card-jackpot-label {
-  color: var(--draw-card-muted);
-  font-size: 0.72rem;
-  font-weight: 900;
+  opacity: 0.8;
   letter-spacing: 0.03em;
 }
 
-.draw-card-jackpot-value {
-  color: var(--draw-card-fg);
-  font-size: clamp(1.7rem, 4.4vw, 2.25rem);
-  line-height: 0.96;
-  font-weight: 900;
+.draw-card-prize-value {
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
   letter-spacing: -0.02em;
 }
 
 .draw-card-footer {
   display: flex;
-  justify-content: flex-end;
-  align-items: flex-end;
-  gap: 10px;
-  margin-top: auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.draw-card-status {
+  display: inline-flex;
+  padding: 3px 7px;
+  border-radius: 100px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .draw-card-cost-block {
-  display: inline-grid;
-  gap: 2px;
-  justify-items: end;
-  min-width: 72px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 6px 9px;
   border-radius: 12px;
-  background: var(--draw-card-cost-bg);
-  color: var(--draw-card-cost-color);
+  background: rgba(255, 255, 255, 0.98);
+  color: #12161d;
 }
 
 .draw-card-cost-label {
-  font-size: 0.58rem;
+  font-size: 9px;
   font-weight: 800;
-  line-height: 1.1;
-  color: #4a4f5b;
   text-transform: uppercase;
   letter-spacing: 0.03em;
+  color: #4a4f5b;
 }
 
 .draw-card-cost-value {
-  font-size: 0.82rem;
-  line-height: 1;
+  font-size: 13px;
   font-weight: 900;
+  line-height: 1;
 }
 
-.draw-card-theme-gold {
-  --draw-card-bg-start: #f5c41e;
-  --draw-card-bg-end: #d99900;
+/* =============================================
+   TODAY'S OFFERS (Figma: Container → Сегодняшние предложения)
+   ============================================= */
+.offers-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px 14px;
 }
 
-.draw-card-theme-teal {
-  --draw-card-bg-start: #1ecdc4;
-  --draw-card-bg-end: #0d9fa6;
+.offers-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -2.78%;
+  color: var(--text);
 }
 
-.draw-card-theme-pink {
-  --draw-card-bg-start: #e65ac9;
-  --draw-card-bg-end: #c748b4;
+.offers-view-all {
+  padding: 6px 10px;
+  border-radius: 100px;
+  background: #FAFAF7;
+  border: 1px solid rgba(15, 15, 20, 0.06);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  min-height: 0;
+  text-transform: none;
+  letter-spacing: 0;
+  box-shadow: none;
 }
 
-.draw-card-theme-blue {
-  --draw-card-bg-start: #18a8ee;
-  --draw-card-bg-end: #0c78d8;
+.offers-view-all:active {
+  background: #f0f0ed;
 }
 
-.draw-card-theme-orange {
-  --draw-card-bg-start: #ff951d;
-  --draw-card-bg-end: #ff6d00;
+.offers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 20px 100px;
 }
 
-@media (max-width: 560px) {
-  .draw-card {
-    min-height: 116px;
-    padding: 10px 11px;
-    border-radius: 18px;
-  }
-
-  .draw-card-compact {
-    flex-basis: 158px;
-  }
-
-  .draw-card-title {
-    font-size: 0.8rem;
-  }
-
-  .draw-card-timer {
-    font-size: 0.72rem;
-    padding: 3px 7px;
-  }
-
-  .draw-card-jackpot-value {
-    font-size: 1.5rem;
-  }
-
-  .draw-card-cost-block {
-    min-width: 68px;
-    padding: 5px 8px;
-  }
-
-   .draw-sort-tab {
-    padding: 9px 12px;
-    font-size: 0.69rem;
-   }
+.offer-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-radius: 22px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  box-shadow: var(--card-shadow);
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+  min-height: 88px;
+  box-sizing: border-box;
 }
 
-/* #currentDrawStateBadge was previously hidden; make it visible so the green ACTIVE badge shows in the header. */
-/* The element uses .state-badge and .state-badge-active classes for styling. */
-
-.current-draw-card {
-  background: linear-gradient(180deg, #121a29 0%, #0f1724 100%);
+.offer-card:active {
+  transform: scale(0.99);
 }
 
-.draw-accent {
-  height: 4px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #1d89ff, #22b2ff);
+.offer-card-featured {
+  background: var(--yellow);
+  border-color: transparent;
 }
 
+.offer-card-featured .offer-card-title,
+.offer-card-featured .offer-card-subtitle {
+  color: #000000;
+}
+
+.offer-card-featured .offer-card-price {
+  color: #000000;
+}
+
+.offer-card-featured .offer-card-cta {
+  background: #111111;
+  color: #ffffff;
+}
+
+.offer-card-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.offer-card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 100px;
+  display: grid;
+  place-items: center;
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+
+.offer-card-icon-yellow {
+  background: var(--yellow);
+  color: #000000;
+}
+
+.offer-card-icon-dark {
+  background: #111111;
+  color: #ffffff;
+}
+
+.offer-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.offer-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.offer-card-subtitle {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+  line-height: 1.2;
+}
+
+.offer-card-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.offer-card-price {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.offer-card-cta {
+  padding: 11px 14px 12px;
+  border-radius: 100px;
+  background: var(--yellow);
+  color: #000000;
+  font-size: 13px;
+  font-weight: 700;
+  border: 0;
+  cursor: pointer;
+  min-height: 0;
+  text-transform: none;
+  letter-spacing: 0;
+  box-shadow: none;
+  white-space: nowrap;
+}
+
+.offer-card-cta:active {
+  transform: scale(0.97);
+}
+
+/* =============================================
+   TAB BAR (Figma: Tab Bar)
+   ============================================= */
+.tabbar {
+  position: fixed;
+  left: 14px;
+  right: 14px;
+  bottom: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 0 6px;
+  height: 68px;
+  box-sizing: border-box;
+  background: var(--tabbar-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(15, 15, 20, 0.06);
+  border-radius: 34px;
+  box-shadow: var(--tabbar-shadow);
+  max-width: 362px;
+  margin: 0 auto;
+  margin-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
+}
+
+.tabbar-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 56px;
+  border-radius: 28px;
+  background: transparent;
+  border: 0;
+  color: var(--muted-light);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 11px;
+  letter-spacing: 1%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-transform: none;
+  min-height: 0;
+  padding: 0;
+  box-shadow: none;
+}
+
+.tabbar-btn-active {
+  background: var(--yellow);
+  color: var(--text);
+  font-weight: 700;
+  box-shadow: 0px 6px 16px 0px rgba(244, 185, 64, 0.4);
+}
+
+.tabbar-btn svg,
+.tabbar-btn-icon {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  font-size: 1.1rem;
+}
+
+/* =============================================
+   SECTION HEADER
+   ============================================= */
 .section-header {
   display: flex;
   justify-content: space-between;
@@ -765,6 +910,9 @@ body.app-loading .loading-shell {
   font-size: var(--font-subtitle);
 }
 
+/* =============================================
+   STATE BADGES
+   ============================================= */
 .state-badge {
   padding: 7px 12px;
   border-radius: 999px;
@@ -776,47 +924,53 @@ body.app-loading .loading-shell {
 }
 
 .state-badge-active {
-  color: #95ffc2;
-  background: rgba(71, 209, 123, 0.16);
-  border-color: rgba(71, 209, 123, 0.4);
+  color: #1AA873;
+  background: rgba(26, 168, 115, 0.12);
+  border-color: rgba(26, 168, 115, 0.4);
 }
 
 .state-badge-upcoming {
-  color: #d0d9e9;
-  background: rgba(148, 164, 189, 0.12);
-  border-color: rgba(148, 164, 189, 0.34);
+  color: var(--muted-light);
+  background: rgba(138, 138, 146, 0.12);
+  border-color: rgba(138, 138, 146, 0.34);
 }
 
 .state-badge-finished {
-  color: #ffc2d2;
-  background: rgba(255, 95, 141, 0.16);
-  border-color: rgba(255, 95, 141, 0.34);
+  color: #EF4444;
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.34);
 }
 
 .state-badge-muted {
-  color: #9cadc7;
-  background: rgba(148, 164, 189, 0.1);
-  border-color: rgba(148, 164, 189, 0.22);
+  color: var(--muted-light);
+  background: rgba(138, 138, 146, 0.1);
+  border-color: rgba(138, 138, 146, 0.22);
 }
 
+/* =============================================
+   DRAW META ROW
+   ============================================= */
 .draw-meta-row {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(15, 15, 18, 0.02);
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 11px 12px;
-  color: #bbcae0;
+  color: var(--muted);
   font-size: 0.98rem;
 }
 
 .draw-meta-row strong {
-  color: #ffffff;
+  color: var(--text);
 }
 
+/* =============================================
+   PROFILE SCREEN
+   ============================================= */
 .profile-screen {
   gap: 12px;
-  background: linear-gradient(180deg, #121a29, #0f1624);
-  border-color: rgba(255, 255, 255, 0.06);
-  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.24);
+  background: var(--bg);
+  border-color: var(--line);
+  box-shadow: var(--card-shadow);
 }
 
 .profile-page-screen,
@@ -843,8 +997,8 @@ body.app-loading .loading-shell {
   gap: 12px;
   padding: 16px;
   border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(22, 31, 41, 0.82);
+  border: 1px solid var(--line);
+  background: var(--bg-elev);
 }
 
 .profile-section-card {
@@ -858,7 +1012,7 @@ body.app-loading .loading-shell {
 
 .profile-balance-label,
 .profile-field-label {
-  color: #8fa4bc;
+  color: var(--muted-light);
   font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.05em;
@@ -868,7 +1022,7 @@ body.app-loading .loading-shell {
 .profile-balance-value {
   font-size: clamp(1.75rem, 4vw, 2.15rem);
   font-weight: 800;
-  color: #ffffff;
+  color: var(--text);
 }
 
 .profile-menu-item {
@@ -878,8 +1032,8 @@ body.app-loading .loading-shell {
   gap: 12px;
   min-height: 0;
   padding: 14px 16px;
-  background: var(--button-bg);
-  border: 1px solid var(--button-border);
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
   border-radius: 18px;
   color: var(--text);
   text-align: left;
@@ -898,15 +1052,15 @@ body.app-loading .loading-shell {
   border-radius: 12px;
   display: grid;
   place-items: center;
-  background: rgba(255, 255, 255, 0.08);
-  color: #dbe7f6;
+  background: rgba(15, 15, 18, 0.06);
+  color: var(--muted);
   font-size: 1.15rem;
   font-weight: 800;
 }
 
 .profile-menu-icon-accent {
-  background: rgba(51, 144, 236, 0.18);
-  color: #65b7ff;
+  background: rgba(26, 168, 115, 0.12);
+  color: var(--green);
 }
 
 .profile-menu-copy {
@@ -915,13 +1069,13 @@ body.app-loading .loading-shell {
 
 .profile-menu-title {
   display: block;
-  color: #ffffff;
+  color: var(--text);
   font-size: 0.98rem;
   font-weight: 700;
 }
 
 .profile-menu-arrow {
-  color: #7e91a8;
+  color: var(--muted-light);
   font-size: 1.3rem;
   line-height: 1;
 }
@@ -935,7 +1089,7 @@ body.app-loading .loading-shell {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  color: #dce9f8;
+  color: var(--muted);
   font-size: 0.92rem;
   line-height: 1.35;
 }
@@ -944,7 +1098,7 @@ body.app-loading .loading-shell {
   width: 18px;
   height: 18px;
   margin: 2px 0 0;
-  accent-color: #65b7ff;
+  accent-color: var(--green);
 }
 
 .withdraw-payout-card {
@@ -952,8 +1106,8 @@ body.app-loading .loading-shell {
   gap: 12px;
   padding: 14px;
   border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(22, 31, 41, 0.82);
+  border: 1px solid var(--line);
+  background: var(--bg-elev);
 }
 
 .withdraw-ton-connect-card {
@@ -961,8 +1115,8 @@ body.app-loading .loading-shell {
   gap: 12px;
   padding: 14px;
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  background: rgba(15, 15, 18, 0.03);
 }
 
 .withdraw-ton-connect-actions {
@@ -973,15 +1127,15 @@ body.app-loading .loading-shell {
   width: 100%;
   box-sizing: border-box;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--line);
+  background: rgba(15, 15, 18, 0.02);
   color: var(--text);
   padding: 13px 14px;
   font-size: 1rem;
 }
 
 .profile-input::placeholder {
-  color: #95a3ba;
+  color: var(--muted-light);
 }
 
 .profile-amount-field {
@@ -991,12 +1145,12 @@ body.app-loading .loading-shell {
   min-height: 56px;
   padding: 0 14px;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--line);
+  background: rgba(15, 15, 18, 0.02);
 }
 
 .profile-amount-prefix {
-  color: #65b7ff;
+  color: var(--green);
   font-size: 1.2rem;
   font-weight: 800;
 }
@@ -1027,21 +1181,17 @@ body.app-loading .loading-shell {
 }
 
 .payment-systems-list {
-  /* Horizontal single-row picker for payment method icons.
-     Keeps icons in a single row, horizontally scrollable on narrow screens.
-     Provides consistent vertical alignment and touch-friendly spacing. */
   display: flex;
   gap: 10px;
   align-items: center;
-  flex-wrap: nowrap; /* keep items on one row */
-  overflow-x: auto; /* allow horizontal scrolling when space is constrained */
-  -webkit-overflow-scrolling: touch; /* smooth scrolling on iOS */
-  padding: 8px 6px; /* comfortable touch padding */
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 8px 6px;
   box-sizing: border-box;
 }
 
 .payment-systems-icon-list {
-  /* Alias class used in markup — keep same single-row behavior to avoid conflicts */
   display: flex;
   gap: 10px;
   align-items: center;
@@ -1051,15 +1201,14 @@ body.app-loading .loading-shell {
 }
 
 .payment-system-icon-btn {
-  /* Compact icon-only button: no large container, inline sizing */
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 auto; /* don't grow or shrink — keep intrinsic size for horizontal row */
-  width: 56px; /* fixed square container */
+  flex: 0 0 auto;
+  width: 56px;
   height: 56px;
   box-sizing: border-box;
-  padding: 4px; /* small inner padding so icon has breathing room */
+  padding: 4px;
   border-radius: 8px;
   border: 0;
   background: transparent;
@@ -1069,13 +1218,10 @@ body.app-loading .loading-shell {
   box-shadow: none;
 }
 
-/* Override generic .app-shell button rules for the compact payment method icons so
-   they keep a fixed square size instead of expanding to full width. This increases
-   specificity so the global button styles don't affect these icon buttons. */
 .app-shell .payment-system-icon-btn,
 .purchase-screen .payment-system-icon-btn,
 .center-popup .payment-system-icon-btn {
-  width: 56px; /* fixed square */
+  width: 56px;
   height: 56px;
   min-height: 0;
   padding: 4px;
@@ -1087,14 +1233,12 @@ body.app-loading .loading-shell {
 }
 
 .payment-system-card-selected {
-  /* Selected payment method: blue outline */
   outline: 2px solid #2d77ff;
   outline-offset: 2px;
   border-radius: 10px;
 }
 
 .payment-system-icon {
-  /* Icon visual inside the square button: keep consistent square icon area */
   width: 100%;
   height: 100%;
   max-width: 48px;
@@ -1103,7 +1247,7 @@ body.app-loading .loading-shell {
   display: inline-grid;
   place-items: center;
   background: transparent;
-  color: #ffffff;
+  color: var(--text);
   font-size: 1.6rem;
   font-weight: 900;
 }
@@ -1154,7 +1298,7 @@ body.app-loading .loading-shell {
 
 .ton-connect-title {
   margin-bottom: 4px;
-  color: #dce9f8;
+  color: var(--muted);
 }
 
 .ton-connect-panel-actions,
@@ -1180,17 +1324,17 @@ body.app-loading .loading-shell {
   gap: 12px;
   padding: 11px 12px;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--line);
+  background: rgba(15, 15, 18, 0.02);
 }
 
 .deposit-details-label {
-  color: #a9b8ce;
+  color: var(--muted-light);
   font-size: 0.84rem;
 }
 
 .deposit-details-value {
-  color: #ffffff;
+  color: var(--text);
   font-size: 0.92rem;
   text-align: right;
   word-break: break-all;
@@ -1240,11 +1384,14 @@ body.app-loading .loading-shell {
 .empty-card {
   border-radius: 14px;
   padding: 12px;
-  border: 1px dashed rgba(255, 255, 255, 0.2);
-  color: #acbbd1;
-  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(15, 15, 18, 0.2);
+  color: var(--muted-light);
+  background: rgba(15, 15, 18, 0.02);
 }
 
+/* =============================================
+   BUTTONS
+   ============================================= */
 .app-shell button,
 .purchase-screen button,
 .center-popup button {
@@ -1296,7 +1443,7 @@ body.app-loading .loading-shell {
   min-height: 10px;
   padding: 0;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(15, 15, 18, 0.18);
   border: 0;
   box-shadow: none;
 }
@@ -1313,9 +1460,9 @@ body.app-loading .loading-shell {
   min-height: 0;
   padding: 10px 14px;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: #f1f5ff;
+  background: rgba(15, 15, 18, 0.04);
+  border: 1px solid var(--line);
+  color: var(--muted);
   font-size: 0.76rem;
   font-weight: 900;
   letter-spacing: 0.04em;
@@ -1340,6 +1487,9 @@ body.app-loading .loading-shell {
   color: #2991ff;
 }
 
+/* =============================================
+   TICKET LIST
+   ============================================= */
 .ticket-list,
 .history-list {
   display: grid;
@@ -1362,8 +1512,8 @@ body.app-loading .loading-shell {
   align-items: center;
   padding: 14px;
   border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--line);
+  background: var(--bg-elev);
 }
 
 .winner-photo {
@@ -1371,8 +1521,8 @@ body.app-loading .loading-shell {
   height: 88px;
   border-radius: 999px;
   object-fit: cover;
-  border: 3px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
+  border: 3px solid var(--line);
+  background: rgba(15, 15, 18, 0.04);
 }
 
 .winner-body {
@@ -1382,14 +1532,14 @@ body.app-loading .loading-shell {
 }
 
 .winner-name {
-  color: #66b6ff;
+  color: #3B82F6;
   font-size: 1.08rem;
   font-weight: 700;
   line-height: 1.2;
 }
 
 .winner-amount {
-  color: #ffffff;
+  color: var(--text);
   font-size: clamp(1.35rem, 3.6vw, 1.85rem);
   font-weight: 900;
   line-height: 1.08;
@@ -1397,14 +1547,14 @@ body.app-loading .loading-shell {
 }
 
 .winner-quote {
-  color: #c6d3e6;
+  color: var(--muted);
   font-size: 0.98rem;
   line-height: 1.45;
 }
 
 .ticket {
   position: relative;
-  background: linear-gradient(180deg, #121a29, #0f1725);
+  background: var(--bg-elev);
   border: 1px solid var(--line);
   border-radius: 16px;
   padding: 14px;
@@ -1427,113 +1577,9 @@ body.app-loading .loading-shell {
   box-shadow: 0 8px 18px rgba(223, 35, 79, 0.34);
 }
 
-.jackpot-buy-row,
-.jackpot-buy-left,
-.jackpot-buy-right,
-.jackpot-buy-ticket-count,
-.jackpot-buy-btn,
-.jackpot-main,
-.jackpot-top,
-.jackpot-chip,
-.jackpot-time,
-.jackpot-headline,
-.jackpot-title,
-.jackpot-amount-bang,
-.jackpot-copy,
-.prize-tier-row,
-.prize-tier-pill,
-.prize-tier-label,
-.prize-tier-value,
-.draw-banner,
-.draw-banner-header,
-.draw-banner-title,
-.draw-banner-body,
-.draw-banner-meta,
-.draw-banner-numbers,
-.draw-banner-footer,
-.draw-banner-price,
-.draw-banner-ticket-count,
-.draw-banner-buy {
-  /* obsolete after the simplified countdown card redesign */
-}
-
-@media (max-width: 560px) {
-
-  .jackpot-time {
-    font-size: 0.8rem;
-  }
-
-  .jackpot-headline {
-    gap: 6px;
-    margin-top: 14px;
-  }
-
-  .jackpot-title {
-    font-size: 1.45rem;
-  }
-
-  .jackpot-amount {
-    font-size: 2.4rem;
-  }
-
-  .jackpot-amount-bang {
-    font-size: 2rem;
-  }
-
-  .jackpot-copy {
-    font-size: 1rem;
-  }
-
-  .jackpot-buy-row {
-    gap: 10px;
-    padding: 14px 16px 16px;
-  }
-
-  .jackpot-buy-left {
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-
-  .jackpot-buy-price-label {
-    font-size: 0.95rem;
-  }
-
-  .jackpot-buy-price {
-    font-size: 1.8rem;
-  }
-
-  .jackpot-buy-right {
-    gap: 6px;
-  }
-
-  .jackpot-buy-ticket-count {
-    font-size: 0.8rem;
-  }
-
-  .jackpot-buy-btn {
-    min-width: 150px;
-    padding: 11px 14px;
-    font-size: 0.95rem;
-  }
-}
-
-/* Jackpot small title/subtitle moved into jackpot card */
-.jackpot-game {
-  margin-top: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.jackpot-game-title {
-  font-size: 1.25rem;
-  font-weight: 800;
-  color: #ffe4ec;
-}
-.jackpot-game-subtitle {
-  font-size: 0.95rem;
-  color: #ffdce6;
-}
-
+/* =============================================
+   TICKET HEADER / FOOTER
+   ============================================= */
 .ticket-header {
   display: flex;
   justify-content: space-between;
@@ -1594,7 +1640,7 @@ body.app-loading .loading-shell {
 
 .ticket-claimed-label {
   font-size: 0.86rem;
-  color: #9be2ff;
+  color: #3B82F6;
   font-weight: 700;
 }
 
@@ -1609,27 +1655,27 @@ body.app-loading .loading-shell {
 }
 
 .ticket-status-awaiting {
-  color: #d0d9e9;
-  background: rgba(148, 164, 189, 0.12);
-  border-color: rgba(148, 164, 189, 0.34);
+  color: var(--muted-light);
+  background: rgba(138, 138, 146, 0.12);
+  border-color: rgba(138, 138, 146, 0.34);
 }
 
 .ticket-status-expired {
-  color: #ffd1de;
-  background: rgba(255, 111, 152, 0.12);
-  border-color: rgba(255, 111, 152, 0.3);
+  color: #EF4444;
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.3);
 }
 
 .ticket-status-win {
-  color: #95ffc2;
-  background: rgba(71, 209, 123, 0.14);
-  border-color: rgba(71, 209, 123, 0.4);
+  color: #1AA873;
+  background: rgba(26, 168, 115, 0.14);
+  border-color: rgba(26, 168, 115, 0.4);
 }
 
 .ticket-status-claimed {
-  color: #9be2ff;
-  background: rgba(33, 144, 255, 0.14);
-  border-color: rgba(33, 144, 255, 0.38);
+  color: #3B82F6;
+  background: rgba(59, 130, 246, 0.14);
+  border-color: rgba(59, 130, 246, 0.38);
 }
 
 .ticket-numbers {
@@ -1644,21 +1690,21 @@ body.app-loading .loading-shell {
   border-radius: 999px;
   display: grid;
   place-items: center;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #dbe8fc;
+  background: rgba(15, 15, 18, 0.05);
+  border: 1px solid var(--line);
+  color: var(--muted);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 
 .ball-result-ready {
-  border-color: rgba(255, 255, 255, 0.16);
+  border-color: rgba(15, 15, 18, 0.16);
 }
 
 .ball-match {
   background: radial-gradient(circle at 30% 30%, rgba(255, 232, 138, 0.34), rgba(241, 190, 55, 0.18));
   border-color: rgba(241, 190, 55, 0.72);
-  color: #ffefbc;
+  color: #8a6d00;
   box-shadow: 0 0 0 1px rgba(241, 190, 55, 0.24) inset;
 }
 
@@ -1671,14 +1717,14 @@ body.app-loading .loading-shell {
 .draw-group {
   display: grid;
   gap: 10px;
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(15, 15, 18, 0.02);
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 10px;
 }
 
 .draw-header {
-  background: linear-gradient(180deg, #1b2537, #131c2b);
+  background: var(--bg-elev);
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 10px;
@@ -1719,10 +1765,13 @@ body.app-loading .loading-shell {
 
 .draw-header-meta,
 .draw-header-label {
-  color: #a8b7cd;
+  color: var(--muted-light);
   font-size: 0.83rem;
 }
 
+/* =============================================
+   SHEET
+   ============================================= */
 .sheet {
   position: fixed;
   inset: 0;
@@ -1745,7 +1794,7 @@ body.app-loading .loading-shell {
   max-height: min(82vh, 760px);
   overflow-y: auto;
   border-radius: 22px 22px 0 0;
-  background: linear-gradient(180deg, #111827 0%, #0d1523 100%);
+  background: var(--bg);
   border: 1px solid var(--line);
   padding: 16px 16px 26px;
 }
@@ -1770,6 +1819,9 @@ body.app-loading .loading-shell {
   line-height: 1;
 }
 
+/* =============================================
+   PURCHASE SCREEN
+   ============================================= */
 .purchase-screen {
   position: fixed;
   inset: 0 0 calc(52px + env(safe-area-inset-bottom, 0px)) 0;
@@ -1787,20 +1839,14 @@ body.app-loading .loading-shell {
   display: grid;
   grid-template-rows: auto auto auto minmax(0, 1fr) auto;
   gap: 12px;
-  background: linear-gradient(180deg, #0f1725, #0a111d);
-  /* Allow the entire purchase panel (including header) to scroll with the rest
-     of the purchase screen so header is not stuck while ticket list scrolls. */
+  background: var(--bg);
   overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
-/* Hide native scrollbars in the purchase panel while keeping scrolling
-   functional (works on WebKit, Blink, Firefox, and legacy IE/Edge). */
-.purchase-screen-panel {
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE 10+ */
-}
 .purchase-screen-panel::-webkit-scrollbar {
-  display: none; /* WebKit/Blink */
+  display: none;
 }
 
 .purchase-screen-panel-footer-visible {
@@ -1832,9 +1878,9 @@ body.app-loading .loading-shell {
   min-height: 38px;
   padding: 8px 14px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  color: #fff6c8;
+  background: rgba(15, 15, 18, 0.08);
+  border: 1px solid rgba(15, 15, 18, 0.16);
+  color: var(--text);
   font-size: 0.82rem;
   font-weight: 800;
   letter-spacing: 0.03em;
@@ -1847,9 +1893,9 @@ body.app-loading .loading-shell {
   min-height: 42px;
   padding: 0 12px;
   border-radius: 12px;
-  background: var(--button-bg);
-  border: 1px solid var(--button-border);
-  color: #fff;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  color: var(--text);
   font-size: 1.4rem;
   line-height: 1;
 }
@@ -1860,7 +1906,6 @@ body.app-loading .loading-shell {
   overflow-x: auto;
   padding: 4px 0 2px;
   -webkit-overflow-scrolling: touch;
-  /* Allow horizontal panning on touch and pointer devices */
   touch-action: pan-x;
   scrollbar-width: none;
   user-select: none;
@@ -1884,8 +1929,6 @@ body.app-loading .loading-shell {
 
 .purchase-screen-draw-switch-card {
   flex: 0 0 180px;
-  /* reduce height so the ticket list is more visible when the purchase panel
-     is open while preserving visual proportions */
   min-height: 94px;
   text-align: left;
   transform: scale(0.92);
@@ -1898,7 +1941,7 @@ body.app-loading .loading-shell {
   min-height: 118px;
   transform: rotate(0deg) scale(1);
   opacity: 1;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.16), 0 18px 32px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 0 0 2px rgba(15, 15, 18, 0.16), 0 18px 32px rgba(0, 0, 0, 0.28);
 }
 
 .purchase-screen-status {
@@ -1908,8 +1951,6 @@ body.app-loading .loading-shell {
 
 .purchase-ticket-list {
   min-height: 0;
-  /* Parent panel (.purchase-screen-panel) handles scrolling so header and
-     footer scroll together with the ticket list. */
   display: grid;
   gap: 14px;
   padding-right: 2px;
@@ -1931,8 +1972,8 @@ body.app-loading .loading-shell {
   gap: 12px;
   padding: 14px;
   border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+  border: 1px solid var(--line);
+  background: var(--bg-elev);
   cursor: default;
   transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
 }
@@ -1976,7 +2017,7 @@ body.app-loading .loading-shell {
 .purchase-ticket-progress-count {
   min-width: 42px;
   text-align: right;
-  color: #dce8fb;
+  color: var(--muted);
   font-size: 0.8rem;
   font-weight: 900;
 }
@@ -2012,9 +2053,9 @@ body.app-loading .loading-shell {
 }
 
 .purchase-ticket-card-clear {
-  background: var(--button-bg);
-  border: 1px solid var(--button-border);
-  color: #eef3ff;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  color: var(--text);
 }
 
 .purchase-ticket-card-random {
@@ -2025,7 +2066,7 @@ body.app-loading .loading-shell {
 .purchase-ticket-selected-label {
   font-size: 0.82rem;
   font-weight: 800;
-  color: #d9e6fa;
+  color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -2055,13 +2096,10 @@ body.app-loading .loading-shell {
 
 .purchase-ticket-number-grid {
   display: grid;
-  /* Use fixed-size columns so the grid does not stretch horizontally. This
-     keeps the horizontal gap equal to the vertical gap. Columns will wrap to
-     new rows when there's not enough space (responsive). */
   grid-template-columns: repeat(auto-fill, 54px);
   gap: 8px;
   justify-items: center;
-  grid-auto-rows: 54px; /* match button height for equal vertical spacing */
+  grid-auto-rows: 54px;
   justify-content: center;
 }
 
@@ -2073,7 +2111,6 @@ body.app-loading .loading-shell {
   max-width: 54px;
   max-height: 54px;
   box-sizing: border-box;
-  /* Keep buttons perfectly circular regardless of grid column resizing */
   aspect-ratio: 1 / 1;
   justify-self: center;
   align-self: center;
@@ -2082,14 +2119,13 @@ body.app-loading .loading-shell {
   place-items: center;
   position: relative;
   border-radius: 50%;
-  /* Simplified visuals: dotted outline for unselected, filled for selected. */
   background-image: none;
   background-repeat: no-repeat;
   background-position: center;
   background-size: 70%;
   background-color: transparent;
-  border: 2px dotted rgba(255, 255, 255, 0.12);
-  color: #dbe8fc;
+  border: 2px dotted rgba(15, 15, 18, 0.12);
+  color: var(--muted);
   font-size: 0.95rem;
   font-weight: 800;
   text-transform: none;
@@ -2110,7 +2146,6 @@ body.app-loading .loading-shell {
   background-color: var(--purchase-accent-start, #1ecdc4) !important;
   color: #ffffff;
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.22);
-  /* Filled circle look: remove outline and dotted border */
   border: none;
   transform: scale(1.06);
   transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease, border 0.12s ease;
@@ -2118,20 +2153,18 @@ body.app-loading .loading-shell {
 }
 
 .purchase-screen-footer {
-  /* Floating purchase footer anchored just above the tabbar. */
   position: fixed;
   left: 0;
   right: 0;
-  /* sit just above the tabbar; increased safe offset for taller tabbars */
   bottom: calc(5px + env(safe-area-inset-bottom, 0px));
-  z-index: 50; /* above tabbar and most app chrome */
+  z-index: 50;
   display: grid;
   place-items: center;
   margin: 0 auto;
   max-width: var(--app-max-width);
   padding: 8px 0 12px;
   box-sizing: border-box;
-  pointer-events: none; /* allow clicks only on the button itself */
+  pointer-events: none;
 }
 
 .purchase-screen-footer > .purchase-screen-submit-btn {
@@ -2144,7 +2177,6 @@ body.app-loading .loading-shell {
   justify-content: space-between;
   gap: 12px;
   width: 100%;
-  /* Use draw accent colors (set on :root by JS) with sensible fallback */
   background: linear-gradient(90deg, var(--purchase-accent-start, #ffe26a), var(--purchase-accent-end, #f1be37));
   color: var(--purchase-accent-foreground, #2b1b00);
   box-shadow: 0 18px 36px rgba(0, 0, 0, 0.42), 0 6px 18px rgba(0,0,0,0.28) inset;
@@ -2217,6 +2249,9 @@ body.app-loading .loading-shell {
   }
 }
 
+/* =============================================
+   CENTER POPUP
+   ============================================= */
 .center-popup {
   position: fixed;
   inset: 0;
@@ -2287,46 +2322,13 @@ body.app-loading .loading-shell {
   }
 }
 
-.tabbar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 40;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-1);
-  max-width: var(--app-max-width);
-  margin: 0 auto;
-  padding: 10px 10px calc(10px + env(safe-area-inset-bottom, 0px));
-  box-sizing: border-box;
-  background: linear-gradient(180deg, rgba(10, 15, 24, 0.2), rgba(10, 15, 24, 0.95) 45%);
-  backdrop-filter: blur(10px);
-  border-top: 1px solid var(--line-soft);
-}
-
-.tabbar-btn {
-  background: transparent;
-  border: 1px solid transparent;
-  color: #a8b7ce;
-  text-transform: none;
-  font-size: 0.82rem;
-  font-weight: 600;
-  min-height: 40px;
-  padding: 8px 6px;
-  border-radius: 10px;
-}
-
-.tabbar-btn-active {
-  color: #ffffff;
-  background: var(--button-bg);
-  border-color: var(--button-border);
-}
-
+/* =============================================
+   SECONDARY / PROFILE BUTTONS
+   ============================================= */
 .secondary-btn {
-  background: var(--button-bg);
-  border: 1px solid var(--button-border);
-  color: #d9e4f6;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  color: var(--muted);
   text-transform: none;
   letter-spacing: 0;
 }
@@ -2339,9 +2341,9 @@ body.app-loading .loading-shell {
   flex: 0 0 40px;
   padding: 0;
   border-radius: 12px;
-  background: var(--button-bg);
+  background: var(--bg-elev);
   color: var(--text);
-  border: 1px solid var(--button-border);
+  border: 1px solid var(--line);
   font-size: 1.1rem;
   font-weight: 700;
   line-height: 1;
@@ -2352,10 +2354,13 @@ body.app-loading .loading-shell {
   box-shadow: none;
 }
 
+/* =============================================
+   TRANSACTION ROW
+   ============================================= */
 .tx-row {
   border: 1px solid var(--line-soft);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(15, 15, 18, 0.03);
   padding: 12px;
   display: grid;
   gap: 6px;
@@ -2378,26 +2383,26 @@ body.app-loading .loading-shell {
 .tx-status {
   font-size: 0.76rem;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(15, 15, 18, 0.18);
   padding: 3px 8px;
-  color: #d6e0f2;
+  color: var(--muted);
 }
 
 .tx-status-paid {
-  color: #87f5b1;
-  border-color: rgba(71, 209, 123, 0.55);
+  color: #1AA873;
+  border-color: rgba(26, 168, 115, 0.55);
 }
 
 .tx-status-rejected,
 .tx-status-invalid,
 .tx-status-expired {
-  color: #ffd0d0;
-  border-color: rgba(255, 124, 124, 0.55);
+  color: #EF4444;
+  border-color: rgba(239, 68, 68, 0.55);
 }
 
 .tx-status-waiting,
 .tx-status-processing {
-  color: #ffe4a6;
+  color: #E09A1F;
   border-color: rgba(241, 190, 55, 0.55);
 }
 
@@ -2419,33 +2424,24 @@ body.app-loading .loading-shell {
   height: 20px;
   padding: 0 6px;
   border-radius: 999px;
-  background: #47d17b;
-  color: #092110;
+  background: #1AA873;
+  color: #ffffff;
   font-size: 0.7rem;
   font-weight: 900;
   line-height: 1;
 }
 
+/* =============================================
+   ANIMATIONS
+   ============================================= */
 @keyframes ticketClaimSpin {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(360deg);
-  }
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 @keyframes ticketEnter {
-  0% {
-    opacity: 0;
-    transform: translateY(-6px) scale(0.996);
-  }
-
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+  0% { opacity: 0; transform: translateY(-6px) scale(0.996); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .ticket.enter {
@@ -2453,17 +2449,9 @@ body.app-loading .loading-shell {
 }
 
 @keyframes ticketHighlight {
-  0% {
-    box-shadow: 0 0 0 0 rgba(33, 144, 255, 0);
-  }
-
-  15% {
-    box-shadow: 0 0 0 6px rgba(33, 144, 255, 0.2);
-  }
-
-  100% {
-    box-shadow: 0 0 0 0 rgba(33, 144, 255, 0);
-  }
+  0% { box-shadow: 0 0 0 0 rgba(33, 144, 255, 0); }
+  15% { box-shadow: 0 0 0 6px rgba(33, 144, 255, 0.2); }
+  100% { box-shadow: 0 0 0 0 rgba(33, 144, 255, 0); }
 }
 
 .ticket.highlight {
@@ -2471,6 +2459,9 @@ body.app-loading .loading-shell {
   border-color: rgba(33, 144, 255, 0.42);
 }
 
+/* =============================================
+   RESPONSIVE
+   ============================================= */
 @media (max-width: 560px) {
   :root {
     --space-2: 10px;
@@ -2479,21 +2470,130 @@ body.app-loading .loading-shell {
     --control-min-height: 44px;
   }
 
-  .brand-title {
-    font-size: 1.8rem;
+  .topbar {
+    padding: 4px 16px 16px;
+  }
+
+  .brand-name {
+    font-size: 14px;
+  }
+
+  .brand-subtitle {
+    font-size: 11px;
   }
 
   .balance-value {
-    font-size: 1.25rem;
+    font-size: 16px;
   }
 
-  .jackpot-amount,
-  .section-title {
-    font-size: clamp(1.35rem, 5.8vw, 1.85rem);
+  .news-banner-section {
+    padding: 0 16px 8px;
   }
 
-  .jackpot-copy {
-    font-size: 1.15rem;
+  .news-banner-title {
+    font-size: 16px;
+  }
+
+  .news-banner-card {
+    height: 140px;
+  }
+
+  .news-banner-content {
+    padding: 16px;
+  }
+
+  .news-banner-headline {
+    font-size: 15px;
+    line-height: 19px;
+  }
+
+  .news-banner-description {
+    font-size: 12px;
+    line-height: 16px;
+  }
+
+  .draw-sort-tabs-section {
+    padding: 16px 16px 4px;
+  }
+
+  .draw-sort-tab {
+    height: 32px;
+    padding: 0 12px;
+    font-size: 11px;
+  }
+
+  .draw-card-list {
+    padding: 10px 16px;
+    gap: 10px;
+  }
+
+  .draw-card {
+    height: 160px;
+    padding: 14px;
+  }
+
+  .draw-card-prize-value {
+    font-size: 20px;
+  }
+
+  .offers-header {
+    padding: 8px 16px 12px;
+  }
+
+  .offers-title {
+    font-size: 16px;
+  }
+
+  .offers-list {
+    padding: 0 16px 80px;
+    gap: 8px;
+  }
+
+  .offer-card {
+    padding: 14px 16px;
+    min-height: 78px;
+  }
+
+  .offer-card-icon {
+    width: 38px;
+    height: 38px;
+    font-size: 1.1rem;
+  }
+
+  .offer-card-title {
+    font-size: 14px;
+  }
+
+  .offer-card-subtitle {
+    font-size: 11px;
+  }
+
+  .offer-card-price {
+    font-size: 14px;
+  }
+
+  .offer-card-cta {
+    padding: 9px 12px 10px;
+    font-size: 12px;
+  }
+
+  .tabbar {
+    left: 10px;
+    right: 10px;
+    height: 60px;
+    border-radius: 30px;
+  }
+
+  .tabbar-btn {
+    height: 48px;
+    font-size: 9px;
+  }
+
+  .tabbar-btn svg,
+  .tabbar-btn-icon {
+    width: 20px;
+    height: 20px;
+    font-size: 1rem;
   }
 
   .section-header,
@@ -2502,7 +2602,6 @@ body.app-loading .loading-shell {
     align-items: flex-start;
     flex-direction: column;
   }
-
 
   .winner-card {
     grid-template-columns: 72px minmax(0, 1fr);
@@ -2514,12 +2613,10 @@ body.app-loading .loading-shell {
     width: 72px;
     height: 72px;
   }
-
 }
 
 @media (max-height: 760px) {
   :root {
-    --app-header-height: clamp(66px, 10svh, 80px);
     --space-2: 10px;
     --space-3: 12px;
     --control-min-height: 44px;
@@ -2543,6 +2640,4 @@ body.app-loading .loading-shell {
   .jackpot-copy {
     line-height: 1.25;
   }
-
 }
-

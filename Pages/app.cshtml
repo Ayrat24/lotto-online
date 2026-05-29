@@ -11,10 +11,14 @@
   <meta name="robots" content="noindex, nofollow" />
   <title data-loc="client.app.title">Lotto</title>
 
-  <meta name="theme-color" content="#0b1019" />
-  <meta name="msapplication-navbutton-color" content="#0b1019" />
+  <meta name="theme-color" content="#FFFFFF" />
+  <meta name="msapplication-navbutton-color" content="#FFFFFF" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
 
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://unpkg.com/%40tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
@@ -77,43 +81,64 @@
     </div>
   </div>
 
-  <header class="app-fixed-header" aria-label="App header" data-loc-aria-label="client.header.aria">
-    <div class="app-fixed-header-inner">
-      <div class="brand">
-        <div class="brand-icon">⚡</div>
-        <div class="brand-title" data-loc="client.brand.title">LottoVibe</div>
-      </div>
-      <div class="balance-block">
-        <div class="balance-label" data-loc="client.balance.label">Money</div>
-        <div id="userBalanceText" class="balance-value">$0.00</div>
+  <!-- TOPBAR: Brand row (Figma: Brand row) -->
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-avatar">D</div>
+      <div class="brand-info">
+        <div id="userNameText" class="brand-name" data-loc="client.brand.name">Diyorbek Solijonov</div>
+        <div id="userTicketsMeta" class="brand-subtitle" data-loc="client.brand.subtitle">3 билета в игре · 1 выигрыш</div>
       </div>
     </div>
-  </header>
+    <div class="balance-block">
+      <div class="balance-label" data-loc="client.balance.label">БАЛАНС</div>
+      <div id="userBalanceText" class="balance-value">$500,00</div>
+    </div>
+  </div>
 
   <main id="appShell" class="container app-shell" aria-busy="true">
     <section id="lotteryTabPanel" class="tab-panel stack">
 
       <div id="debugModeBadge" class="debug-mode-badge" hidden></div>
 
-      <section id="newsBannerSection" class="card news-banner-section" hidden>
-        <div class="section-header news-banner-header">
-          <div class="section-title news-banner-title" data-loc="client.news.title">Latest news</div>
-        </div>
+      <!-- NEWS BANNER (Figma: News) -->
+      <section id="newsBannerSection" class="news-banner-section" hidden>
+        <div class="news-banner-title" data-loc="client.news.title">Последние новости</div>
         <div id="newsBannerCarousel" class="news-banner-carousel" aria-label="News banners" data-loc-aria-label="client.news.carouselAria">
           <div id="newsBannerTrack" class="news-banner-track"></div>
           <div id="newsBannerDots" class="news-banner-dots"></div>
         </div>
       </section>
 
-      <section id="featuredJackpotCard" class="card draw-card featured-draw-card" role="button" tabindex="0" aria-haspopup="dialog" aria-controls="ticketPurchaseScreen">
+      <!-- SEGMENTED TABS (Figma: Segmented:margin) -->
+      <section id="drawSortTabsSection" class="draw-sort-tabs-section">
+        <div class="draw-sort-tabs" role="tablist" aria-label="Draw sorting" data-loc-aria-label="client.drawSort.aria">
+          <button id="sortClosestDrawBtn" type="button" class="draw-sort-tab draw-sort-tab-active" role="tab" aria-selected="true" data-loc="client.drawSort.closest">Ближайший тираж</button>
+          <button id="sortBiggestJackpotBtn" type="button" class="draw-sort-tab" role="tab" aria-selected="false" data-loc="client.drawSort.biggestJackpot">Высокий суперприз</button>
+          <button id="sortCheaperTicketsBtn" type="button" class="draw-sort-tab" role="tab" aria-selected="false" data-loc="client.drawSort.cheaperTickets">Сначала дешевле</button>
+        </div>
+      </section>
+
+      <!-- DRAW CARDS (Figma: Draw cards) -->
+      <div id="jackpotCardsContainer" class="draw-card-list" hidden>
+        <!-- Draw cards will be injected dynamically by JS -->
+      </div>
+
+      <div id="purchaseStatus" class="section-subtitle"></div>
+
+      <!-- FEATURED JACKPOT CARD (used by JS as fallback / for purchase screen) -->
+      <section id="featuredJackpotCard" class="draw-card draw-card-theme-red" role="button" tabindex="0" aria-haspopup="dialog" aria-controls="ticketPurchaseScreen" hidden>
         <div class="draw-card-header">
           <div id="jackpotGameTitle" class="draw-card-title" data-loc="client.drawCard.titlePrefix">Draw #</div>
           <div id="currentDrawCreatedAt" class="draw-card-timer" data-loc="client.jackpot.endsIn">Ends in --:--:--</div>
         </div>
 
         <div id="currentDrawStateBadge" class="draw-card-status" hidden></div>
-        <div id="jackpotSubtitle" class="draw-card-jackpot-label" data-loc="client.drawCard.jackpotLabel">JACKPOT</div>
-        <div id="jackpotAmount" class="draw-card-jackpot-value">$0.00</div>
+
+        <div class="draw-card-prize-section">
+          <div id="jackpotSubtitle" class="draw-card-prize-label" data-loc="client.drawCard.jackpotLabel">JACKPOT</div>
+          <div id="jackpotAmount" class="draw-card-prize-value">$0.00</div>
+        </div>
 
         <div class="draw-card-footer">
           <div class="draw-card-cost-block">
@@ -129,19 +154,55 @@
         </div>
       </section>
 
-      <section id="drawSortTabsSection" class="draw-sort-tabs-section" hidden>
-        <div class="draw-sort-tabs" role="tablist" aria-label="Draw sorting" data-loc-aria-label="client.drawSort.aria">
-          <button id="sortClosestDrawBtn" type="button" class="draw-sort-tab draw-sort-tab-active" role="tab" aria-selected="true" data-loc="client.drawSort.closest">Closest draw</button>
-          <button id="sortBiggestJackpotBtn" type="button" class="draw-sort-tab" role="tab" aria-selected="false" data-loc="client.drawSort.biggestJackpot">Biggest jackpot</button>
-          <button id="sortCheaperTicketsBtn" type="button" class="draw-sort-tab" role="tab" aria-selected="false" data-loc="client.drawSort.cheaperTickets">Cheaper tickets</button>
+      <!-- TODAY'S OFFERS (Figma: Сегодняшние предложения) -->
+      <div class="offers-header">
+        <div class="offers-title" data-loc="client.offers.title">Сегодняшние предложения</div>
+        <button type="button" class="offers-view-all" data-loc="client.offers.viewAll">Смотреть все</button>
+      </div>
+
+      <div class="offers-list">
+        <div class="offer-card offer-card-featured" role="button" tabindex="0">
+          <div class="offer-card-left">
+            <div class="offer-card-icon offer-card-icon-dark">🎯</div>
+            <div class="offer-card-info">
+              <div class="offer-card-title" data-loc="client.offers.item1.title">Счастливый вторник</div>
+              <div class="offer-card-subtitle" data-loc="client.offers.item1.subtitle">3 билета за 30 000 сум</div>
+            </div>
+          </div>
+          <div class="offer-card-right">
+            <span class="offer-card-price" data-loc="client.offers.item1.price">$4.00</span>
+            <button type="button" class="offer-card-cta" data-loc="client.offers.item1.cta">Купить</button>
+          </div>
         </div>
-      </section>
 
-      <div id="jackpotCardsContainer" class="stack" hidden></div>
+        <div class="offer-card" role="button" tabindex="0">
+          <div class="offer-card-left">
+            <div class="offer-card-icon offer-card-icon-yellow">🔥</div>
+            <div class="offer-card-info">
+              <div class="offer-card-title" data-loc="client.offers.item2.title">Новогодний розыгрыш</div>
+              <div class="offer-card-subtitle" data-loc="client.offers.item2.subtitle">Выиграйте до 500 000 сум</div>
+            </div>
+          </div>
+          <div class="offer-card-right">
+            <span class="offer-card-price" data-loc="client.offers.item2.price">$1.00</span>
+            <button type="button" class="offer-card-cta" data-loc="client.offers.item2.cta">Купить</button>
+          </div>
+        </div>
 
-      <div id="purchaseStatus" class="section-subtitle"></div>
-
-      <!-- current draw card removed — its small helpers were migrated into the jackpot card above -->
+        <div class="offer-card" role="button" tabindex="0">
+          <div class="offer-card-left">
+            <div class="offer-card-icon offer-card-icon-yellow">⚡</div>
+            <div class="offer-card-info">
+              <div class="offer-card-title" data-loc="client.offers.item3.title">VIP-доступ</div>
+              <div class="offer-card-subtitle" data-loc="client.offers.item3.subtitle">Эксклюзивные тиражи</div>
+            </div>
+          </div>
+          <div class="offer-card-right">
+            <span class="offer-card-price" data-loc="client.offers.item3.price">$10.00</span>
+            <button type="button" class="offer-card-cta" data-loc="client.offers.item3.cta">Купить</button>
+          </div>
+        </div>
+      </div>
 
     </section>
 
@@ -400,11 +461,25 @@
     </div>
   </div>
 
+  <!-- TAB BAR (Figma: Tab Bar) -->
   <nav class="tabbar" aria-label="Bottom tabs" data-loc-aria-label="client.tabbar.aria">
-    <button id="lotteryTabBtn" type="button" class="tabbar-btn tabbar-btn-active"><span data-loc="client.tab.home">Home</span></button>
-    <button id="ticketsTabBtn" type="button" class="tabbar-btn"><span data-loc="client.tab.tickets">My Tickets</span> <span id="ticketsWinningPin" class="tickets-winning-pin" hidden>0</span></button>
-    <button id="winnersTabBtn" type="button" class="tabbar-btn"><span data-loc="client.tab.winners">Winners</span></button>
-    <button id="profileTabBtn" type="button" class="tabbar-btn"><span data-loc="client.tab.profile">Profile</span></button>
+    <button id="lotteryTabBtn" type="button" class="tabbar-btn tabbar-btn-active">
+      <span class="tabbar-btn-icon">🏠</span>
+      <span data-loc="client.tab.home">Главная</span>
+    </button>
+    <button id="ticketsTabBtn" type="button" class="tabbar-btn">
+      <span class="tabbar-btn-icon">🎫</span>
+      <span data-loc="client.tab.tickets">Мои билеты</span>
+      <span id="ticketsWinningPin" class="tickets-winning-pin" hidden>0</span>
+    </button>
+    <button id="winnersTabBtn" type="button" class="tabbar-btn">
+      <span class="tabbar-btn-icon">🏆</span>
+      <span data-loc="client.tab.winners">Победители</span>
+    </button>
+    <button id="profileTabBtn" type="button" class="tabbar-btn">
+      <span class="tabbar-btn-icon">👤</span>
+      <span data-loc="client.tab.profile">Профиль</span>
+    </button>
   </nav>
 
   <div id="centerPopup" class="center-popup" hidden>
