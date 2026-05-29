@@ -1,0 +1,225 @@
+@page
+@model MiniApp.Pages.Admin.PromotionsModel
+@using MiniApp.Features.Promotions
+@{
+    ViewData["Title"] = Model.T("admin.promotions.title", "Promotions");
+}
+
+<h1>@Model.T("admin.promotions.heading", "Promotions")</h1>
+<p class="text-muted">@Model.T("admin.promotions.subtitle", "Manage promotional cards shown on the Mini App home screen.")</p>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <div class="alert @(Model.StatusIsError ? "alert-danger" : "alert-info")" role="status">@Model.StatusMessage</div>
+}
+
+<div class="card mb-3">
+    <div class="card-body">
+        <h5 class="card-title">@Model.T("admin.promotions.create.title", "Create promotion")</h5>
+
+        <form method="post" asp-page-handler="Create" class="row g-3">
+            <div class="col-12 col-md-6">
+                <label for="promotionTitle" class="form-label">@Model.T("admin.promotions.create.title", "Title")</label>
+                <input id="promotionTitle" name="title" type="text" maxlength="256" class="form-control" required />
+            </div>
+            <div class="col-12 col-md-6">
+                <label for="promotionSubtitle" class="form-label">@Model.T("admin.promotions.create.subtitle", "Subtitle")</label>
+                <input id="promotionSubtitle" name="subtitle" type="text" maxlength="512" class="form-control" required />
+            </div>
+            <div class="col-12 col-md-6">
+                <label for="promotionButtonText" class="form-label">@Model.T("admin.promotions.create.buttonText", "Button text")</label>
+                <input id="promotionButtonText" name="buttonText" type="text" maxlength="128" class="form-control" required />
+            </div>
+            <div class="col-6 col-md-3">
+                <label for="promotionBackgroundColor" class="form-label">@Model.T("admin.promotions.create.backgroundColor", "Background color")</label>
+                <input id="promotionBackgroundColor" name="backgroundColor" type="text" maxlength="32" value="#FFB929" class="form-control" />
+            </div>
+            <div class="col-6 col-md-3">
+                <label for="promotionDisplayOrder" class="form-label">@Model.T("admin.promotions.create.order", "Display order")</label>
+                <input id="promotionDisplayOrder" name="displayOrder" type="number" min="0" step="1" value="0" class="form-control" />
+            </div>
+            <div class="col-12 col-lg-4">
+                <label for="promotionActionType" class="form-label">@Model.T("admin.promotions.create.actionType", "Tap action")</label>
+                <select id="promotionActionType" name="actionType" class="form-select">
+                    @foreach (var option in Model.ActionTypeOptions)
+                    {
+                        <option value="@option.Value">@Model.T(option.LabelKey, option.FallbackLabel)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-12 col-lg-4">
+                <label for="promotionActionAppSection" class="form-label">@Model.T("admin.promotions.create.actionAppSection", "App section")</label>
+                <select id="promotionActionAppSection" name="actionAppSection" class="form-select">
+                    <option value="">@Model.T("admin.promotions.create.actionSectionEmpty", "Select app section")</option>
+                    @foreach (var appSection in Model.AppSectionOptions)
+                    {
+                        <option value="@appSection">@appSection</option>
+                    }
+                </select>
+            </div>
+            <div class="col-12 col-lg-4">
+                <label for="promotionActionOfferId" class="form-label">@Model.T("admin.promotions.create.actionOffer", "Discounted offer")</label>
+                <select id="promotionActionOfferId" name="actionOfferId" class="form-select">
+                    <option value="">@Model.T("admin.promotions.create.actionOfferEmpty", "Select active offer")</option>
+                    @foreach (var offer in Model.AvailableOffers)
+                    {
+                        <option value="@offer.Id">@string.Format(Model.T("admin.promotions.offer.option", "Offer #{0} · Draw #{1} · {2} tickets · {3}"), offer.Id, offer.DrawId, offer.NumberOfDiscountedTickets, offer.Cost.ToString("0.00"))</option>
+                    }
+                </select>
+            </div>
+            <div class="col-12 col-lg-4">
+                <label for="promotionActionExternalUrl" class="form-label">@Model.T("admin.promotions.create.actionExternalUrl", "External URL")</label>
+                <input id="promotionActionExternalUrl" name="actionExternalUrl" type="url" maxlength="1024" class="form-control" placeholder="https://example.com" />
+                <div class="form-text">@string.Format(Model.T("admin.promotions.create.actionHelp", "Use one of these app targets: {0}. External links must be absolute HTTPS URLs."), string.Join(", ", Model.AppSectionOptions))</div>
+            </div>
+            <div class="col-6 col-lg-2">
+                <div class="form-check mt-lg-4 pt-lg-2">
+                    <input id="promotionIsPublished" name="isPublished" type="checkbox" value="true" class="form-check-input" checked />
+                    <label for="promotionIsPublished" class="form-check-label">@Model.T("admin.promotions.create.published", "Published")</label>
+                </div>
+            </div>
+            <div class="col-12 col-lg-2">
+                <button type="submit" class="btn btn-primary w-100 mt-lg-4">@Model.T("admin.promotions.create.submit", "Create promotion")</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (Model.Items.Count == 0)
+{
+    <div class="alert alert-secondary">@Model.T("admin.promotions.empty", "No promotions yet.")</div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">@Model.T("admin.promotions.manage.title", "Manage promotions")</h5>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                    <tr>
+                        <th>@Model.T("admin.promotions.table.title", "Title")</th>
+                        <th>@Model.T("admin.promotions.table.subtitle", "Subtitle")</th>
+                        <th>@Model.T("admin.promotions.table.buttonText", "Button")</th>
+                        <th>@Model.T("admin.promotions.table.color", "Color")</th>
+                        <th>@Model.T("admin.promotions.table.actionType", "Tap action")</th>
+                        <th>@Model.T("admin.promotions.table.actionValue", "Action target")</th>
+                        <th>@Model.T("admin.promotions.table.order", "Order")</th>
+                        <th>@Model.T("admin.promotions.table.status", "Status")</th>
+                        <th>@Model.T("admin.promotions.table.createdUtc", "Created (UTC)")</th>
+                        <th>@Model.T("admin.promotions.table.updatedUtc", "Updated (UTC)")</th>
+                        <th>@Model.T("admin.promotions.table.actions", "Actions")</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var item in Model.Items)
+                    {
+                        <tr>
+                            <form method="post" asp-page-handler="Update">
+                                <input type="hidden" name="id" value="@item.Id" />
+                                <td style="min-width: 180px;">
+                                    <input name="title" type="text" maxlength="256" value="@item.Title" class="form-control form-control-sm" />
+                                </td>
+                                <td style="min-width: 200px;">
+                                    <input name="subtitle" type="text" maxlength="512" value="@item.Subtitle" class="form-control form-control-sm" />
+                                </td>
+                                <td style="min-width: 140px;">
+                                    <input name="buttonText" type="text" maxlength="128" value="@item.ButtonText" class="form-control form-control-sm" />
+                                </td>
+                                <td style="min-width: 120px;">
+                                    <input name="backgroundColor" type="text" maxlength="32" value="@item.BackgroundColor" class="form-control form-control-sm" />
+                                    <div class="mt-1" style="width: 40px; height: 24px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.1); background-color: @item.BackgroundColor;"></div>
+                                </td>
+                                <td style="min-width: 180px;">
+                                    <select name="actionType" class="form-select form-select-sm">
+                                        @foreach (var option in Model.ActionTypeOptions)
+                                        {
+                                            if (string.Equals(item.ActionType, option.Value, StringComparison.Ordinal))
+                                            {
+                                                <option value="@option.Value" selected>@Model.T(option.LabelKey, option.FallbackLabel)</option>
+                                            }
+                                            else
+                                            {
+                                                <option value="@option.Value">@Model.T(option.LabelKey, option.FallbackLabel)</option>
+                                            }
+                                        }
+                                    </select>
+                                </td>
+                                <td style="min-width: 320px;">
+                                    <div class="d-grid gap-2">
+                                        <select name="actionAppSection" class="form-select form-select-sm">
+                                            <option value="">@Model.T("admin.promotions.create.actionSectionEmpty", "Select app section")</option>
+                                            @foreach (var appSection in Model.AppSectionOptions)
+                                            {
+                                                if (string.Equals(item.ActionType, PromotionsManagement.ActionTypeAppSection, StringComparison.Ordinal)
+                                                    && string.Equals(item.ActionValue, appSection, StringComparison.Ordinal))
+                                                {
+                                                    <option value="@appSection" selected>@appSection</option>
+                                                }
+                                                else
+                                                {
+                                                    <option value="@appSection">@appSection</option>
+                                                }
+                                            }
+                                        </select>
+                                        <select name="actionOfferId" class="form-select form-select-sm">
+                                            <option value="">@Model.T("admin.promotions.create.actionOfferEmpty", "Select active offer")</option>
+                                            @foreach (var offer in Model.AvailableOffers)
+                                            {
+                                                var offerValue = offer.Id.ToString();
+                                                if (string.Equals(item.ActionType, PromotionsManagement.ActionTypeDiscountedOffer, StringComparison.Ordinal)
+                                                    && string.Equals(item.ActionValue, offerValue, StringComparison.Ordinal))
+                                                {
+                                                    <option value="@offer.Id" selected>@string.Format(Model.T("admin.promotions.offer.option", "Offer #{0} · Draw #{1} · {2} tickets · {3}"), offer.Id, offer.DrawId, offer.NumberOfDiscountedTickets, offer.Cost.ToString("0.00"))</option>
+                                                }
+                                                else
+                                                {
+                                                    <option value="@offer.Id">@string.Format(Model.T("admin.promotions.offer.option", "Offer #{0} · Draw #{1} · {2} tickets · {3}"), offer.Id, offer.DrawId, offer.NumberOfDiscountedTickets, offer.Cost.ToString("0.00"))</option>
+                                                }
+                                            }
+                                        </select>
+                                        <input name="actionExternalUrl" type="url" maxlength="1024" value="@(string.Equals(item.ActionType, PromotionsManagement.ActionTypeExternalUrl, StringComparison.Ordinal) ? item.ActionValue : null)" class="form-control form-control-sm" placeholder="https://example.com" />
+                                    </div>
+                                </td>
+                                <td style="max-width: 110px;">
+                                    <input name="displayOrder" type="number" min="0" step="1" value="@item.DisplayOrder" class="form-control form-control-sm" />
+                                </td>
+                                <td>
+                                    <div class="form-check mb-2">
+                                        @if (item.IsPublished)
+                                        {
+                                            <input id="published_@item.Id" name="isPublished" type="checkbox" value="true" class="form-check-input" checked />
+                                        }
+                                        else
+                                        {
+                                            <input id="published_@item.Id" name="isPublished" type="checkbox" value="true" class="form-check-input" />
+                                        }
+                                        <label for="published_@item.Id" class="form-check-label">@Model.T("admin.promotions.create.published", "Published")</label>
+                                    </div>
+                                    <span class="badge @(item.IsPublished ? "bg-success-subtle text-dark border border-success-subtle" : "bg-secondary-subtle text-dark border border-secondary-subtle")">
+                                        @(item.IsPublished ? Model.T("admin.promotions.status.published", "Published") : Model.T("admin.promotions.status.hidden", "Hidden"))
+                                    </span>
+                                </td>
+                                <td>@item.CreatedAtUtc.ToString("u")</td>
+                                <td>@item.UpdatedAtUtc.ToString("u")</td>
+                                <td class="text-nowrap">
+                                    <button type="submit" class="btn btn-sm btn-outline-primary">@Model.T("admin.promotions.action.save", "Save")</button>
+                                    <button type="submit"
+                                            class="btn btn-sm btn-outline-danger"
+                                            formmethod="post"
+                                            formaction="?handler=Delete"
+                                            name="id"
+                                            value="@item.Id"
+                                            onclick="return confirm('@Model.T("admin.promotions.confirm.delete", "Delete this promotion?")');">
+                                        @Model.T("admin.promotions.action.delete", "Delete")
+                                    </button>
+                                </td>
+                            </form>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}

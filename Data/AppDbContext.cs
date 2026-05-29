@@ -23,6 +23,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<DiscountedTicketOffer> DiscountedTicketOffers => Set<DiscountedTicketOffer>();
     public DbSet<WinnerEntry> WinnerEntries => Set<WinnerEntry>();
     public DbSet<TicketPurchaseSettings> TicketPurchaseSettings => Set<TicketPurchaseSettings>();
+    public DbSet<Promotion> Promotions => Set<Promotion>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -388,6 +389,26 @@ public sealed class AppDbContext : DbContext
                 .IsRequired();
             b.Property(x => x.Error).HasMaxLength(512);
             b.Property(x => x.ReceivedAtUtc).IsRequired();
+        });
+
+        modelBuilder.Entity<Promotion>(b =>
+        {
+            b.ToTable("promotions");
+            b.HasKey(x => x.Id);
+
+            b.HasIndex(x => new { x.IsPublished, x.DisplayOrder, x.CreatedAtUtc });
+            b.HasIndex(x => x.UpdatedAtUtc);
+
+            b.Property(x => x.Title).HasMaxLength(256).IsRequired();
+            b.Property(x => x.Subtitle).HasMaxLength(512).IsRequired();
+            b.Property(x => x.ButtonText).HasMaxLength(128).IsRequired();
+            b.Property(x => x.ActionType).HasMaxLength(32).IsRequired().HasDefaultValue("none");
+            b.Property(x => x.ActionValue).HasMaxLength(1024);
+            b.Property(x => x.BackgroundColor).HasMaxLength(32).IsRequired().HasDefaultValue("#FFB929");
+            b.Property(x => x.DisplayOrder).IsRequired();
+            b.Property(x => x.IsPublished).IsRequired().HasDefaultValue(true);
+            b.Property(x => x.CreatedAtUtc).IsRequired();
+            b.Property(x => x.UpdatedAtUtc).IsRequired();
         });
     }
 }

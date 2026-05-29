@@ -1,0 +1,119 @@
+using Microsoft.EntityFrameworkCore;
+using MiniApp.Data;
+using MiniApp.Features.Auth;
+using MiniApp.Features.Draws;
+using MiniApp.Features.Localization;
+using MiniApp.Features.Offers;
+using MiniApp.TelegramLogin;
+
+namespace MiniApp.Features.Promotions;
+
+public static class PromotionsEndpoints
+{
+    public static IEndpointRouteBuilder MapPromotionsEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        endpoints.MapGet("/api/promotions", async (AppDbContext db, CancellationToken ct) =>
+        {
+            var promotionDtos = await BuildPromotionDtosAsync(db, ct);
+            return Results.Ok(new PromotionsListResult(true, promotionDtos));
+        });
+
+        endpoints.MapPost("/api/promotions", async (
+            PromotionsRequest req,
+            HttpContext http,
+            IConfiguration config,
+            IWebHostEnvironment env,
+            AppDbContext db,
+            IUserService users,
+            CancellationToken ct) =>
+        {
+            var authResult = await TryResolveTelegramUserIdAsync(req.InitData ?? string.Empty, http, config, env, db, ct);
+            if (authResult.ErrorResult is not null)
+                return authResult.ErrorResult;
+
+            var telegramUserId = authResult.TelegramUserId!.Value;
+            await users.TouchUserAsync(telegramUserId, ct);
+            var promotionDtos = await BuildPromotionDtosAsync(db, ct);
+            return Results.Ok(new PromotionsListResult(true, promotionDtos));
+        });
+
+        return endpoints;
+    }
+
+    private static async Task<List<PromotionDto>> BuildPromotionDtosAsync(AppDbContext db, CancellationToken ct)
+    {
+        var nowUtc = DateTimeOffset.UtcNow;
+        var activeDraws = await db.Draws
+            .AsNoTracking()
+            .Where(x => x.State == DrawState.Active)
+            .ToListAsync(ct);
+
+        var activeDrawsById = activeDraws
+            .Where(x => DrawManagement.CanPurchase(x, nowUtc))
+            .ToDictionary(x => x.Id);
+
+        var offers = activeDrawsById.Count == 0
+            ? Array.Empty<DiscountedTicketOfferDto>()
+            : (await db.DiscountedTicketOffers
+                .AsNoTracking()
+                .Where(x => x.IsActive && activeDrawsById.Keys.Contains(x.DrawId))
+                .OrderByDescending(x => x.UpdatedAtUtc)
+                .ThenByDescending(x => x.Id)
+                .ToListAsync(ct))
+                .Where(x => activeDrawsById.TryGetValue(x.DrawId, out var draw)
+                    && DiscountedTicketOfferManagement.IsAvailable(x, draw, nowUtc))
+                .Select(DiscountedTicketOfferManagement.ToDto)
+                .ToArray();
+
+        var offersById = offers.ToDictionary(x => x.Id);
+
+        var promotions = await db.Promotions
+            .AsNoTracking()
+            .Where(x => x.IsPublished)
+            .OrderBy(x => x.DisplayOrder)
+            .ThenByDescending(x => x.CreatedAtUtc)
+            .ToListAsync(ct);
+
+        return promotions
+            .Where(x =>
+            {
+                // Filter out promotions that reference unavailable offers
+                if (string.Equals(PromotionsManagement.NormalizeStoredActionType(x.ActionType), PromotionsManagement.ActionTypeDiscountedOffer, StringComparison.Ordinal)
+                    && long.TryParse(x.ActionValue, out var offerId))
+                {
+                    return offersById.ContainsKey(offerId);
+                }
+                return true;
+            })
+            .Select(PromotionsManagement.ToDto)
+            .ToList();
+    }
+
+    private static async Task<(long? TelegramUserId, IResult? ErrorResult)> TryResolveTelegramUserIdAsync(
+        string initData,
+        HttpContext http,
+        IConfiguration config,
+        IWebHostEnvironment env,
+        AppDbContext db,
+        CancellationToken ct)
+    {
+        if (LocalDebugMode.TryGetDebugTelegramUserId(http, config, env, out var localDebugUserId))
+        {
+            await LocalDebugSeed.EnsureSeededAsync(db, localDebugUserId, ct);
+            return (localDebugUserId, null);
+        }
+
+        var botToken = config["BotToken"];
+        if (string.IsNullOrWhiteSpace(botToken))
+            return (null, Results.Problem("BotToken is not configured.", statusCode: 500));
+
+        if (!TelegramInitDataValidator.TryValidateInitData(initData, botToken, TimeSpan.FromMinutes(10), out var tgUser, out var error))
+        {
+            if (env.IsDevelopment())
+                return (null, Results.Json(new { ok = false, error }, statusCode: StatusCodes.Status401Unauthorized));
+            return (null, Results.Unauthorized());
+        }
+
+        return (tgUser!.Id, null);
+    }
+}

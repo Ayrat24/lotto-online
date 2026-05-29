@@ -13,6 +13,7 @@ using MiniApp.Features.Wallet;
 using MiniApp.Features.Payments;
 using MiniApp.Features.Localization;
 using MiniApp.Features.NewsBanners;
+using MiniApp.Features.Promotions;
 using MiniApp.Features.Referrals;
 using MiniApp.Features.Winners;
 using Telegram.Bot;
@@ -241,6 +242,7 @@ app.MapWalletEndpoints();
 app.MapPaymentsEndpoints();
 app.MapLocalizationEndpoints();
 app.MapNewsBannersEndpoints();
+app.MapPromotionsEndpoints();
 app.MapWinnersEndpoints();
 app.MapReferralsEndpoints();
 
