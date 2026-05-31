@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Options;
 using Npgsql;
@@ -44,7 +45,8 @@ public static class DatabaseModule
             }
 
             var db = sp.GetRequiredService<IOptions<DbOptions>>().Value;
-            options.UseNpgsql(db.ConnectionString);
+            options.UseNpgsql(db.ConnectionString)
+                  .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
         });
 
         // Data access services
