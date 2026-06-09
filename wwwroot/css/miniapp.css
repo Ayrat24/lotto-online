@@ -22,6 +22,7 @@
   --button-bg: #161f29;
   --button-bg-strong: #1d2835;
   --button-border: rgba(15, 15, 18, 0.06);
+  --button-text: #20131d;
   --yellow: #FFB929;
   --yellow-strong: #E09A1F;
   --green: #1AA873;
@@ -304,6 +305,14 @@ body.app-loading .loading-shell {
   background: linear-gradient(135deg, #F4B940 0%, #E09A1F 100%);
   color: #ffffff;
   box-shadow: 0px 1.6px 4.8px 0px rgba(224, 154, 31, 0.1), 0px 8.1px 24.2px 0px rgba(244, 185, 64, 0.28);
+}
+
+.brand-avatar-img {
+  width: 42px;
+  height: 42px;
+  border-radius: 14.5px;
+  object-fit: cover;
+  display: block;
 }
 
 .brand-info {
@@ -911,6 +920,12 @@ body.app-loading .loading-shell {
   font-size: 1.1rem;
 }
 
+.tabbar-btn-icon-img {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+
 /* =============================================
    SECTION HEADER
    ============================================= */
@@ -1279,6 +1294,24 @@ body.app-loading .loading-shell {
   height: 26px;
 }
 
+.payment-system-icon img {
+  width: 26px;
+  height: 26px;
+  display: block;
+}
+
+.profile-menu-icon img {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.offer-card-icon img {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+
 .payment-system-icon-telegram-ton {
   color: #65b7ff;
 }
@@ -1422,8 +1455,9 @@ body.app-loading .loading-shell {
   border-radius: var(--radius-control);
   min-height: var(--control-min-height);
   padding: 12px var(--space-3);
-  background: var(--button-bg);
-  color: #ffffff;
+  /* Use neutral elevated background + dark text for regular buttons; primary CTAs override below */
+  background: var(--bg-elev);
+  color: var(--text);
   font-size: var(--font-button);
   text-transform: uppercase;
   font-weight: 800;
@@ -1444,6 +1478,24 @@ body.app-loading .loading-shell {
 .center-popup button:disabled {
   opacity: 0.52;
   cursor: not-allowed;
+}
+
+/* Primary CTA override to match Figma: use yellow accent and dark text */
+.profile-primary-cta,
+.offer-card-cta,
+.app-shell .primary-cta,
+.purchase-screen button.purchase-screen-submit-btn,
+.center-popup-topup {
+  background: var(--yellow);
+  color: var(--button-text, #20131d);
+  border-color: transparent;
+}
+
+/* Strong/hover state for primary CTAs */
+.profile-primary-cta:active,
+.offer-card-cta:active,
+.app-shell .primary-cta:active {
+  transform: translateY(1px) scale(0.995);
 }
 
 .app-shell .news-banner-slide-actionable {

@@ -2999,17 +2999,57 @@
     return '';
   }
 
-  function createPaymentSystemIcon(methodKey) {
-    var normalized = String(methodKey || '').trim().toLowerCase();
+  function createPaymentSystemIcon(systemOrKey) {
+    // Accept either a system object or a string key for backward compatibility.
+    var system = null;
+    var methodKey = '';
+    if (systemOrKey && typeof systemOrKey === 'object') {
+      system = systemOrKey;
+      methodKey = String(system.key || system.method || '').trim().toLowerCase();
+    } else {
+      methodKey = String(systemOrKey || '').trim().toLowerCase();
+    }
+
+    // create icon node: prefer provider-supplied iconUrl, otherwise fall back
+    // to bundled SVGs (mapped by known payment keys) or CSS-only marker.
+    var normalized = methodKey;
     var icon = document.createElement('span');
     icon.className = 'payment-system-icon payment-system-icon-' + normalized.replace(/[^a-z0-9]+/g, '-');
+    try {
+      var imgUrl = null;
+      if (system && system.iconUrl) {
+        imgUrl = String(system.iconUrl || '').trim();
+      }
 
-    if (normalized === 'btcpay_crypto') {
-      icon.textContent = '₿';
+      if (!imgUrl) {
+        var keyMap = {
+          'telegram_ton': '/images/icons/icon-deposit.svg',
+          'btcpay': '/images/icons/icon-transactions.svg',
+          'btcpay_crypto': '/images/icons/icon-transactions.svg'
+        };
+        imgUrl = keyMap[normalized] || null;
+      }
+
+      if (imgUrl) {
+        var img = document.createElement('img');
+        img.src = imgUrl;
+        img.alt = String(system && (system.name || system.title) || methodKey || '');
+        img.decoding = 'async';
+        icon.appendChild(img);
+      }
+    } catch (e) {
+      // ignore icon render failures and leave CSS-only placeholder
+    }
+
+    if (normalized === 'btcpay_crypto' || normalized === 'btcpay') {
+      // If image not appended, fall back to textual bitcoin sign for visibility
+      if (!icon.querySelector('img')) icon.textContent = '₿';
       return icon;
     }
 
     if (normalized === 'telegram_ton') {
+      // If we already appended an image, prefer that; otherwise append inline svg
+      if (icon.querySelector('img')) return icon;
       var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
       svg.setAttribute('viewBox', '0 0 24 24');
       svg.setAttribute('aria-hidden', 'true');
@@ -3022,7 +3062,8 @@
       return icon;
     }
 
-    icon.textContent = '¤';
+    // Generic placeholder if no known key matched and no image appended.
+    if (!icon.querySelector('img')) icon.textContent = '¤';
     return icon;
   }
 
