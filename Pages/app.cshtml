@@ -3,6 +3,10 @@
 @inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 @inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment Environment
 @{ Layout = null; }
+@{
+  // Ensure absolute URLs for assets so icons load correctly inside embedded webviews
+  var baseUrl = Request.Scheme + "://" + Request.Host + Url.Content("~");
+}
 <!doctype html>
 <html lang="en">
 <head>
@@ -84,7 +88,7 @@
   <!-- TOPBAR: Brand row (Figma: Brand row) -->
   <div class="topbar">
     <div class="brand">
-      <img src="/images/icons/brand-avatar.svg" alt="avatar" class="brand-avatar-img" />
+      <img src="@($"{baseUrl}images/icons/brand-avatar.svg")" alt="avatar" class="brand-avatar-img" />
       <div class="brand-info">
         <div id="userNameText" class="brand-name" data-loc="client.brand.name">Diyorbek Solijonov</div>
         <div id="userTicketsMeta" class="brand-subtitle" data-loc="client.brand.subtitle">3 билета в игре · 1 выигрыш</div>
@@ -167,7 +171,7 @@
             <span class="offer-card-hole-right"></span>
             <div class="offer-card-left">
               <div class="offer-card-icon offer-card-icon-yellow">
-                <img src="/images/icons/icon-deposit.svg" alt="offer" style="width:22px;height:22px;" />
+                <img src="@($"{baseUrl}images/icons/icon-deposit.svg")" alt="offer" style="width:22px;height:22px;" />
               </div>
               <div class="offer-card-info">
                 <div class="offer-card-title" data-loc="client.offers.item1.title">Счастливый вторник</div>
@@ -184,7 +188,7 @@
             <span class="offer-card-hole-right"></span>
             <div class="offer-card-left">
               <div class="offer-card-icon offer-card-icon-dark">
-                <img src="/images/icons/icon-transactions.svg" alt="offer" style="width:22px;height:22px;" />
+                <img src="@($"{baseUrl}images/icons/icon-transactions.svg")" alt="offer" style="width:22px;height:22px;" />
               </div>
               <div class="offer-card-info">
                 <div class="offer-card-title" data-loc="client.offers.item2.title">Новогодний розыгрыш</div>
@@ -201,7 +205,7 @@
             <span class="offer-card-hole-right"></span>
             <div class="offer-card-left">
               <div class="offer-card-icon offer-card-icon-dark">
-                <img src="/images/icons/icon-invite.svg" alt="offer" style="width:22px;height:22px;" />
+                <img src="@($"{baseUrl}images/icons/icon-invite.svg")" alt="offer" style="width:22px;height:22px;" />
               </div>
               <div class="offer-card-info">
                 <div class="offer-card-title" data-loc="client.offers.item3.title">VIP-доступ</div>
@@ -248,7 +252,7 @@
         <!-- Profile header subtitle and current balance removed from UI -->
 
         <button id="openDepositScreenBtn" type="button" class="profile-menu-item">
-          <span class="profile-menu-icon profile-menu-icon-accent"><img src="/images/icons/icon-deposit.svg" alt="deposit" style="width:20px;height:20px;"/></span>
+          <span class="profile-menu-icon profile-menu-icon-accent"><img src="@($"{baseUrl}images/icons/icon-deposit.svg")" alt="deposit" style="width:20px;height:20px;"/></span>
           <span class="profile-menu-copy">
             <span class="profile-menu-title" data-loc="client.profile.menuDeposit">Deposit Money</span>
           </span>
@@ -256,7 +260,7 @@
         </button>
 
         <button id="openInviteScreenBtn" type="button" class="profile-menu-item">
-          <span class="profile-menu-icon"><img src="/images/icons/icon-invite.svg" alt="invite" style="width:18px;height:18px;"/></span>
+           <span class="profile-menu-icon"><img src="@($"{baseUrl}images/icons/icon-invite.svg")" alt="invite" style="width:18px;height:18px;"/></span>
           <span class="profile-menu-copy">
             <span class="profile-menu-title" data-loc="client.profile.menuInvite">Invite Friend</span>
           </span>
@@ -264,7 +268,7 @@
         </button>
 
         <button id="openWithdrawScreenBtn" type="button" class="profile-menu-item">
-          <span class="profile-menu-icon"><img src="/images/icons/icon-withdraw.svg" alt="withdraw" style="width:18px;height:18px;"/></span>
+           <span class="profile-menu-icon"><img src="@($"{baseUrl}images/icons/icon-withdraw.svg")" alt="withdraw" style="width:18px;height:18px;"/></span>
           <span class="profile-menu-copy">
             <span class="profile-menu-title" data-loc="client.profile.menuWithdraw">Withdraw Money</span>
           </span>
@@ -272,7 +276,7 @@
         </button>
 
         <button id="openHistoryScreenBtn" type="button" class="profile-menu-item">
-          <span class="profile-menu-icon"><img src="/images/icons/icon-transactions.svg" alt="history" style="width:18px;height:18px;"/></span>
+           <span class="profile-menu-icon"><img src="@($"{baseUrl}images/icons/icon-transactions.svg")" alt="history" style="width:18px;height:18px;"/></span>
           <span class="profile-menu-copy">
             <span class="profile-menu-title" data-loc="client.profile.menuHistory">Transaction History</span>
           </span>
@@ -472,21 +476,21 @@
 
   <!-- TAB BAR (Figma: Tab Bar) -->
   <nav class="tabbar" aria-label="Bottom tabs" data-loc-aria-label="client.tabbar.aria">
-    <button id="lotteryTabBtn" type="button" class="tabbar-btn tabbar-btn-active">
-      <img src="/images/icons/icon-deposit.svg" alt="home" class="tabbar-btn-icon-img" />
+      <button id="lotteryTabBtn" type="button" class="tabbar-btn tabbar-btn-active">
+       <img src="@(Url.Content("~/images/icons/icon-deposit.svg"))" alt="home" class="tabbar-btn-icon-img" />
       <span data-loc="client.tab.home">Главная</span>
     </button>
-    <button id="ticketsTabBtn" type="button" class="tabbar-btn">
-      <img src="/images/icons/icon-transactions.svg" alt="tickets" class="tabbar-btn-icon-img" />
+     <button id="ticketsTabBtn" type="button" class="tabbar-btn">
+       <img src="@(Url.Content("~/images/icons/icon-transactions.svg"))" alt="tickets" class="tabbar-btn-icon-img" />
       <span data-loc="client.tab.tickets">Мои билеты</span>
       <span id="ticketsWinningPin" class="tickets-winning-pin" hidden>0</span>
     </button>
-    <button id="winnersTabBtn" type="button" class="tabbar-btn">
-      <img src="/images/icons/icon-invite.svg" alt="winners" class="tabbar-btn-icon-img" />
+     <button id="winnersTabBtn" type="button" class="tabbar-btn">
+       <img src="@(Url.Content("~/images/icons/icon-invite.svg"))" alt="winners" class="tabbar-btn-icon-img" />
       <span data-loc="client.tab.winners">Победители</span>
     </button>
-    <button id="profileTabBtn" type="button" class="tabbar-btn">
-      <img src="/images/icons/icon-profile.svg" alt="profile" class="tabbar-btn-icon-img" />
+     <button id="profileTabBtn" type="button" class="tabbar-btn">
+       <img src="@(Url.Content("~/images/icons/icon-profile.svg"))" alt="profile" class="tabbar-btn-icon-img" />
       <span data-loc="client.tab.profile">Профиль</span>
     </button>
   </nav>

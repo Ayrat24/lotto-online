@@ -3022,10 +3022,10 @@
       }
 
       if (!imgUrl) {
-        var keyMap = {
-          'telegram_ton': '/images/icons/icon-deposit.svg',
-          'btcpay': '/images/icons/icon-transactions.svg',
-          'btcpay_crypto': '/images/icons/icon-transactions.svg'
+      var keyMap = {
+          'telegram_ton': window.location.origin + '/images/icons/icon-deposit.svg',
+          'btcpay': window.location.origin + '/images/icons/icon-transactions.svg',
+          'btcpay_crypto': window.location.origin + '/images/icons/icon-transactions.svg'
         };
         imgUrl = keyMap[normalized] || null;
       }
