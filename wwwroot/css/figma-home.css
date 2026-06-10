@@ -1,0 +1,10 @@
+/* Figma export home screen styles (trimmed and namespaced) */
+@charset "UTF-8";
+.element-HOME { display:inline-flex; flex-direction:column; height:840px; align-items:center; gap:14px; padding:18px 0 0; position:relative; background-color:#fff; border-radius:27px; overflow:hidden; }
+.element-HOME .container{display:flex;flex-direction:column;width:390px;align-items:flex-start;padding:0 0 328px;position:relative;flex:1;flex-grow:1;overflow-y:scroll}
+.element-HOME .brand-row{display:flex;width:390px;align-items:center;justify-content:space-between;padding:4px 20px 20px;position:relative}
+.element-HOME .brand-row img{width:42px;height:42px;border-radius:14px}
+.element-HOME .tab-bar{display:flex;width:calc(100% - 28px);height:68px;align-items:center;justify-content:center;padding:0 6px;position:fixed;left:14px;bottom:16px;background-color:#ffffffd9;border-radius:34px;border:1px solid #0f0f140f;box-shadow:0 2px 8px #0f0f140a,0 16px 40px #0f0f1414}
+.element-HOME .draw-cards{display:flex;width:390px;align-items:flex-start;justify-content:center;gap:12px;padding:14px 20px;position:relative}
+/* small responsive adjustments */
+@media (max-width:420px){.element-HOME{max-width:100%;height:auto}.element-HOME .container{width:100%;padding-bottom:200px}.element-HOME .brand-row,.element-HOME .news,.element-HOME .draw-cards{width:100%}}
