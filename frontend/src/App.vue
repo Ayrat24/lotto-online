@@ -149,8 +149,24 @@ const activeTab = computed(() => {
 })
 
 const selectedDraw = computed(() => {
-  if (!selectedDrawId.value || !state.timeline?.activeDraws) return null
-  return state.timeline.activeDraws.find(d => d && d.id === selectedDrawId.value) || null
+  if (!selectedDrawId.value || !state.timeline?.activeDraws) {
+    console.log('[MiniApp] selectedDraw: no drawId or no activeDraws', { 
+      drawId: selectedDrawId.value, 
+      hasTimeline: !!state.timeline,
+      hasActiveDraws: !!state.timeline?.activeDraws,
+      activeDrawsCount: state.timeline?.activeDraws?.length 
+    })
+    return null
+  }
+  // Ensure numeric comparison (URL params come as strings, API returns numbers)
+  const targetId = Number(selectedDrawId.value)
+  const found = state.timeline.activeDraws.find(d => d && Number(d.id) === targetId)
+  console.log('[MiniApp] selectedDraw lookup', { 
+    targetId, 
+    found: !!found, 
+    activeDrawIds: state.timeline.activeDraws.map(d => d?.id) 
+  })
+  return found || null
 })
 
 const ticketPurchase = computed(() => {
