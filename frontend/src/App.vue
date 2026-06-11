@@ -5,6 +5,7 @@ import AppTabBar from './components/AppTabBar.vue'
 import HomeScreen from './screens/HomeScreen.vue'
 import TicketSelectionScreen from './screens/TicketSelectionScreen.vue'
 import MyTicketsScreen from './screens/MyTicketsScreen.vue'
+import WinnersScreen from './screens/WinnersScreen.vue'
 
 const DRAW_SORTS = {
   closest: 'closest',
@@ -35,6 +36,7 @@ function getInitialScreen() {
   const screen = params.get('screen')
   if (screen === 'ticket-selection') return 'ticket-selection'
   if (screen === 'tickets') return 'tickets'
+  if (screen === 'winners') return 'winners'
   return 'home'
 }
 
@@ -77,6 +79,7 @@ const state = reactive({
   user: { firstName: 'Player', lastName: '', username: '', balance: 0 },
   timeline: null,
   banners: [],
+  winners: [],
   loading: true,
   error: '',
   sortMode: DRAW_SORTS.closest,
@@ -241,6 +244,9 @@ const myTicketsTexts = computed(() => ({
   noWonTickets: texts.noWonTickets
 }))
 
+const winnersError = ref('')
+const winnersLoading = ref(false)
+
 function openTicketSelection(draw) {
   if (!draw || draw.id == null) return
   selectedDrawId.value = draw.id
@@ -260,6 +266,10 @@ function handleTabNavigate(tab) {
     selectedDrawId.value = null
   } else {
     currentScreen.value = tab
+  }
+  // Load winners data when navigating to winners tab
+  if (tab === 'winners' && !state.winners.length) {
+    loadWinners()
   }
   updateUrl()
 }
@@ -308,6 +318,26 @@ async function loadTimeline() {
 async function loadBanners() {
   const res = await postJson('/api/news-banners', { initData: state.initData, locale: state.locale })
   state.banners = res && res.ok && Array.isArray(res.banners) ? res.banners : []
+}
+
+async function loadWinners() {
+  if (winnersLoading.value) return
+  winnersLoading.value = true
+  winnersError.value = ''
+  try {
+    const response = await fetch('/api/winners')
+    const data = response.ok ? await response.json() : null
+    if (data && data.ok && Array.isArray(data.winners)) {
+      state.winners = data.winners
+    } else {
+      state.winners = []
+    }
+  } catch (err) {
+    winnersError.value = err?.message || 'Failed to load winners.'
+    state.winners = []
+  } finally {
+    winnersLoading.value = false
+  }
 }
 
 async function loadAll() {
@@ -400,10 +430,13 @@ onBeforeUnmount(() => {
         @open-draw="openTicketSelection"
       />
 
-      <div v-else-if="currentScreen === 'winners'" class="placeholder-screen">
-        <div class="placeholder-title">Победители</div>
-        <div class="placeholder-text">Экран в разработке</div>
-      </div>
+      <WinnersScreen
+        v-else-if="currentScreen === 'winners'"
+        :loading="winnersLoading"
+        :error="winnersError"
+        :locale="state.locale"
+        :winners="state.winners"
+      />
 
       <div v-else-if="currentScreen === 'profile'" class="placeholder-screen">
         <div class="placeholder-title">Профиль</div>
