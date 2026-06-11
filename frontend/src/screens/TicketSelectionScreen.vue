@@ -154,8 +154,10 @@ function handleBack() {
   emit('back')
 }
 
-watch(() => props.draw, () => {
-  createEmptyTicketEntries()
+watch(() => props.draw?.id, (newId, oldId) => {
+  if (newId !== undefined && newId !== oldId) {
+    createEmptyTicketEntries()
+  }
 }, { immediate: true })
 
 onMounted(() => {
