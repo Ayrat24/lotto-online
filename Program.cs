@@ -172,8 +172,22 @@ app.UseStaticFiles(new StaticFileOptions { ContentTypeProvider = provider });
 if (localDebugEnabled)
 {
     EnsureFrontendDistExists(app.Environment.ContentRootPath, app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("FrontendDebug"));
+}
 
-    var frontendDistPath = ResolveFrontendDistPath(app.Environment.ContentRootPath);
+// Serve frontend dist from /dist path (frontend/dist -> /dist/*)
+var frontendDistPath = ResolveFrontendDistPath(app.Environment.ContentRootPath);
+if (Directory.Exists(frontendDistPath))
+{
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(frontendDistPath),
+        RequestPath = "/dist",
+        ContentTypeProvider = provider
+    });
+}
+
+if (localDebugEnabled)
+{
     var frontendAssetsPath = Path.Combine(frontendDistPath, "assets");
     var frontendJsPath = Path.Combine(frontendAssetsPath, "index.js");
     var frontendCssPath = Path.Combine(frontendAssetsPath, "index.css");
