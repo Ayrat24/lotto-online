@@ -112,33 +112,18 @@ const numberGrid = computed(() => {
   return numbers
 })
 
-function selectedIndexOf(ticket, number) {
-  return ticket.selectedNumbers.indexOf(number)
+function isNumberSelected(ticket, number) {
+  return ticket.selectedNumbers.includes(number)
 }
 
-function remainingLabelFor(ticket) {
-  const remaining = Math.max(0, ticket.numbersPerTicket - ticket.selectedNumbers.length)
-  return 'Выберите еще ' + remaining + ' число(а)'
+function remainingCount(ticket) {
+  return Math.max(0, ticket.numbersPerTicket - ticket.selectedNumbers.length)
 }
 
-function formattedTicketCost(amount) {
-  return formatCurrency(amount)
-}
-
-function canPurchase(ticket) {
-  return ticket.selectedNumbers.length === ticket.numbersPerTicket
-}
-
-async function purchaseTicket(ticketId) {
-  const ticket = ticketEntries.value.find(t => t.id === ticketId)
-  if (!ticket || ticket.selectedNumbers.length !== ticket.numbersPerTicket || purchasing.value) return
-  await purchaseSelectedTickets([ticket.selectedNumbers])
-}
-
-async function purchaseSelectedTickets(forcedTickets) {
+async function purchaseSelectedTickets() {
   if (!props.draw || purchasing.value) return
 
-  const tickets = forcedTickets || ticketEntries.value
+  const tickets = ticketEntries.value
     .filter(ticket => ticket.selectedNumbers.length === ticket.numbersPerTicket)
     .map(ticket => ticket.selectedNumbers)
 
@@ -179,328 +164,340 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="element-HOME">
-    <div class="container-7">
-      <div class="container-8">
-        <img
-          class="back-button"
-          alt="Back"
-          src="https://c.animaapp.com/c5LmgKAe/img/background-border-shadow.svg"
-          @click="handleBack"
-        />
-        <div class="container-9">
-          <div class="text-wrapper-15">{{ texts.title }}</div>
+  <div class="ticket-selection-screen">
+    <!-- Header Row: Back button + Title -->
+    <div class="ts-header">
+      <button class="ts-back-btn" type="button" @click="handleBack">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M10 12L6 8L10 4" stroke="#0F0F12" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <h1 class="ts-title">{{ texts.title }}</h1>
+    </div>
+
+    <!-- Instructions -->
+    <div v-if="!loading && !error && draw" class="ts-instructions">
+      <p class="ts-instructions-main">Заполните один или несколько билетов, чтобы купить их вместе.</p>
+      <p class="ts-instructions-hint">Заполните хотя бы один билет, чтобы продолжить.</p>
+    </div>
+
+    <!-- Loading/Error States -->
+    <div v-if="loading" class="ts-state-message">
+      {{ texts.loadingText }}
+    </div>
+    <div v-else-if="error" class="ts-state-message ts-state-message--error">
+      {{ error }}
+    </div>
+    <div v-else-if="!draw" class="ts-state-message">
+      {{ texts.noDrawText || 'No active draw available.' }}
+    </div>
+
+    <!-- Ticket Cards -->
+    <div v-else class="ts-tickets-list">
+      <div
+        v-for="ticket in ticketEntries"
+        :key="ticket.id"
+        class="ts-ticket-card"
+      >
+        <!-- Ticket Title -->
+        <div class="ts-ticket-title">Билет {{ ticket.ticketNumber }}</div>
+        <div class="ts-ticket-subtitle">Выберите еще {{ remainingCount(ticket) }} число(а)</div>
+
+        <!-- Progress Slots -->
+        <div class="ts-slots">
+          <div
+            v-for="slot in ticket.numbersPerTicket"
+            :key="'slot-' + ticket.ticketNumber + '-' + slot"
+            :class="['ts-slot', { 'ts-slot--filled': slot <= ticket.selectedNumbers.length }]"
+          />
+        </div>
+
+        <!-- Counter -->
+        <div class="ts-counter">{{ ticket.selectedNumbers.length }}/{{ ticket.numbersPerTicket }}</div>
+
+        <!-- Number Grid -->
+        <div class="ts-number-grid">
+          <button
+            v-for="num in numberGrid"
+            :key="'num-' + ticket.ticketNumber + '-' + num"
+            :class="['ts-number-btn', { 'ts-number-btn--selected': isNumberSelected(ticket, num) }]"
+            type="button"
+            @click="toggleNumber(ticket.id, num)"
+          >
+            {{ num }}
+          </button>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="ts-actions">
+          <button class="ts-action-btn ts-action-btn--secondary" type="button" @click="randomizeTicket(ticket.id)">
+            Случайные числа
+          </button>
+          <button class="ts-action-btn ts-action-btn--primary" type="button" @click="clearTicket(ticket.id)">
+            Очистить
+          </button>
         </div>
       </div>
+    </div>
 
-      <div v-if="loading" class="state-message">
-        {{ texts.loadingText }}
-      </div>
-      <div v-else-if="error" class="state-message state-message--error">
-        {{ error }}
-      </div>
-      <div v-else-if="!draw" class="state-message">
-        {{ texts.noDrawText || 'No active draw available.' }}
-      </div>
-      <div v-else class="tickets-list">
-        <div
-          v-for="ticket in ticketEntries"
-          :key="ticket.id"
-          class="ticket-card"
-        >
-          <div class="ticket-card__title-row">
-            <div class="ticket-card__title">{{ texts.ticketLabel || 'Билет' }} {{ ticket.ticketNumber }}</div>
-            <div class="ticket-card__subtitle">{{ remainingLabelFor(ticket) }}</div>
-          </div>
+    <!-- Purchase Bar -->
+    <div v-if="showPurchaseBar && !loading && !error && draw" class="ts-purchase-bar">
+      <button class="ts-purchase-btn" type="button" @click="purchaseSelectedTickets()">
+        {{ purchasing ? texts.purchasingText : texts.purchaseText }} · {{ formatCurrency(selectedTicketsTotalCost) }}
+      </button>
+    </div>
 
-          <div class="ticket-card__slots">
-            <div
-              v-for="slot in ticket.numbersPerTicket"
-              :key="'slot-' + ticket.ticketNumber + '-' + slot"
-              :class="slot <= ticket.selectedNumbers.length ? 'ticket-card__slot ticket-card__slot--filled' : 'ticket-card__slot'"
-            />
-          </div>
-
-          <div class="ticket-card__counter">{{ ticket.selectedNumbers.length }}/{{ ticket.numbersPerTicket }}</div>
-
-          <div class="ticket-card__grid">
-            <button
-              v-for="num in numberGrid"
-              :key="'num-' + ticket.ticketNumber + '-' + num"
-              :class="selectedIndexOf(ticket, num) >= 0 ? 'ticket-card__number ticket-card__number--selected' : 'ticket-card__number'"
-              type="button"
-              @click="toggleNumber(ticket.id, num)"
-            >
-              <span>{{ num }}</span>
-            </button>
-          </div>
-
-          <div class="ticket-card__actions">
-            <button class="ticket-card__button ticket-card__button--secondary" type="button" @click="randomizeTicket(ticket.id)">
-              {{ texts.randomizeText || 'СЛУЧАЙНЫЕ ЧИСЛА' }}
-            </button>
-            <button class="ticket-card__button ticket-card__button--primary" type="button" @click="clearTicket(ticket.id)">
-              {{ texts.clearText || 'ОЧИСТИТЬ' }}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div v-if="showPurchaseBar && !loading && !error && draw" class="purchase-card">
-        <div class="purchase-card__title">{{ texts.purchaseSummaryTitle || 'Итоговая покупка' }}</div>
-        <div class="purchase-card__subtitle">{{ texts.purchaseSummarySubtitle || 'Готовы купить все заполненные билеты по общей стоимости' }}</div>
-        <button class="purchase-card__button" type="button" @click="purchaseSelectedTickets()">
-          {{ texts.purchaseText }} · {{ formatCurrency(selectedTicketsTotalCost) }}
-        </button>
-      </div>
-
-      <div v-if="purchaseError" class="purchase-error">
-        {{ purchaseError }}
-      </div>
+    <!-- Error Message -->
+    <div v-if="purchaseError" class="ts-purchase-error">
+      {{ purchaseError }}
     </div>
   </div>
 </template>
 
-<style>
-.element-HOME {
-  align-items: center;
-  background-color: #ffffff;
+<style scoped>
+.ticket-selection-screen {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 14px;
-  min-height: 100%;
-  padding: 18px 0px 0px;
-  position: relative;
   width: 100%;
-}
-
-.element-HOME .container-7 {
-  align-items: center;
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 14px;
-  overflow-y: auto;
-  position: relative;
-  width: 390px;
-  max-width: 100%;
+  max-width: 390px;
   padding-bottom: 20px;
 }
 
-.element-HOME .container-7::-webkit-scrollbar {
-  display: none;
-  width: 0;
-}
-
-.element-HOME .container-8 {
-  align-items: center;
-  align-self: stretch;
+/* Header */
+.ts-header {
   display: flex;
-  flex: 0 0 auto;
+  align-items: center;
   gap: 12px;
-  padding: 0px 20px;
-  position: relative;
   width: 100%;
+  padding: 0 20px;
 }
 
-.element-HOME .back-button {
-  height: 40px;
+.ts-back-btn {
+  display: flex;
+  justify-content: center;
+  align-items: center;
   width: 40px;
+  height: 40px;
+  background: #FAFAF7;
+  border: 1px solid rgba(15, 15, 20, 0.06);
+  border-radius: 14px;
+  box-shadow: 0px 1px 2px rgba(15, 15, 20, 0.04), 0px 4px 20px rgba(15, 15, 20, 0.04);
   cursor: pointer;
   flex-shrink: 0;
 }
 
-.element-HOME .container-9 {
-  align-items: flex-start;
-  display: inline-flex;
-  flex: 0 0 auto;
-  flex-direction: column;
-  position: relative;
-}
-
-.element-HOME .text-wrapper-15 {
-  align-items: center;
-  color: #0f0f12;
-  display: flex;
-  font-family: "Manrope", Helvetica;
-  font-size: 24px;
+.ts-title {
+  font-family: 'Manrope', Helvetica, sans-serif;
   font-weight: 800;
+  font-size: 24px;
   letter-spacing: -0.5px;
-  line-height: normal;
-  margin-top: -1px;
-  position: relative;
-  width: fit-content;
+  color: #0F0F12;
+  margin: 0;
 }
 
-.state-message {
+/* Instructions */
+.ts-instructions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  padding: 0 20px 0 44px;
+}
+
+.ts-instructions-main {
+  font-family: 'Manrope', Helvetica, sans-serif;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 12px;
+  color: #8A8A8A;
+  margin: 0;
+}
+
+.ts-instructions-hint {
+  font-family: 'Manrope', Helvetica, sans-serif;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 12px;
+  color: #8A8A8A;
+  margin: 0;
+}
+
+/* State Messages */
+.ts-state-message {
   padding: 40px 20px;
   text-align: center;
   color: #3f3f46;
   font-size: 14px;
-  font-family: "Manrope", Helvetica;
+  font-family: 'Manrope', Helvetica, sans-serif;
 }
 
-.state-message--error {
+.ts-state-message--error {
   color: #b42318;
 }
 
-.tickets-list {
+/* Tickets List */
+.ts-tickets-list {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  width: 100%;
   padding: 0 20px;
-  width: 100%;
 }
 
-.ticket-card,
-.purchase-card {
-  align-items: flex-start;
-  background-color: #ffffff;
-  border: 1px solid #e7e7e7;
-  border-radius: 24px;
-  box-shadow: 0 1px 2px rgba(15, 15, 20, 0.04), 0 4px 20px rgba(15, 15, 20, 0.04);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 20px 18px 18px;
-  width: 100%;
-}
-
-.ticket-card__title-row {
+/* Ticket Card */
+.ts-ticket-card {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  width: 100%;
+  padding: 22px;
+  background: #FFFFFF;
+  border: 1px solid #E7E7E7;
+  border-radius: 22px;
+  box-shadow: 0px 1px 2px rgba(15, 15, 20, 0.04), 0px 4px 20px rgba(15, 15, 20, 0.04);
 }
 
-.ticket-card__title {
-  color: #1a1c1e;
-  font-family: "Manrope", Helvetica;
-  font-size: 18px;
+.ts-ticket-title {
+  font-family: 'Manrope', Helvetica, sans-serif;
   font-weight: 800;
-  line-height: 1.1;
+  font-size: 18px;
+  color: #1A1C1E;
 }
 
-.ticket-card__subtitle {
-  color: #6c727a;
-  font-family: "Inter", Helvetica;
+.ts-ticket-subtitle {
+  font-family: 'Inter', Helvetica, sans-serif;
+  font-weight: 400;
   font-size: 13px;
-  line-height: 1.2;
+  color: #6C727A;
 }
 
-.ticket-card__slots {
+/* Progress Slots */
+.ts-slots {
   display: flex;
   gap: 6px;
-  padding-top: 2px;
-  width: 100%;
+  padding-top: 11px;
 }
 
-.ticket-card__slot {
-  background: #e7e7e7;
-  border-radius: 999px;
+.ts-slot {
+  flex: 1;
   height: 7px;
-  flex: 1 1 0;
+  background: #E7E7E7;
+  border-radius: 4px;
 }
 
-.ticket-card__slot--filled {
-  background: #ffb929;
+.ts-slot--filled {
+  background: #FFB929;
 }
 
-.ticket-card__counter {
-  color: #1a1c1e;
-  font-family: "Manrope", Helvetica;
-  font-size: 13px;
+/* Counter */
+.ts-counter {
+  font-family: 'Manrope', Helvetica, sans-serif;
   font-weight: 700;
-}
-
-.ticket-card__grid {
-  display: grid;
-  gap: 4px;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  font-size: 13px;
+  color: #1A1C1E;
   padding-top: 6px;
-  width: 100%;
 }
 
-.ticket-card__number {
+/* Number Grid */
+.ts-number-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 3px;
+  padding-top: 11px;
+}
+
+.ts-number-btn {
+  display: flex;
+  justify-content: center;
   align-items: center;
-  aspect-ratio: 1;
-  background: #ffffff;
-  border: 1px solid #e7e7e7;
+  height: 45px;
+  background: #FFFFFF;
+  border: 1px solid #E7E7E7;
   border-radius: 11px;
-  color: #18a957;
+  font-family: 'Manrope', Helvetica, sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: #1A1C1E;
   cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ts-number-btn:hover {
+  border-color: #FFB929;
+}
+
+.ts-number-btn--selected {
+  border-color: #FFB929;
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.08);
+}
+
+/* Action Buttons */
+.ts-actions {
+  display: flex;
+  gap: 11px;
+  padding-top: 18px;
+}
+
+.ts-action-btn {
   display: flex;
   justify-content: center;
-  padding: 0;
-  width: 100%;
-  min-height: 40px;
-  font-family: "Manrope", Helvetica;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.ticket-card__number--selected {
-  border-color: #ffb929;
-  box-shadow: 0 4px 10px rgba(15, 15, 20, 0.08);
-}
-
-.ticket-card__actions {
-  display: flex;
-  gap: 12px;
-  padding-top: 10px;
-  width: 100%;
-}
-
-.ticket-card__button,
-.purchase-card__button {
   align-items: center;
-  border: 1px solid rgba(15, 15, 20, 0.06);
-  border-radius: 999px;
-  box-shadow: 0 1px 2px rgba(15, 15, 20, 0.04), 0 4px 20px rgba(15, 15, 20, 0.04);
-  cursor: pointer;
-  display: flex;
-  height: 44px;
-  justify-content: center;
+  height: 45px;
   padding: 0 18px;
-  font-family: "Manrope", Helvetica;
-  font-size: 13px;
+  border-radius: 100px;
+  font-family: 'Manrope', Helvetica, sans-serif;
   font-weight: 700;
-  color: #0f0f12;
-  white-space: nowrap;
-}
-
-.ticket-card__button--secondary {
-  background: #ffffff;
-  flex: 1;
-}
-
-.ticket-card__button--primary,
-.purchase-card__button {
-  background: #ffb929;
-  flex: 1;
-}
-
-.purchase-card {
-  margin: 0 20px 20px;
-}
-
-.purchase-card__title {
-  color: #1a1c1e;
-  font-family: "Manrope", Helvetica;
-  font-size: 18px;
-  font-weight: 800;
-}
-
-.purchase-card__subtitle {
-  color: #6c727a;
-  font-family: "Inter", Helvetica;
   font-size: 13px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  cursor: pointer;
+  border: 1px solid rgba(15, 15, 20, 0.06);
+  box-shadow: 0px 1px 2px rgba(15, 15, 20, 0.04), 0px 4px 20px rgba(15, 15, 20, 0.04);
 }
 
-.purchase-error {
+.ts-action-btn--secondary {
+  background: #FFFFFF;
+  color: #0F0F12;
+  flex-shrink: 0;
+}
+
+.ts-action-btn--primary {
+  background: #FFB929;
+  color: #0F0F12;
+  flex: 1;
+}
+
+/* Purchase Bar */
+.ts-purchase-bar {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 40px);
+  max-width: 350px;
+  z-index: 50;
+}
+
+.ts-purchase-btn {
+  width: 100%;
+  height: 52px;
+  background: #FFB929;
+  border: 1px solid rgba(15, 15, 20, 0.06);
+  border-radius: 100px;
+  box-shadow: 0px 1px 2px rgba(15, 15, 20, 0.04), 0px 4px 20px rgba(15, 15, 20, 0.04);
+  font-family: 'Manrope', Helvetica, sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: #0F0F12;
+  cursor: pointer;
+}
+
+/* Purchase Error */
+.ts-purchase-error {
   padding: 10px 20px;
   color: #b42318;
-  font-family: "Manrope", Helvetica;
+  font-family: 'Manrope', Helvetica, sans-serif;
   font-size: 14px;
   text-align: center;
 }

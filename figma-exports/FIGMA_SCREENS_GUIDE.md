@@ -313,3 +313,115 @@ Ensure your screen content has `padding-bottom: 100px` or more.
 1. Check CSS class names match between JS and CSS
 2. Verify CSS is in `wwwroot/dist/assets/index.css`
 3. Check for CSS specificity conflicts
+
+---
+
+## Critical CSS Rules (MUST FOLLOW)
+
+These rules prevent common issues that cause screens to appear blank or broken:
+
+### 1. Never Use Fixed Heights on Screen Containers
+
+**❌ BAD - Causes blank screens:**
+```css
+.my-screen {
+  height: 840px;      /* Fixed height clips content */
+  overflow: hidden;   /* Hides overflowing content */
+}
+```
+
+**✅ GOOD - Flexible layout:**
+```css
+.my-screen {
+  min-height: 100%;   /* Grows with content */
+  display: flex;
+  flex-direction: column;
+}
+```
+
+### 2. Use Unique, Scoped Class Names
+
+**❌ BAD - Generic names cause conflicts:**
+```css
+.background-border { ... }  /* May conflict with other screens */
+.container { ... }          /* Too generic */
+```
+
+**✅ GOOD - Screen-prefixed names:**
+```css
+.ts-back-btn { ... }        /* ts = ticket-selection */
+.hs-banner { ... }          /* hs = home-screen */
+```
+
+### 3. Always Use `scoped` Styles in Vue Components
+
+```vue
+<style scoped>
+/* Styles only apply to this component */
+.my-class { ... }
+</style>
+```
+
+### 4. Ensure Proper Scrolling
+
+```css
+/* Screen content should scroll, not be clipped */
+.screen-content {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 100px; /* Space for tab bar */
+}
+```
+
+### 5. Test Both Data States
+
+Always verify screens work with:
+- **Data present**: Normal rendering
+- **Data missing/null**: Loading states, error messages, empty states
+
+Add console logging during development:
+```javascript
+console.log('[ScreenName] data:', { prop1, prop2 })
+```
+
+---
+
+## Figma-to-Code Translation Guide
+
+When implementing Figma designs:
+
+| Figma Property | CSS Equivalent |
+|----------------|----------------|
+| `layout: column` | `display: flex; flex-direction: column;` |
+| `layout: row` | `display: flex; flex-direction: row;` |
+| `gap: 14px` | `gap: 14px;` |
+| `padding: 22px` | `padding: 22px;` |
+| `borderRadius: 22px` | `border-radius: 22px;` |
+| `fill: #FFFFFF` | `background: #FFFFFF;` |
+| `stroke: #E7E7E7` | `border: 1px solid #E7E7E7;` |
+| `effects: boxShadow` | `box-shadow: ...;` |
+| `sizing: fill` | `flex: 1;` or `width: 100%;` |
+| `sizing: hug` | `width: fit-content;` |
+
+### Common Figma Colors in This Project
+
+| Color | Usage |
+|-------|-------|
+| `#0F0F12` | Primary text |
+| `#1A1C1E` | Dark text |
+| `#6C727A` | Secondary text |
+| `#8A8A8A` | Muted text |
+| `#E7E7E7` | Borders |
+| `#FAFAF7` | Light backgrounds |
+| `#FFB929` | Primary accent (yellow) |
+| `#1AA873` | Success/balance (green) |
+
+### Common Figma Fonts
+
+| Style | CSS |
+|-------|-----|
+| Title | `font-family: 'Manrope'; font-weight: 800; font-size: 24px;` |
+| Subtitle | `font-family: 'Manrope'; font-weight: 700; font-size: 18px;` |
+| Body | `font-family: 'Manrope'; font-weight: 500; font-size: 14px;` |
+| Caption | `font-family: 'Manrope'; font-weight: 400; font-size: 12px;` |
+| Button | `font-family: 'Manrope'; font-weight: 700; font-size: 13px; text-transform: uppercase;` |
