@@ -21,11 +21,7 @@ function resolveInitData() {
   const params = new URLSearchParams(window.location.search || '')
   const forceLocalDebug = params.get('debug') === '1' || params.get('mode') === 'local-debug'
   const telegramInitData = getTelegramInitData()
-
-  if (forceLocalDebug || !telegramInitData) {
-    return { initData: 'local-debug', isLocalDebug: true }
-  }
-
+  if (forceLocalDebug || !telegramInitData) return { initData: 'local-debug', isLocalDebug: true }
   return { initData: telegramInitData, isLocalDebug: false }
 }
 
@@ -35,23 +31,15 @@ async function postJson(url, payload) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload ?? {})
   })
-
+  const text = await response.text()
   let data = null
-  try {
-    data = await response.json()
-  } catch {
-    data = null
-  }
-
+  try { data = text ? JSON.parse(text) : null } catch { data = null }
   if (!response.ok) {
     const message = data && (data.error || data.title || data.message)
       ? String(data.error || data.title || data.message)
       : `Request failed: ${response.status}`
-    const error = new Error(message)
-    error.status = response.status
-    throw error
+    throw new Error(message)
   }
-
   return data
 }
 
@@ -71,16 +59,11 @@ function formatJackpot(value, locale = 'en-US') {
 function formatCountdown(targetUtc) {
   const targetMs = Date.parse(targetUtc || '')
   if (!Number.isFinite(targetMs)) return 'Schedule pending'
-
   const remaining = Math.max(0, Math.floor((targetMs - Date.now()) / 1000))
   const hours = Math.floor(remaining / 3600)
   const minutes = Math.floor((remaining % 3600) / 60)
   const seconds = remaining % 60
-
-  if (hours > 0) {
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
-  }
-
+  if (hours > 0) return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
@@ -92,10 +75,11 @@ function compareDraws(mode) {
     const bJackpot = Number(b?.prizePoolMatch5 || 0)
     const aCost = Number(a?.ticketCost || 0)
     const bCost = Number(b?.ticketCost || 0)
-
-    if (mode === DRAW_SORTS.jackpot) return bJackpot - aJackpot || aClose - bClose || aCost - bCost || b.id - a.id
-    if (mode === DRAW_SORTS.cheap) return aCost - bCost || bJackpot - aJackpot || aClose - bClose || b.id - a.id
-    return aClose - bClose || bJackpot - aJackpot || aCost - bCost || b.id - a.id
+    const aId = Number(a?.id || 0)
+    const bId = Number(b?.id || 0)
+    if (mode === DRAW_SORTS.jackpot) return bJackpot - aJackpot || aClose - bClose || aCost - bCost || bId - aId
+    if (mode === DRAW_SORTS.cheap) return aCost - bCost || bJackpot - aJackpot || aClose - bClose || bId - aId
+    return aClose - bClose || bJackpot - aJackpot || aCost - bCost || bId - aId
   }
 }
 
@@ -116,18 +100,57 @@ const state = reactive({
 let timerId = null
 let pollId = null
 
+const texts = {
+  newsTitle: 'Последние новости',
+  bannerBadge: 'АНОНС',
+  balanceLabel: 'БАЛАНС',
+  jackpotLabel: 'ДЖЕКПОТ',
+  ticketPriceLabel: 'ЦЕНА БИЛЕТА',
+  loadingText: 'Loading home screen…',
+  emptyDrawsText: 'There are no active draws right now.',
+  offersTitle: 'Сегодняшние предложения',
+  seeAllText: 'Смотреть все',
+  homeTab: 'Главная',
+  ticketsTab: 'Мои билеты',
+  winnersTab: 'Победители',
+  profileTab: 'Профиль',
+  closestSort: 'Ближайший тираж',
+  jackpotSort: 'Высокий суперприз',
+  cheapSort: 'Сначала дешевле'
+}
+
 const intlLocale = computed(() => state.locale === 'ru' ? 'ru-RU' : state.locale === 'uz' ? 'uz-UZ' : 'en-US')
-const activeDraws = computed(() => {
-  const draws = Array.isArray(state.timeline?.activeDraws) ? state.timeline.activeDraws.slice() : []
-  return draws
-    .filter(draw => draw && draw.state === 'active' && draw.canPurchase !== false)
-    .sort(compareDraws(state.sortMode))
-})
-const featuredBanner = computed(() => state.banners[0] || null)
 const userName = computed(() => {
   const value = [state.user.firstName, state.user.lastName].filter(Boolean).join(' ').trim()
   return value || state.user.username || 'Player'
 })
+const avatarLetter = computed(() => userName.value.slice(0, 1).toUpperCase())
+const featuredBanner = computed(() => state.banners[0] || null)
+const sortOptions = computed(() => ([
+  { value: DRAW_SORTS.closest, label: texts.closestSort },
+  { value: DRAW_SORTS.jackpot, label: texts.jackpotSort },
+  { value: DRAW_SORTS.cheap, label: texts.cheapSort }
+]))
+const activeDraws = computed(() => {
+  const draws = Array.isArray(state.timeline?.activeDraws) ? state.timeline.activeDraws.slice() : []
+  return draws.filter(draw => draw && draw.state === 'active' && draw.canPurchase !== false).sort(compareDraws(state.sortMode))
+})
+const formattedDraws = computed(() => activeDraws.value.map((draw, index) => {
+  const color = String(draw?.cardColor || 'gold').toLowerCase()
+  return {
+    id: draw.id,
+    title: `Тираж #${draw.id}`,
+    countdown: formatCountdown(draw.purchaseClosesAtUtc),
+    jackpot: formatJackpot(draw.prizePoolMatch5, intlLocale.value),
+    ticketPrice: formatCurrency(draw.ticketCost, intlLocale.value).replace('.', ','),
+    theme: color === 'blue' || index % 2 === 1 ? 'blue' : 'orange'
+  }
+}))
+const bannerTitle = computed(() => featuredBanner.value?.title || featuredBanner.value?.name || 'Не знаешь, как получить крипту?')
+const bannerSubtitle = computed(() => featuredBanner.value?.subtitle || featuredBanner.value?.description || 'Переходи по ссылке в боте')
+
+const primaryOffer = { kicker: 'БОНУС НОВИЧКА', title: '3 бесплатных билета', actionText: 'Получить' }
+const secondaryOffer = { kicker: 'ПРИГЛАШАЙ И ЗАРАБАТЫВАЙ', title: '$5 за каждого друга', actionText: 'Поделиться' }
 
 async function loadLocale() {
   const res = await postJson('/api/localization/bootstrap', { initData: state.initData, locale: state.locale })
@@ -177,13 +200,9 @@ onMounted(() => {
       window.Telegram.WebApp.ready()
       window.Telegram.WebApp.expand()
     }
-  } catch {
-  }
-
+  } catch {}
   loadAll()
-  timerId = window.setInterval(() => {
-    state.nowTick = Date.now()
-  }, 1000)
+  timerId = window.setInterval(() => { state.nowTick = Date.now() }, 1000)
   pollId = window.setInterval(() => {
     loadTimeline().catch(() => {})
     loadBanners().catch(() => {})
@@ -197,66 +216,90 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="home-page">
-    <header class="topbar">
-      <div class="brand-block">
-        <div class="avatar">{{ userName.slice(0, 1).toUpperCase() }}</div>
-        <div>
-          <div class="brand-name">{{ userName }}</div>
-          <div v-if="state.isLocalDebug" class="brand-meta">Local debug mode</div>
+  <div class="element-home">
+    <div class="container-16">
+      <header class="brand-row-wrapper">
+        <div class="container-12">
+          <div class="background-shadow-4"><div class="text-wrapper-22">{{ avatarLetter }}</div></div>
+          <div class="container-13">
+            <div class="text-wrapper-23">{{ userName }}</div>
+            <p class="text-wrapper-24">3 билета в игре · 1 выигрыш</p>
+          </div>
         </div>
-      </div>
+        <div class="container-14">
+          <div class="container-15"><div class="text-wrapper-25">{{ texts.balanceLabel }}</div></div>
+          <div class="container-15"><div class="text-wrapper-26">{{ formatCurrency(state.user.balance, intlLocale).replace('.', ',') }}</div></div>
+        </div>
+      </header>
 
-      <div class="balance-card">
-        <div class="balance-label">Balance</div>
-        <div class="balance-value">{{ formatCurrency(state.user.balance, intlLocale) }}</div>
-      </div>
-    </header>
+      <div class="news"><div class="text-wrapper-27">{{ texts.newsTitle }}</div></div>
 
-    <main class="home-content">
-      <section v-if="featuredBanner" class="news-section">
-        <div class="section-title">Latest news</div>
-        <article class="news-banner">
-          <img class="news-banner-image" :src="featuredBanner.imageUrl" alt="News banner" />
+      <section class="margin-subsection">
+        <div class="background-border">
+          <img v-if="featuredBanner?.imageUrl" class="image-dynamic" :src="featuredBanner.imageUrl" alt="Banner image" />
+          <div class="background"><div class="div" /><div class="text-wrapper">{{ texts.bannerBadge }}</div></div>
+          <p class="p">{{ bannerTitle }}</p>
+          <p class="text-wrapper-2">{{ bannerSubtitle }}</p>
+          <div class="container"><div class="background-2" /><div class="background-3" /><div class="background-3" /><div class="background-3" /></div>
+        </div>
+      </section>
+
+      <section class="segmented-margin-subsection">
+        <button v-for="option in sortOptions" :key="option.value" :class="option.value === state.sortMode ? 'div-wrapper' : 'border'" type="button" @click="state.sortMode = option.value">
+          <div :class="option.value === state.sortMode ? 'text-wrapper-3' : 'text-wrapper-4'">{{ option.label }}</div>
+        </button>
+      </section>
+
+      <section class="draw-cards-subsection">
+        <div v-if="state.loading || state.error || !formattedDraws.length" class="draw-status-card" :class="{ 'draw-status-card-error': !!state.error }">
+          <template v-if="state.loading">{{ texts.loadingText }}</template>
+          <template v-else-if="state.error">{{ state.error }}</template>
+          <template v-else>{{ texts.emptyDrawsText }}</template>
+        </div>
+        <article v-for="draw in formattedDraws" v-else :key="draw.id" :class="draw.theme === 'blue' ? 'background-shadow-2' : 'background-shadow'">
+          <div class="container-2">
+            <div class="container-3"><div class="text-wrapper-5">{{ draw.title }}</div></div>
+            <div class="overlay"><div class="text-wrapper-6">{{ draw.countdown }}</div></div>
+          </div>
+          <div class="container-4">
+            <div class="container-5"><div class="text-wrapper-7">{{ texts.jackpotLabel }}</div></div>
+            <div class="container-5"><div :class="draw.theme === 'blue' ? 'text-wrapper-11' : 'text-wrapper-8'">{{ draw.jackpot }}</div></div>
+          </div>
+          <div class="overlay-overlayblur">
+            <div class="container-3"><div class="text-wrapper-9">{{ texts.ticketPriceLabel }}</div></div>
+            <div class="container-3"><div class="text-wrapper-10">{{ draw.ticketPrice }}</div></div>
+          </div>
         </article>
       </section>
 
-      <section class="sort-tabs">
-        <button :class="['sort-tab', { active: state.sortMode === DRAW_SORTS.closest }]" @click="state.sortMode = DRAW_SORTS.closest">Closest draw</button>
-        <button :class="['sort-tab', { active: state.sortMode === DRAW_SORTS.jackpot }]" @click="state.sortMode = DRAW_SORTS.jackpot">Biggest jackpot</button>
-        <button :class="['sort-tab', { active: state.sortMode === DRAW_SORTS.cheap }]" @click="state.sortMode = DRAW_SORTS.cheap">Cheapest tickets</button>
+      <section class="container-subsection">
+        <div class="text-wrapper-12">{{ texts.offersTitle }}</div>
+        <div class="background-border-2"><div class="text-wrapper-13">{{ texts.seeAllText }}</div></div>
       </section>
 
-      <section class="draws-section">
-        <div class="section-title">Draw cards</div>
-        <div v-if="state.loading" class="status-card">Loading home screen…</div>
-        <div v-else-if="state.error" class="status-card status-card-error">
-          <div>{{ state.error }}</div>
-          <button class="retry-btn" @click="loadAll">Retry</button>
+      <section class="container-wrapper-subsection">
+        <div class="background-4">
+          <div class="container-6">
+            <div class="container-7"><div class="text-wrapper-14">{{ primaryOffer.kicker }}</div><div class="text-wrapper-15">{{ primaryOffer.title }}</div></div>
+            <div class="background-5"><div class="text-wrapper-16">{{ primaryOffer.actionText }}</div></div>
+          </div>
+          <div class="background-6" /><div class="background-7" />
         </div>
-        <div v-else-if="!activeDraws.length" class="status-card">There are no active draws right now.</div>
-        <div v-else class="draw-list">
-          <article v-for="draw in activeDraws" :key="draw.id" :class="['draw-card', 'draw-card-' + (draw.cardColor || 'gold').toLowerCase()]">
-            <div class="draw-card-top">
-              <div class="draw-title">Draw #{{ draw.id }}</div>
-              <div class="draw-timer">{{ formatCountdown(draw.purchaseClosesAtUtc) }}</div>
-            </div>
-            <div class="draw-jackpot-label">Jackpot</div>
-            <div class="draw-jackpot-value">{{ formatJackpot(draw.prizePoolMatch5, intlLocale) }}</div>
-            <div class="draw-footer">
-              <div>
-                <div class="draw-cost-label">Ticket cost</div>
-                <div class="draw-cost-value">{{ formatCurrency(draw.ticketCost, intlLocale) }}</div>
-              </div>
-              <div class="draw-badges">
-                <span class="draw-badge">3: {{ formatCurrency(draw.prizePoolMatch3, intlLocale, 0) }}</span>
-                <span class="draw-badge">4: {{ formatCurrency(draw.prizePoolMatch4, intlLocale, 0) }}</span>
-                <span class="draw-badge">5: {{ formatCurrency(draw.prizePoolMatch5, intlLocale, 0) }}</span>
-              </div>
-            </div>
-          </article>
+        <div class="background-border-3">
+          <div class="container-8">
+            <div class="container-7"><div class="text-wrapper-17">{{ secondaryOffer.kicker }}</div><div class="text-wrapper-18">{{ secondaryOffer.title }}</div></div>
+            <div class="background-8"><div class="text-wrapper-19">{{ secondaryOffer.actionText }}</div></div>
+          </div>
+          <div class="background-9" /><div class="background-10" />
         </div>
       </section>
-    </main>
+    </div>
+
+    <nav class="tab-bar-subsection">
+      <div class="background-shadow-3"><div class="tab-icon">⌂</div><div class="container-10"><div class="text-wrapper-20">{{ texts.homeTab }}</div></div></div>
+      <div class="container-11"><div class="tab-icon tab-icon-muted">≣</div><div class="container-10"><div class="text-wrapper-21">{{ texts.ticketsTab }}</div></div></div>
+      <div class="container-11"><div class="tab-icon tab-icon-muted">⌕</div><div class="container-10"><div class="text-wrapper-21">{{ texts.winnersTab }}</div></div></div>
+      <div class="container-11"><div class="tab-icon tab-icon-muted">◌</div><div class="container-10"><div class="text-wrapper-21">{{ texts.profileTab }}</div></div></div>
+    </nav>
   </div>
 </template>

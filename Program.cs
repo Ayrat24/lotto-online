@@ -428,17 +428,35 @@ static void EnsureFrontendDistExists(string contentRootPath, ILogger logger)
 
     try
     {
-        var npmCommand = OperatingSystem.IsWindows() ? "npm.cmd" : "npm";
-        var startInfo = new System.Diagnostics.ProcessStartInfo
+        var workingDirectory = frontendPath;
+        System.Diagnostics.ProcessStartInfo startInfo;
+
+        if (OperatingSystem.IsWindows())
         {
-            FileName = npmCommand,
-            Arguments = "run build",
-            WorkingDirectory = frontendPath,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
+            startInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = "/c npm run build",
+                WorkingDirectory = workingDirectory,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+        }
+        else
+        {
+            startInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "npm",
+                Arguments = "run build",
+                WorkingDirectory = workingDirectory,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+        }
 
         using var process = System.Diagnostics.Process.Start(startInfo);
         if (process is null)

@@ -129,9 +129,9 @@
     var locale = getIntlLocale();
 
     var bannerHtml = featuredBanner
-      ? '<section class="news-section"><div class="section-title">Latest news</div><article class="news-banner">'
+      ? '<section class="news-section"><div class="section-title">Последние новости</div><article class="news-banner figma-banner">'
         + '<img class="news-banner-image" src="' + String(featuredBanner.imageUrl || '') + '" alt="News banner"></article></section>'
-      : '';
+      : '<section class="news-section"><div class="section-title">Последние новости</div><article class="news-banner figma-banner news-banner-placeholder"></article></section>';
 
     var statusHtml = '';
     if (state.loading) {
@@ -144,39 +144,58 @@
 
     var drawCardsHtml = activeDraws.map(function (draw) {
       var color = String((draw && draw.cardColor) || 'gold').toLowerCase();
+      var localizedColor = color === 'blue' ? 'blue' : color === 'orange' ? 'orange' : color === 'pink' ? 'pink' : color === 'teal' ? 'teal' : 'orange';
       return '<article class="draw-card draw-card-' + color + '">'
-        + '<div class="draw-card-top"><div class="draw-title">Draw #' + draw.id + '</div><div class="draw-timer">' + formatCountdown(draw.purchaseClosesAtUtc) + '</div></div>'
-        + '<div class="draw-jackpot-label">Jackpot</div>'
+        + '<div class="draw-card-top"><div class="draw-title">Тираж #' + draw.id + '</div><div class="draw-timer-pill">' + formatCountdown(draw.purchaseClosesAtUtc) + '</div></div>'
+        + '<div class="draw-jackpot-label">ДЖЕКПОТ</div>'
         + '<div class="draw-jackpot-value">' + formatJackpot(draw.prizePoolMatch5, locale) + '</div>'
-        + '<div class="draw-footer"><div><div class="draw-cost-label">Ticket cost</div><div class="draw-cost-value">' + formatCurrency(draw.ticketCost, locale) + '</div></div>'
-        + '<div class="draw-badges">'
-        + '<span class="draw-badge">3: ' + formatCurrency(draw.prizePoolMatch3, locale, 0) + '</span>'
-        + '<span class="draw-badge">4: ' + formatCurrency(draw.prizePoolMatch4, locale, 0) + '</span>'
-        + '<span class="draw-badge">5: ' + formatCurrency(draw.prizePoolMatch5, locale, 0) + '</span>'
-        + '</div></div></article>';
+        + '<div class="draw-footer"><div class="ticket-price-chip"><span class="ticket-price-label">ЦЕНА БИЛЕТА</span><span class="ticket-price-value">' + formatCurrency(draw.ticketCost, locale) + '</span></div></div></article>';
     }).join('');
+
+    var offersHtml = ''
+      + '<section class="offers-section">'
+      + '  <div class="offers-header"><div class="section-title">Сегодняшние предложения</div><button class="see-all-btn">Смотреть все</button></div>'
+      + '  <div class="offer-card offer-card-yellow">'
+      + '    <div><div class="offer-kicker">БОНУС НОВИЧКА</div><div class="offer-title">3 бесплатных билета</div></div>'
+      + '    <button class="offer-action-btn">Получить</button>'
+      + '  </div>'
+      + '  <div class="offer-card offer-card-white">'
+      + '    <div><div class="offer-kicker offer-kicker-muted">ПРИГЛАШАЙ И ЗАРАБАТЫВАЙ</div><div class="offer-title offer-title-dark">$5 за каждого друга</div></div>'
+      + '    <button class="share-action-btn">Поделиться</button>'
+      + '  </div>'
+      + '</section>';
+
+    var bottomTabsHtml = ''
+      + '<nav class="bottom-tabbar">'
+      + '  <button class="bottom-tab active"><span class="bottom-tab-icon">⌂</span><span>Главная</span></button>'
+      + '  <button class="bottom-tab"><span class="bottom-tab-icon">≣</span><span>Мои билеты</span></button>'
+      + '  <button class="bottom-tab"><span class="bottom-tab-icon">⌕</span><span>Победители</span></button>'
+      + '  <button class="bottom-tab"><span class="bottom-tab-icon">◌</span><span>Профиль</span></button>'
+      + '</nav>';
 
     root.innerHTML = ''
       + '<div class="home-page">'
       + '  <header class="topbar">'
       + '    <div class="brand-block">'
       + '      <div class="avatar">' + getUserName().slice(0, 1).toUpperCase() + '</div>'
-      + '      <div><div class="brand-name">' + getUserName() + '</div>' + (state.isLocalDebug ? '<div class="brand-meta">Local debug mode</div>' : '') + '</div>'
+      + '      <div><div class="brand-name">' + getUserName() + '</div><div class="brand-meta">3 билета в игре · 1 выигрыш</div></div>'
       + '    </div>'
-      + '    <div class="balance-card"><div class="balance-label">Balance</div><div class="balance-value">' + formatCurrency(state.user.balance, locale) + '</div></div>'
+      + '    <div class="balance-card"><div class="balance-label">БАЛАНС</div><div class="balance-value">' + formatCurrency(state.user.balance, locale).replace('.', ',') + '</div></div>'
       + '  </header>'
       + '  <main class="home-content">'
       +       bannerHtml
       + '    <section class="sort-tabs">'
-      + '      <button class="sort-tab' + (state.sortMode === 'closest' ? ' active' : '') + '" data-sort="closest">Closest draw</button>'
-      + '      <button class="sort-tab' + (state.sortMode === 'jackpot' ? ' active' : '') + '" data-sort="jackpot">Biggest jackpot</button>'
-      + '      <button class="sort-tab' + (state.sortMode === 'cheap' ? ' active' : '') + '" data-sort="cheap">Cheapest tickets</button>'
+      + '      <button class="sort-tab' + (state.sortMode === 'closest' ? ' active' : '') + '" data-sort="closest">Ближайший тираж</button>'
+      + '      <button class="sort-tab' + (state.sortMode === 'jackpot' ? ' active' : '') + '" data-sort="jackpot">Высокий суперприз</button>'
+      + '      <button class="sort-tab' + (state.sortMode === 'cheap' ? ' active' : '') + '" data-sort="cheap">Сначала дешевле</button>'
       + '    </section>'
-      + '    <section class="draws-section"><div class="section-title">Draw cards</div>'
+      + '    <section class="draws-section">'
       +         statusHtml
       +         (!state.loading && !state.error && activeDraws.length ? '<div class="draw-list">' + drawCardsHtml + '</div>' : '')
       + '    </section>'
+      +       offersHtml
       + '  </main>'
+      +        bottomTabsHtml
       + '</div>';
 
     var retryBtn = document.getElementById('fallbackRetryBtn');

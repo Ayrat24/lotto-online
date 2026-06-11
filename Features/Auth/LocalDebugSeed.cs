@@ -34,9 +34,14 @@ public static class LocalDebugSeed
         foreach (var seed in seeds)
             await EnsureUserAsync(db, seed, now, ct);
 
+        await DeduplicateUsersAsync(db, seeds.Select(x => x.TelegramUserId).ToArray(), ct);
+
         await EnsureWinnerEntriesAsync(db, now, ct);
 
-        var debugUser = await db.Users.SingleAsync(x => x.TelegramUserId == debugTelegramUserId, ct);
+        var debugUser = await db.Users
+            .Where(x => x.TelegramUserId == debugTelegramUserId)
+            .OrderBy(x => x.Id)
+            .FirstAsync(ct);
 
         var draws = await db.Draws
             .OrderBy(x => x.Id)
@@ -259,7 +264,11 @@ public static class LocalDebugSeed
 
     private static async Task EnsureUserAsync(AppDbContext db, DebugUserSeed seed, DateTimeOffset now, CancellationToken ct)
     {
-        var user = await db.Users.FirstOrDefaultAsync(x => x.TelegramUserId == seed.TelegramUserId, ct);
+        var user = await db.Users
+            .Where(x => x.TelegramUserId == seed.TelegramUserId)
+            .OrderBy(x => x.Id)
+            .FirstOrDefaultAsync(ct);
+
         if (user is not null)
         {
             user.Number ??= seed.Number;
@@ -290,6 +299,48 @@ public static class LocalDebugSeed
             CreatedAtUtc = now,
             LastSeenAtUtc = now.AddMinutes(-seed.LastSeenMinutesAgo)
         });
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    private static async Task DeduplicateUsersAsync(AppDbContext db, long[] telegramUserIds, CancellationToken ct)
+    {
+        var duplicateGroups = await db.Users
+            .Where(x => telegramUserIds.Contains(x.TelegramUserId))
+            .OrderBy(x => x.Id)
+            .GroupBy(x => x.TelegramUserId)
+            .Where(g => g.Count() > 1)
+            .ToListAsync(ct);
+
+        if (duplicateGroups.Count == 0)
+            return;
+
+        foreach (var group in duplicateGroups)
+        {
+            var keep = group.First();
+            var duplicates = group.Skip(1).ToList();
+            var duplicateIds = duplicates.Select(x => x.Id).ToArray();
+
+            if (duplicateIds.Length > 0)
+            {
+                var ticketsToReassign = await db.Tickets
+                    .Where(x => duplicateIds.Contains(x.UserId))
+                    .ToListAsync(ct);
+
+                foreach (var ticket in ticketsToReassign)
+                    ticket.UserId = keep.Id;
+            }
+
+            keep.Number ??= duplicates.Select(x => x.Number).FirstOrDefault(x => !string.IsNullOrWhiteSpace(x));
+            keep.PreferredLanguage ??= duplicates.Select(x => x.PreferredLanguage).FirstOrDefault(x => !string.IsNullOrWhiteSpace(x));
+            keep.AcquisitionDeepLink ??= duplicates.Select(x => x.AcquisitionDeepLink).FirstOrDefault(x => !string.IsNullOrWhiteSpace(x));
+            keep.InviteCode ??= duplicates.Select(x => x.InviteCode).FirstOrDefault(x => !string.IsNullOrWhiteSpace(x));
+            keep.Balance = Math.Max(keep.Balance, duplicates.Max(x => x.Balance));
+            keep.LastSeenAtUtc = new[] { keep.LastSeenAtUtc }.Concat(duplicates.Select(x => x.LastSeenAtUtc)).Max();
+            keep.IsFake = keep.IsFake || duplicates.Any(x => x.IsFake);
+
+            db.Users.RemoveRange(duplicates);
+        }
 
         await db.SaveChangesAsync(ct);
     }
