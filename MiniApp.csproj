@@ -25,4 +25,11 @@
     <PackageReference Include="TonSdk.Core" Version="0.3.9" />
   </ItemGroup>
 
+  <!-- Auto-build frontend before .NET build in Debug mode -->
+  <Target Name="BuildFrontend" BeforeTargets="Build" Condition="'$(Configuration)' == 'Debug'">
+    <Message Importance="High" Text="Building Vue frontend..." />
+    <Exec WorkingDirectory="$(ProjectDir)frontend" Command="npm install --silent" />
+    <Exec WorkingDirectory="$(ProjectDir)frontend" Command="npm run build" />
+  </Target>
+
 </Project>
