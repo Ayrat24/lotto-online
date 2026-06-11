@@ -32,6 +32,7 @@
   :empty-text="texts.emptyDrawsText"
   :jackpot-label="texts.jackpotLabel"
   :ticket-price-label="texts.ticketPriceLabel"
+  @select="openTicketSelection"
 />
 <ContainerSubsection
   :title="texts.offersTitle"
@@ -189,6 +190,11 @@ export default {
   methods: {
     handleSortChange: function (value) {
       this.sortMode = value || "closest";
+    },
+    openTicketSelection: function (draw) {
+      if (!draw || draw.id == null) return;
+      var url = "/ticket-selection-app/?drawId=" + encodeURIComponent(String(draw.id));
+      window.location.href = url;
     },
     formatCurrency: function (value, digits) {
       var amount = Number(value || 0);

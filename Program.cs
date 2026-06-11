@@ -167,6 +167,7 @@ var provider = new FileExtensionContentTypeProvider
 {
     Mappings = { [".tgs"] = "application/x-tgsticker" }
 };
+app.UseDefaultFiles(); // Serve index.html for directory paths (e.g. /ticket-selection-app/)
 app.UseStaticFiles(new StaticFileOptions { ContentTypeProvider = provider });
 
 if (localDebugEnabled)

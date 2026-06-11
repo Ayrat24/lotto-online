@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Выберите билеты - Lotto</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { 
+      font-family: 'Manrope', system-ui, sans-serif; 
+      background: #fff; 
+      color: #1a1c1e;
+      min-height: 100vh;
+    }
+    .app {
+      max-width: 390px;
+      margin: 0 auto;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    /* App Header - Fixed at top */
+    .app-header {
+      align-items: center;
+      display: flex;
+      justify-content: space-between;
+      padding: 22px 20px 20px;
+      position: fixed;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100%;
+      max-width: 390px;
+      flex-shrink: 0;
+      background: #ffffff;
+      z-index: 90;
+    }
+    
+    /* Spacer to offset content below fixed header */
+    .header-spacer {
+      height: 82px;
+      flex-shrink: 0;
+    }
+    .app-header__left {
+      align-items: center;
+      display: inline-flex;
+      flex: 0 0 auto;
+      gap: 12px;
+      position: relative;
+    }
+    .app-header__avatar {
+      align-items: center;
+      background: linear-gradient(145deg, rgba(244, 185, 64, 1) 0%, rgba(224, 154, 31, 1) 100%);
+      border-radius: 14.54px;
+      box-shadow: 0 1.62px 4.85px #e09a1f1a, 0 8.08px 24.23px #f4b94047;
+      display: flex;
+      height: 42px;
+      justify-content: center;
+      width: 42px;
+    }
+    .app-header__avatar-letter {
+      align-items: center;
+      color: #ffffff;
+      display: flex;
+      font-size: 16.2px;
+      font-weight: 800;
+      justify-content: center;
+    }
+    .app-header__info {
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    .app-header__name {
+      color: #0f0f12;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.2px;
+    }
+    .app-header__subtitle {
+      color: #3f3f46;
+      font-size: 12px;
+      font-weight: 400;
+      margin: 0;
+    }
+    .app-header__right {
+      align-items: flex-end;
+      display: inline-flex;
+      flex: 0 0 auto;
+      flex-direction: column;
+      position: relative;
+    }
+    .app-header__balance-label {
+      color: #8a8a92;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-align: right;
+    }
+    .app-header__balance-value {
+      color: #1aa873;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      text-align: right;
+    }
+    
+    /* Screen Header with Back Button */
+    .screen-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 20px 14px;
+    }
+    .back-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: #f5f5f7;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      transition: background 0.15s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .back-btn:hover { background: #e8e8ea; }
+    .back-btn:active { transform: scale(0.96); }
+    
+    .screen-title {
+      flex: 1;
+    }
+    .screen-title h1 {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #0f0f12;
+      margin: 0;
+    }
+    .screen-title p {
+      font-size: 13px;
+      color: #6c727a;
+      margin: 4px 0 0 0;
+    }
+    
+    /* Scrollable tickets container */
+    .tickets-scroll {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 0 20px 180px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .tickets-scroll::-webkit-scrollbar { display: none; width: 0; }
+    
+    /* Ticket Card */
+    .ticket-card {
+      background: #ffffff;
+      border: 1px solid #e7e7e7;
+      border-radius: 22px;
+      box-shadow: 0 1px 2px rgba(15, 15, 20, 0.04), 0 4px 20px rgba(15, 15, 20, 0.04);
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .ticket-title {
+      font-size: 18px;
+      font-weight: 800;
+      color: #1a1c1e;
+    }
+    .ticket-subtitle {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 400;
+      color: #6c727a;
+    }
+    
+    /* Progress Slots */
+    .slots-container {
+      display: flex;
+      gap: 6px;
+      padding-top: 11px;
+    }
+    .slot {
+      flex: 1;
+      height: 7px;
+      border-radius: 4px;
+      background: #e7e7e7;
+      transition: background 0.2s ease;
+    }
+    .slot.filled {
+      background: #ffb929;
+    }
+    
+    /* Counter */
+    .counter {
+      font-size: 13px;
+      font-weight: 700;
+      color: #1a1c1e;
+      padding-top: 6px;
+    }
+    
+    /* Number Grid */
+    .number-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 7px;
+      padding-top: 11px;
+    }
+    .number-btn {
+      aspect-ratio: 1;
+      border-radius: 11px;
+      border: 1px solid #e7e7e7;
+      background: #fff;
+      cursor: pointer;
+      font-family: 'Manrope', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      color: #1a1c1e;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .number-btn:hover { border-color: #ffb929; }
+    .number-btn:active { transform: scale(0.95); }
+    .number-btn.selected {
+      border-color: #ffb929;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.08);
+    }
+    
+    /* Action Buttons */
+    .action-buttons {
+      display: flex;
+      gap: 11px;
+      padding-top: 18px;
+      justify-content: center;
+    }
+    .action-btn {
+      flex: 1;
+      min-height: 44px;
+      border-radius: 100px;
+      border: 1px solid rgba(15, 15, 20, 0.06);
+      box-shadow: 0 1px 2px rgba(15, 15, 20, 0.04), 0 4px 20px rgba(15, 15, 20, 0.04);
+      cursor: pointer;
+      font-family: 'Manrope', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      color: #0f0f12;
+      transition: transform 0.1s ease, background 0.15s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .action-btn:active { transform: scale(0.97); }
+    .action-btn.random { background: #fff; }
+    .action-btn.clear { background: #ffb929; }
+    
+    /* Purchase Bar - Above Tab Bar */
+    .purchase-bar {
+      position: fixed;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: calc(100% - 40px);
+      max-width: 350px;
+      background: #0f0f12;
+      border-radius: 16px;
+      padding: 14px 18px;
+      display: none;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 8px 24px rgba(15, 15, 18, 0.25);
+      z-index: 50;
+    }
+    .purchase-bar.visible {
+      display: flex;
+    }
+    .purchase-info {
+      display: flex;
+      flex-direction: column;
+    }
+    .purchase-info-label {
+      font-size: 11px;
+      color: #8a8a92;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .purchase-info-value {
+      font-size: 20px;
+      font-weight: 800;
+      color: #fff;
+    }
+    .purchase-btn {
+      background: linear-gradient(145deg, #ffb929, #f4a500);
+      border: none;
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-family: 'Manrope', sans-serif;
+      font-weight: 700;
+      font-size: 14px;
+      color: #0f0f12;
+      cursor: pointer;
+      transition: transform 0.1s ease, opacity 0.15s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .purchase-btn:hover { opacity: 0.9; }
+    .purchase-btn:active { transform: scale(0.97); }
+    .purchase-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    /* Tab Bar - Persistent Bottom Navigation */
+    .tab-bar {
+      -webkit-backdrop-filter: blur(10px) brightness(100%);
+      align-items: center;
+      backdrop-filter: blur(10px) brightness(100%);
+      background-color: #ffffffd9;
+      border: 1px solid #0f0f140f;
+      border-radius: 34px;
+      bottom: 16px;
+      box-shadow: 0 2px 8px #0f0f140a, 0 16px 40px #0f0f1414;
+      display: flex;
+      height: 68px;
+      justify-content: center;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 0 6px;
+      position: fixed;
+      width: calc(100% - 28px);
+      max-width: 362px;
+      z-index: 100;
+    }
+    .tab-bar__item {
+      align-items: center;
+      appearance: none;
+      background: transparent;
+      border: none;
+      border-radius: 28px;
+      cursor: pointer;
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      gap: 3px;
+      height: 56px;
+      justify-content: center;
+      padding: 0;
+      position: relative;
+      touch-action: manipulation;
+      transition: background-color 0.15s ease, box-shadow 0.15s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tab-bar__item--active {
+      background-color: #ffb929;
+      box-shadow: 0 6px 16px #f4b94066;
+    }
+    .tab-bar__icon {
+      font-size: 18px;
+      font-weight: 800;
+      height: 22px;
+      line-height: 22px;
+      text-align: center;
+      width: 22px;
+      color: #8a8a92;
+    }
+    .tab-bar__item--active .tab-bar__icon {
+      color: #0f0f12;
+    }
+    .tab-bar__label {
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.1px;
+      line-height: 11px;
+      text-align: center;
+      white-space: nowrap;
+      color: #8a8a92;
+    }
+    .tab-bar__item--active .tab-bar__label {
+      color: #0f0f12;
+      font-weight: 700;
+    }
+    
+    /* Loading/Error */
+    .state-message {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 200px;
+      color: #8a8a92;
+      font-size: 14px;
+      text-align: center;
+      padding: 20px;
+    }
+    .state-message.error {
+      color: #b42318;
+    }
+  </style>
+</head>
+<body>
+  <div id="app" class="app">
+    <div class="state-message">Loading ticket selection...</div>
+  </div>
+  <script type="module">
+    // === Config ===
+    const DEFAULT_NUMBERS_PER_TICKET = 5;
+    const DEFAULT_MIN_NUMBER = 1;
+    const DEFAULT_MAX_NUMBER = 36;
+    const DEFAULT_TICKET_SLOTS = 3;
+    
+    // === Init ===
+    function getTelegramInitData() {
+      try { return window.Telegram?.WebApp?.initData || ''; } 
+      catch { return ''; }
+    }
+    
+    function resolveInitData() {
+      const params = new URLSearchParams(window.location.search);
+      const forceLocalDebug = params.get('debug') === '1' || params.get('mode') === 'local-debug';
+      const telegramInitData = getTelegramInitData();
+      if (forceLocalDebug || !telegramInitData) return { initData: 'local-debug', isLocalDebug: true };
+      return { initData: telegramInitData, isLocalDebug: false };
+    }
+    
+    async function postJson(url, payload) {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload ?? {})
+      });
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : null;
+      if (!response.ok) throw new Error(data?.error || data?.message || 'Request failed');
+      return data;
+    }
+    
+    function formatCurrency(value) {
+      const amount = Number(value || 0);
+      return '$' + (Number.isFinite(amount) ? amount : 0).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+    
+    // === State ===
+    const runtime = resolveInitData();
+    const params = new URLSearchParams(window.location.search);
+    const requestedDrawId = params.get('drawId');
+    
+    let state = {
+      loading: true,
+      error: '',
+      user: { firstName: 'Player', lastName: '', username: '', balance: 0, ticketsInPlay: 0, wins: 0 },
+      draw: null,
+      ticketConfig: {
+        numbersPerTicket: DEFAULT_NUMBERS_PER_TICKET,
+        minNumber: DEFAULT_MIN_NUMBER,
+        maxNumber: DEFAULT_MAX_NUMBER,
+        ticketSlotsCount: DEFAULT_TICKET_SLOTS
+      },
+      tickets: [] // [{id, selectedNumbers: []}]
+    };
+    
+    // === Helper ===
+    function getUserDisplayName() {
+      const name = [state.user.firstName, state.user.lastName].filter(Boolean).join(' ').trim();
+      return name || state.user.username || 'Player';
+    }
+    
+    function getAvatarLetter() {
+      return (getUserDisplayName() || 'P').slice(0, 1).toUpperCase();
+    }
+    
+    function getUserSubtitle() {
+      return `${state.user.ticketsInPlay} билета в игре · ${state.user.wins} выигрыш`;
+    }
+    
+    // === Rendering ===
+    function render() {
+      const app = document.getElementById('app');
+      
+      if (state.loading) {
+        app.innerHTML = '<div class="state-message">Загрузка билетов...</div>';
+        return;
+      }
+      
+      if (state.error) {
+        app.innerHTML = `
+          ${renderHeader()}
+          <div class="screen-header">
+            <button class="back-btn" id="backBtn">←</button>
+            <div class="screen-title"><h1>Ошибка</h1></div>
+          </div>
+          <div class="state-message error">${state.error}</div>
+          ${renderTabBar()}
+        `;
+        bindEvents();
+        return;
+      }
+      
+      // Build tickets HTML
+      const ticketsHtml = state.tickets.map((ticket, idx) => renderTicketCard(ticket, idx)).join('');
+      
+      // Calculate ready tickets for bulk purchase
+      const readyTickets = state.tickets.filter(t => 
+        t.selectedNumbers.length === state.ticketConfig.numbersPerTicket
+      );
+      const totalCost = readyTickets.length * (state.draw?.ticketCost || 0);
+      const canBulkPurchase = readyTickets.length > 0;
+      
+      app.innerHTML = `
+        ${renderHeader()}
+        <div class="header-spacer"></div>
+        
+        <div class="screen-header">
+          <button class="back-btn" id="backBtn">←</button>
+          <div class="screen-title">
+            <h1>Выберите билеты</h1>
+            <p>Заполните один или несколько билетов, чтобы купить их вместе.</p>
+          </div>
+        </div>
+        
+        <div class="tickets-scroll">
+          ${ticketsHtml}
+        </div>
+        
+        <div class="purchase-bar ${canBulkPurchase ? 'visible' : ''}" id="purchaseBar">
+          <div class="purchase-info">
+            <div class="purchase-info-label">ГОТОВО К ПОКУПКЕ</div>
+            <div class="purchase-info-value">${readyTickets.length} билет(ов)</div>
+          </div>
+          <button class="purchase-btn" id="purchaseAllBtn">
+            Купить · ${formatCurrency(totalCost)}
+          </button>
+        </div>
+        
+        ${renderTabBar()}
+      `;
+      
+      bindEvents();
+    }
+    
+    function renderHeader() {
+      return `
+        <header class="app-header">
+          <div class="app-header__left">
+            <div class="app-header__avatar">
+              <div class="app-header__avatar-letter">${getAvatarLetter()}</div>
+            </div>
+            <div class="app-header__info">
+              <div class="app-header__name">${getUserDisplayName()}</div>
+              <p class="app-header__subtitle">${getUserSubtitle()}</p>
+            </div>
+          </div>
+          <div class="app-header__right">
+            <div class="app-header__balance-label">БАЛАНС</div>
+            <div class="app-header__balance-value">${formatCurrency(state.user.balance)}</div>
+          </div>
+        </header>
+      `;
+    }
+    
+    function renderTabBar() {
+      return `
+        <nav class="tab-bar">
+          <button type="button" class="tab-bar__item tab-bar__item--active" data-tab="home">
+            <div class="tab-bar__icon">⌂</div>
+            <div class="tab-bar__label">Главная</div>
+          </button>
+          <button type="button" class="tab-bar__item" data-tab="tickets">
+            <div class="tab-bar__icon">≣</div>
+            <div class="tab-bar__label">Мои билеты</div>
+          </button>
+          <button type="button" class="tab-bar__item" data-tab="winners">
+            <div class="tab-bar__icon">⌕</div>
+            <div class="tab-bar__label">Победители</div>
+          </button>
+          <button type="button" class="tab-bar__item" data-tab="profile">
+            <div class="tab-bar__icon">◌</div>
+            <div class="tab-bar__label">Профиль</div>
+          </button>
+        </nav>
+      `;
+    }
+    
+    function renderTicketCard(ticket, idx) {
+      const { numbersPerTicket, minNumber, maxNumber } = state.ticketConfig;
+      const selectedCount = ticket.selectedNumbers.length;
+      const isReady = selectedCount === numbersPerTicket;
+      const remaining = numbersPerTicket - selectedCount;
+      
+      // Progress slots
+      const slotsHtml = Array.from({ length: numbersPerTicket }, (_, i) => 
+        `<div class="slot ${i < selectedCount ? 'filled' : ''}"></div>`
+      ).join('');
+      
+      // Number grid
+      const numbersHtml = [];
+      for (let n = minNumber; n <= maxNumber; n++) {
+        const isSelected = ticket.selectedNumbers.includes(n);
+        numbersHtml.push(`
+          <button class="number-btn ${isSelected ? 'selected' : ''}" data-number="${n}">${n}</button>
+        `);
+      }
+      
+      return `
+        <div class="ticket-card" data-ticket="${idx}">
+          <div class="ticket-title">Билет ${idx + 1}</div>
+          <div class="ticket-subtitle">
+            ${isReady ? 'Готов к покупке!' : `Выберите еще ${remaining} число(а)`}
+          </div>
+          
+          <div class="slots-container">${slotsHtml}</div>
+          <div class="counter">${selectedCount}/${numbersPerTicket}</div>
+          
+          <div class="number-grid">${numbersHtml.join('')}</div>
+          
+          <div class="action-buttons">
+            <button class="action-btn random" id="randomBtn-${idx}">СЛУЧАЙНЫЕ ЧИСЛА</button>
+            <button class="action-btn clear" id="clearBtn-${idx}">ОЧИСТИТЬ</button>
+          </div>
+        </div>
+      `;
+    }
+    
+    function bindEvents() {
+      // Back button
+      const backBtn = document.getElementById('backBtn');
+      if (backBtn) backBtn.onclick = goBack;
+      
+      // Purchase button
+      const purchaseAllBtn = document.getElementById('purchaseAllBtn');
+      if (purchaseAllBtn) purchaseAllBtn.onclick = purchaseAll;
+      
+      // Tab bar navigation
+      document.querySelectorAll('.tab-bar__item').forEach(item => {
+        item.onclick = () => {
+          const tab = item.dataset.tab;
+          if (tab === 'home') {
+            goBack();
+          } else {
+            // Future: navigate to other tabs
+            alert('Экран в разработке');
+          }
+        };
+      });
+      
+      // Ticket event listeners
+      state.tickets.forEach((ticket, idx) => {
+        document.querySelectorAll(`[data-ticket="${idx}"] .number-btn`).forEach(btn => {
+          btn.onclick = () => toggleNumber(idx, parseInt(btn.dataset.number));
+        });
+        const randomBtn = document.getElementById(`randomBtn-${idx}`);
+        const clearBtn = document.getElementById(`clearBtn-${idx}`);
+        
+        if (randomBtn) randomBtn.onclick = () => randomize(idx);
+        if (clearBtn) clearBtn.onclick = () => clear(idx);
+      });
+    }
+    
+    // === Actions ===
+    function goBack() {
+      window.location.href = '/app';
+    }
+    
+    function toggleNumber(ticketIdx, num) {
+      const ticket = state.tickets[ticketIdx];
+      if (!ticket) return;
+      
+      const idx = ticket.selectedNumbers.indexOf(num);
+      if (idx >= 0) {
+        ticket.selectedNumbers.splice(idx, 1);
+      } else if (ticket.selectedNumbers.length < state.ticketConfig.numbersPerTicket) {
+        ticket.selectedNumbers.push(num);
+        ticket.selectedNumbers.sort((a, b) => a - b);
+      }
+      render();
+    }
+    
+    function randomize(ticketIdx) {
+      const { numbersPerTicket, minNumber, maxNumber } = state.ticketConfig;
+      const numbers = [];
+      const used = new Set();
+      while (numbers.length < numbersPerTicket) {
+        const num = Math.floor(Math.random() * (maxNumber - minNumber + 1)) + minNumber;
+        if (!used.has(num)) {
+          used.add(num);
+          numbers.push(num);
+        }
+      }
+      numbers.sort((a, b) => a - b);
+      state.tickets[ticketIdx].selectedNumbers = numbers;
+      render();
+    }
+    
+    function clear(ticketIdx) {
+      state.tickets[ticketIdx].selectedNumbers = [];
+      render();
+    }
+    
+    async function purchaseAll() {
+      const readyTickets = state.tickets
+        .filter(t => t.selectedNumbers.length === state.ticketConfig.numbersPerTicket)
+        .map(t => t.selectedNumbers);
+      
+      if (readyTickets.length === 0) return;
+      await doPurchase(readyTickets);
+    }
+    
+    async function doPurchase(ticketNumbers) {
+      if (!state.draw) return;
+      
+      try {
+        state.loading = true;
+        state.error = '';
+        render();
+        
+        const res = await postJson('/api/tickets/purchase', {
+          initData: runtime.initData,
+          drawId: state.draw.id,
+          tickets: ticketNumbers
+        });
+        
+        if (res && res.ok) {
+          state.user.balance = Number(res.balance || state.user.balance);
+          // Clear purchased tickets and refresh
+          alert(`Успешно куплено ${ticketNumbers.length} билет(ов)!`);
+          // Reset tickets
+          initializeTickets();
+        }
+        
+        state.loading = false;
+        render();
+      } catch (err) {
+        state.error = err.message || 'Ошибка при покупке';
+        state.loading = false;
+        render();
+      }
+    }
+    
+    function initializeTickets() {
+      const count = Math.max(1, state.ticketConfig.ticketSlotsCount);
+      state.tickets = [];
+      for (let i = 0; i < count; i++) {
+        state.tickets.push({
+          id: `ticket-${i + 1}`,
+          selectedNumbers: []
+        });
+      }
+    }
+    
+    // === Load Data ===
+    async function loadData() {
+      try {
+        // Load auth
+        const authRes = await postJson('/api/auth/telegram', { initData: runtime.initData });
+        if (authRes?.ok) {
+          state.user.firstName = authRes.firstName || 'Player';
+          state.user.lastName = authRes.lastName || '';
+          state.user.username = authRes.username || '';
+          state.user.balance = Number(authRes.balance || 0);
+        }
+        
+        // Load timeline to get draw and ticket config
+        const timelineRes = await postJson('/api/timeline', { initData: runtime.initData });
+        if (timelineRes?.ok && timelineRes.state) {
+          const draws = timelineRes.state.activeDraws || [];
+          
+          // Find requested draw or first active
+          state.draw = requestedDrawId 
+            ? draws.find(d => String(d.id) === String(requestedDrawId))
+            : draws.find(d => d.state === 'active' && d.canPurchase !== false);
+          
+          if (!state.draw && draws.length > 0) {
+            state.draw = draws[0];
+          }
+          
+          // Get ticket config
+          if (timelineRes.state.ticketPurchase) {
+            const tc = timelineRes.state.ticketPurchase;
+            state.ticketConfig = {
+              numbersPerTicket: Number(tc.numbersPerTicket || DEFAULT_NUMBERS_PER_TICKET),
+              minNumber: Number(tc.minNumber || DEFAULT_MIN_NUMBER),
+              maxNumber: Number(tc.maxNumber || DEFAULT_MAX_NUMBER),
+              ticketSlotsCount: Number(tc.ticketSlotsCount || DEFAULT_TICKET_SLOTS)
+            };
+          }
+          
+          state.user.balance = Number(timelineRes.state.balance || state.user.balance);
+          
+          // Get user stats from timeline (tickets in play, wins)
+          const currentTickets = timelineRes.state.currentTickets || [];
+          state.user.ticketsInPlay = currentTickets.length;
+          state.user.wins = 1; // Placeholder - would come from actual data
+        }
+        
+        if (!state.draw) {
+          throw new Error('Нет активных тиражей для покупки билетов');
+        }
+        
+        initializeTickets();
+        state.loading = false;
+        render();
+      } catch (err) {
+        state.error = err.message || 'Не удалось загрузить данные';
+        state.loading = false;
+        render();
+      }
+    }
+    
+    // === Initialize ===
+    try {
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.ready();
+        window.Telegram.WebApp.expand();
+      }
+    } catch {}
+    
+    loadData();
+  </script>
+</body>
+</html>

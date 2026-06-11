@@ -305,12 +305,18 @@ public static class LocalDebugSeed
 
     private static async Task DeduplicateUsersAsync(AppDbContext db, long[] telegramUserIds, CancellationToken ct)
     {
-        var duplicateGroups = await db.Users
+        var duplicateUsers = await db.Users
             .Where(x => telegramUserIds.Contains(x.TelegramUserId))
             .OrderBy(x => x.Id)
+            .ToListAsync(ct);
+
+        if (duplicateUsers.Count < 2)
+            return;
+
+        var duplicateGroups = duplicateUsers
             .GroupBy(x => x.TelegramUserId)
             .Where(g => g.Count() > 1)
-            .ToListAsync(ct);
+            .ToList();
 
         if (duplicateGroups.Count == 0)
             return;

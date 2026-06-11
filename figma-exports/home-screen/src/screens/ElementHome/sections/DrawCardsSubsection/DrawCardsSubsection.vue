@@ -1,42 +1,49 @@
 <template>
-<div class="draw-cards-subsection">
-<div v-if="loading || error || !draws.length" class="draw-status-card" :class="{ 'draw-status-card-error': !!error }">
-  <template v-if="loading">{{ loadingText }}</template>
-  <template v-else-if="error">{{ error }}</template>
-  <template v-else>{{ emptyText }}</template>
-</div>
-<div
-    v-for="draw in draws"
-    v-else
-    :key="draw.id"
-    :class="cardClass(draw)"
-  >
-<div class="container-2">
-<div class="container-3">
-<div class="text-wrapper-5">{{ drawTitle(draw) }}</div>
-</div>
-<div class="overlay">
-<div class="text-wrapper-6">{{ draw.countdown }}</div>
-</div>
-</div>
-<div class="container-4">
-<div class="container-5">
-<div class="text-wrapper-7">{{ jackpotLabel }}</div>
-</div>
-<div class="container-5">
-<div :class="jackpotClass(draw)">{{ draw.jackpot }}</div>
-</div>
-</div>
-<div class="overlay-overlayblur">
-<div class="container-3">
-<div class="text-wrapper-9">{{ ticketPriceLabel }}</div>
-</div>
-<div class="container-3">
-<div class="text-wrapper-10">{{ draw.ticketPrice }}</div>
-</div>
-</div>
-</div>
-</div>
+  <div class="draw-cards-subsection">
+    <div
+      v-if="loading || error || !draws.length"
+      class="draw-status-card"
+      :class="{ 'draw-status-card-error': !!error }"
+    >
+      <template v-if="loading">{{ loadingText }}</template>
+      <template v-else-if="error">{{ error }}</template>
+      <template v-else>{{ emptyText }}</template>
+    </div>
+
+    <button
+      v-for="draw in draws"
+      v-else
+      :key="draw.id"
+      :class="cardClass(draw)"
+      type="button"
+      @click="$emit('select', draw)"
+    >
+      <div class="container-2">
+        <div class="container-3">
+          <div class="text-wrapper-5">{{ drawTitle(draw) }}</div>
+        </div>
+        <div class="overlay">
+          <div class="text-wrapper-6">{{ draw.countdown }}</div>
+        </div>
+      </div>
+      <div class="container-4">
+        <div class="container-5">
+          <div class="text-wrapper-7">{{ jackpotLabel }}</div>
+        </div>
+        <div class="container-5">
+          <div :class="jackpotClass(draw)">{{ draw.jackpot }}</div>
+        </div>
+      </div>
+      <div class="overlay-overlayblur">
+        <div class="container-3">
+          <div class="text-wrapper-9">{{ ticketPriceLabel }}</div>
+        </div>
+        <div class="container-3">
+          <div class="text-wrapper-10">{{ draw.ticketPrice }}</div>
+        </div>
+      </div>
+    </button>
+  </div>
 </template>
 <script>
 export default {
@@ -129,10 +136,12 @@ export default {
     rgba(239, 68, 68, 1) 0%,
     rgba(249, 115, 22, 1) 100%
   );
+  border: none;
   border-radius: 22px;
   box-shadow:
     inset 0px 1px 0px #ffffff59,
     0px 12px 28px #ef444444;
+  cursor: pointer;
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -142,6 +151,18 @@ export default {
   overflow: hidden;
   padding: 16px;
   position: relative;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.draw-cards-subsection .background-shadow:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0px 1px 0px #ffffff59,
+    0px 16px 32px #ef444466;
+}
+
+.draw-cards-subsection .background-shadow:active {
+  transform: translateY(0);
 }
 
 .draw-cards-subsection .container-2 {
@@ -300,10 +321,12 @@ export default {
     rgba(124, 58, 237, 1) 0%,
     rgba(59, 130, 246, 1) 100%
   );
+  border: none;
   border-radius: 22px;
   box-shadow:
     inset 0px 1px 0px #ffffff59,
     0px 12px 28px #7c3aed44;
+  cursor: pointer;
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -313,6 +336,18 @@ export default {
   overflow: hidden;
   padding: 16px;
   position: relative;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.draw-cards-subsection .background-shadow-2:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0px 1px 0px #ffffff59,
+    0px 16px 32px #7c3aed66;
+}
+
+.draw-cards-subsection .background-shadow-2:active {
+  transform: translateY(0);
 }
 
 .draw-cards-subsection .text-wrapper-11 {

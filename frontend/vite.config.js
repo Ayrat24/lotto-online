@@ -5,7 +5,7 @@ export default defineConfig({
   base: '/dist/',
   plugins: [vue()],
   build: {
-    outDir: 'dist',
+    outDir: '../wwwroot/dist',
     emptyOutDir: true,
     rollupOptions: {
       output: {
