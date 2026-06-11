@@ -4,6 +4,7 @@ import AppHeader from './components/AppHeader.vue'
 import AppTabBar from './components/AppTabBar.vue'
 import HomeScreen from './screens/HomeScreen.vue'
 import TicketSelectionScreen from './screens/TicketSelectionScreen.vue'
+import MyTicketsScreen from './screens/MyTicketsScreen.vue'
 
 const DRAW_SORTS = {
   closest: 'closest',
@@ -33,6 +34,7 @@ function getInitialScreen() {
   const params = new URLSearchParams(window.location.search || '')
   const screen = params.get('screen')
   if (screen === 'ticket-selection') return 'ticket-selection'
+  if (screen === 'tickets') return 'tickets'
   return 'home'
 }
 
@@ -115,7 +117,20 @@ const texts = {
   totalLabel: 'Итого:',
   purchaseText: 'Купить',
   purchasingText: 'Обработка...',
-  noDrawText: 'Нет доступных тиражей.'
+  noDrawText: 'Нет доступных тиражей.',
+  // My Tickets texts
+  myTicketsTitle: 'Мои билеты',
+  myTicketsLoading: 'Загрузка билетов...',
+  allTicketsSort: 'Все',
+  activeSort: 'Активные',
+  wonSort: 'Выигрышные',
+  statusAwaitingDraw: 'Ожидает розыгрыша',
+  statusWon: 'Выигрыш',
+  statusClaimed: 'Выплачено',
+  statusLost: 'Не выиграл',
+  noTickets: 'У вас пока нет билетов',
+  noActiveTickets: 'Нет активных билетов',
+  noWonTickets: 'Нет выигрышных билетов'
 }
 
 const intlLocale = computed(() => state.locale === 'ru' ? 'ru-RU' : state.locale === 'uz' ? 'uz-UZ' : 'en-US')
@@ -129,6 +144,9 @@ const formattedBalance = computed(() => formatCurrency(state.user.balance, intlL
 const userSubtitle = computed(() => {
   if (currentScreen.value === 'ticket-selection') {
     return 'Выберите номера для билета'
+  }
+  if (currentScreen.value === 'tickets') {
+    return 'Ваши приобретённые билеты'
   }
   return '3 билета в игре · 1 выигрыш'
 })
@@ -209,6 +227,20 @@ const ticketTexts = computed(() => ({
   noDrawText: texts.noDrawText
 }))
 
+const myTicketsTexts = computed(() => ({
+  loadingText: texts.myTicketsLoading,
+  allTicketsSort: texts.allTicketsSort,
+  activeSort: texts.activeSort,
+  wonSort: texts.wonSort,
+  statusAwaitingDraw: texts.statusAwaitingDraw,
+  statusWon: texts.statusWon,
+  statusClaimed: texts.statusClaimed,
+  statusLost: texts.statusLost,
+  noTickets: texts.noTickets,
+  noActiveTickets: texts.noActiveTickets,
+  noWonTickets: texts.noWonTickets
+}))
+
 function openTicketSelection(draw) {
   if (!draw || draw.id == null) return
   selectedDrawId.value = draw.id
@@ -241,6 +273,8 @@ function updateUrl() {
   if (currentScreen.value === 'ticket-selection' && selectedDrawId.value) {
     url.searchParams.set('screen', 'ticket-selection')
     url.searchParams.set('drawId', String(selectedDrawId.value))
+  } else if (currentScreen.value === 'tickets') {
+    url.searchParams.set('screen', 'tickets')
   } else {
     url.searchParams.delete('screen')
     url.searchParams.delete('drawId')
@@ -354,10 +388,17 @@ onBeforeUnmount(() => {
         @balance-updated="handleBalanceUpdated"
       />
 
-      <div v-else-if="currentScreen === 'tickets'" class="placeholder-screen">
-        <div class="placeholder-title">Мои билеты</div>
-        <div class="placeholder-text">Экран в разработке</div>
-      </div>
+      <MyTicketsScreen
+        v-else-if="currentScreen === 'tickets'"
+        :timeline="state.timeline"
+        :loading="state.loading"
+        :error="state.error"
+        :locale="state.locale"
+        :texts="myTicketsTexts"
+        :post-json="postJson"
+        :init-data="state.initData"
+        @open-draw="openTicketSelection"
+      />
 
       <div v-else-if="currentScreen === 'winners'" class="placeholder-screen">
         <div class="placeholder-title">Победители</div>
