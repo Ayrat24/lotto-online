@@ -3,513 +3,60 @@
 @inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 @inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment Environment
 @{ Layout = null; }
-@{
-  // Ensure absolute URLs for assets so icons load correctly inside embedded webviews
-  var baseUrl = Request.Scheme + "://" + Request.Host + Url.Content("~");
-}
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="robots" content="noindex, nofollow" />
-  <title data-loc="client.app.title">Lotto</title>
-
-  <meta name="theme-color" content="#FFFFFF" />
-  <meta name="msapplication-navbutton-color" content="#FFFFFF" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-
+  <title>Lotto</title>
+  <meta name="theme-color" content="#ffffff" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="https://unpkg.com/%40tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-  <script src="https://unpkg.com/tonweb/dist/tonweb.js"></script>
   <script>
-    // Expose server-side local debug flag to client so debug controls can render reliably
     try {
       window.__serverLocalDebug = @(LocalDebugMode.IsEnabled(Configuration, Environment) ? "true" : "false");
     } catch (e) { window.__serverLocalDebug = false; }
   </script>
-  <link rel="stylesheet" href="~/css/miniapp.css" asp-append-version="true" />
-  <!-- Figma exported home screen styles -->
-  <link rel="stylesheet" href="~/css/figma-global.css" asp-append-version="true" />
-  <link rel="stylesheet" href="~/css/figma-home.css" asp-append-version="true" />
+  @if (LocalDebugMode.IsEnabled(Configuration, Environment))
+  {
+    <link rel="stylesheet" href="~/css/miniapp-home-fallback.css" asp-append-version="true" />
+  }
+  else
+  {
+    <link rel="stylesheet" href="~/dist/assets/index.css" asp-append-version="true" />
+  }
 </head>
-<body class="app-loading">
-  <div id="appLoadingShell" class="loading-shell" aria-hidden="true">
-    <div class="container loading-shell-inner">
-      <div class="loading-shell-topbar">
-        <div class="loading-skeleton loading-skeleton-circle"></div>
-        <div class="loading-skeleton loading-skeleton-title"></div>
-      </div>
+<body>
+  <div id="app"></div>
+  @if (LocalDebugMode.IsEnabled(Configuration, Environment))
+  {
+    <script src="~/js/miniapp-home-fallback.js" asp-append-version="true"></script>
+  }
+  else
+  {
+    <script type="module" src="~/dist/assets/index.js" asp-append-version="true"></script>
+  }
+  <noscript>This app requires JavaScript.</noscript>
+  <script>
+    window.addEventListener('error', function (event) {
+      try {
+        console.error('MiniApp host error', event && event.message ? event.message : event);
+      } catch {}
+    });
 
-      <section class="loading-shell-card loading-shell-hero">
-        <div class="loading-shell-row">
-          <div class="loading-skeleton loading-skeleton-chip"></div>
-          <div class="loading-skeleton loading-skeleton-time"></div>
-        </div>
-        <div class="loading-skeleton loading-skeleton-amount"></div>
-        <div class="loading-skeleton loading-skeleton-copy"></div>
-        <div class="loading-shell-pills">
-          <div class="loading-skeleton loading-skeleton-pill"></div>
-          <div class="loading-skeleton loading-skeleton-pill"></div>
-          <div class="loading-skeleton loading-skeleton-pill"></div>
-        </div>
-      </section>
+    window.addEventListener('DOMContentLoaded', function () {
+      var appRoot = document.getElementById('app');
+      if (!appRoot) return;
 
-      <section class="loading-shell-card loading-shell-main">
-        <div class="loading-shell-row">
-          <div class="loading-skeleton loading-skeleton-title loading-skeleton-title-sm"></div>
-          <div class="loading-skeleton loading-skeleton-badge"></div>
-        </div>
-        <div class="loading-skeleton loading-skeleton-line"></div>
-        <div class="loading-skeleton loading-skeleton-button"></div>
-        <div class="loading-skeleton loading-skeleton-line loading-skeleton-line-wide"></div>
-      </section>
-
-      <section class="loading-shell-card loading-shell-list">
-        <div class="loading-shell-row">
-          <div class="loading-skeleton loading-skeleton-title loading-skeleton-title-sm"></div>
-          <div class="loading-skeleton loading-skeleton-badge"></div>
-        </div>
-        <div class="loading-skeleton loading-skeleton-ticket"></div>
-        <div class="loading-skeleton loading-skeleton-ticket"></div>
-      </section>
-
-      <nav class="loading-shell-tabbar" aria-label="Loading tabs" data-loc-aria-label="client.loading.tabsAria">
-        <div class="loading-skeleton loading-skeleton-tab"></div>
-        <div class="loading-skeleton loading-skeleton-tab"></div>
-        <div class="loading-skeleton loading-skeleton-tab"></div>
-        <div class="loading-skeleton loading-skeleton-tab"></div>
-      </nav>
-    </div>
-  </div>
-
-  <!-- TOPBAR: Brand row (Figma: Brand row) -->
-  <div class="topbar">
-    <div class="brand">
-      <img src="@($"{baseUrl}images/icons/brand-avatar.svg")" alt="avatar" class="brand-avatar-img" />
-      <div class="brand-info">
-        <div id="userNameText" class="brand-name" data-loc="client.brand.name">Diyorbek Solijonov</div>
-        <div id="userTicketsMeta" class="brand-subtitle" data-loc="client.brand.subtitle">3 билета в игре · 1 выигрыш</div>
-      </div>
-    </div>
-    <div class="balance-block">
-      <div class="balance-label" data-loc="client.balance.label">БАЛАНС</div>
-      <div id="userBalanceText" class="balance-value">$500,00</div>
-    </div>
-  </div>
-
-  <main id="appShell" class="container app-shell" aria-busy="true">
-    <section id="lotteryTabPanel" class="tab-panel stack">
-
-      <div id="debugModeBadge" class="debug-mode-badge" hidden></div>
-
-      <!-- NEWS BANNER (Figma: News) -->
-      <section id="newsBannerSection" class="news-banner-section" hidden>
-        <div class="news-banner-title" data-loc="client.news.title">Последние новости</div>
-        <div id="newsBannerCarousel" class="news-banner-carousel" aria-label="News banners" data-loc-aria-label="client.news.carouselAria">
-          <div id="newsBannerTrack" class="news-banner-track"></div>
-          <div id="newsBannerDots" class="news-banner-dots"></div>
-        </div>
-      </section>
-
-      <!-- SEGMENTED TABS (Figma: Segmented:margin) -->
-      <section id="drawSortTabsSection" class="draw-sort-tabs-section">
-        <div class="draw-sort-tabs" role="tablist" aria-label="Draw sorting" data-loc-aria-label="client.drawSort.aria">
-          <button id="sortClosestDrawBtn" type="button" class="draw-sort-tab draw-sort-tab-active" role="tab" aria-selected="true" data-loc="client.drawSort.closest">Ближайший тираж</button>
-          <button id="sortBiggestJackpotBtn" type="button" class="draw-sort-tab" role="tab" aria-selected="false" data-loc="client.drawSort.biggestJackpot">Высокий суперприз</button>
-          <button id="sortCheaperTicketsBtn" type="button" class="draw-sort-tab" role="tab" aria-selected="false" data-loc="client.drawSort.cheaperTickets">Сначала дешевле</button>
-        </div>
-      </section>
-
-      <!-- DRAW CARDS (Figma: Draw cards) -->
-      <div id="jackpotCardsContainer" class="draw-card-list" hidden>
-        <!-- Draw cards will be injected dynamically by JS -->
-      </div>
-
-      <div id="purchaseStatus" class="section-subtitle"></div>
-
-      <!-- FEATURED JACKPOT CARD (used by JS as fallback / for purchase screen) -->
-      <section id="featuredJackpotCard" class="draw-card draw-card-theme-red" role="button" tabindex="0" aria-haspopup="dialog" aria-controls="ticketPurchaseScreen" hidden>
-        <div class="draw-card-header">
-          <div id="jackpotGameTitle" class="draw-card-title" data-loc="client.drawCard.titlePrefix">Draw #</div>
-          <div id="currentDrawCreatedAt" class="draw-card-timer" data-loc="client.jackpot.endsIn">Ends in --:--:--</div>
-        </div>
-
-        <div id="currentDrawStateBadge" class="draw-card-status" hidden></div>
-
-        <div class="draw-card-prize-section">
-          <div id="jackpotSubtitle" class="draw-card-prize-label" data-loc="client.drawCard.jackpotLabel">JACKPOT</div>
-          <div id="jackpotAmount" class="draw-card-prize-value">$0.00</div>
-        </div>
-
-        <div class="draw-card-footer">
-          <div class="draw-card-cost-block">
-            <div class="draw-card-cost-label" data-loc="client.drawCard.ticketCostLabel">Ticket cost</div>
-            <div id="jackpotBuyPrice" class="draw-card-cost-value">$2.00</div>
-          </div>
-        </div>
-
-        <div id="currentDrawPrizeTiers" hidden>
-          <span id="currentDrawPrizePool3">$0.00</span>
-          <span id="currentDrawPrizePool4">$0.00</span>
-          <span id="currentDrawPrizePool5">$0.00</span>
-        </div>
-      </section>
-
-      <!-- TODAY'S OFFERS (Figma: Сегодняшние предложения) -->
-      <div class="offers-header">
-        <div class="offers-title" data-loc="client.offers.title">Сегодняшние предложения</div>
-        <button type="button" class="offers-view-all" data-loc="client.offers.viewAll">Смотреть все</button>
-      </div>
-
-      <div class="offers-list">
-        <div class="offer-card offer-card-featured" role="button" tabindex="0">
-          <div class="offer-card-inner">
-            <span class="offer-card-hole-left"></span>
-            <span class="offer-card-hole-right"></span>
-            <div class="offer-card-left">
-              <div class="offer-card-icon offer-card-icon-yellow">
-                <img src="@($"{baseUrl}images/icons/icon-deposit.svg")" alt="offer" style="width:22px;height:22px;" />
-              </div>
-              <div class="offer-card-info">
-                <div class="offer-card-title" data-loc="client.offers.item1.title">Счастливый вторник</div>
-                <div class="offer-card-subtitle" data-loc="client.offers.item1.subtitle">3 билета за 30 000 сум</div>
-              </div>
-            </div>
-            <button type="button" class="offer-card-cta" data-loc="client.offers.item1.cta">Купить</button>
-          </div>
-        </div>
-
-        <div class="offer-card" role="button" tabindex="0">
-          <div class="offer-card-inner">
-            <span class="offer-card-hole-left"></span>
-            <span class="offer-card-hole-right"></span>
-            <div class="offer-card-left">
-              <div class="offer-card-icon offer-card-icon-dark">
-                <img src="@($"{baseUrl}images/icons/icon-transactions.svg")" alt="offer" style="width:22px;height:22px;" />
-              </div>
-              <div class="offer-card-info">
-                <div class="offer-card-title" data-loc="client.offers.item2.title">Новогодний розыгрыш</div>
-                <div class="offer-card-subtitle" data-loc="client.offers.item2.subtitle">Выиграйте до 500 000 сум</div>
-              </div>
-            </div>
-            <button type="button" class="offer-card-cta" data-loc="client.offers.item2.cta">Купить</button>
-          </div>
-        </div>
-
-        <div class="offer-card" role="button" tabindex="0">
-          <div class="offer-card-inner">
-            <span class="offer-card-hole-left"></span>
-            <span class="offer-card-hole-right"></span>
-            <div class="offer-card-left">
-              <div class="offer-card-icon offer-card-icon-dark">
-                <img src="@($"{baseUrl}images/icons/icon-invite.svg")" alt="offer" style="width:22px;height:22px;" />
-              </div>
-              <div class="offer-card-info">
-                <div class="offer-card-title" data-loc="client.offers.item3.title">VIP-доступ</div>
-                <div class="offer-card-subtitle" data-loc="client.offers.item3.subtitle">Эксклюзивные тиражи</div>
-              </div>
-            </div>
-            <button type="button" class="offer-card-cta" data-loc="client.offers.item3.cta">Купить</button>
-          </div>
-        </div>
-      </div>
-
-    </section>
-
-    <section id="ticketsTabPanel" class="tab-panel stack" hidden>
-      <div class="card stack">
-        <div class="section-header tickets-header">
-          <div class="section-title" data-loc="client.tickets.title">My tickets</div>
-        </div>
-        <div id="timelineStatus" class="section-subtitle"></div>
-        <div id="myTicketsEmpty" class="empty-card" data-loc="client.tickets.empty">You have not bought any tickets yet.</div>
-        <div id="myTicketsList" class="history-list"></div>
-      </div>
-    </section>
-
-    <section id="winnersTabPanel" class="tab-panel stack" hidden>
-      <div class="card stack winners-screen">
-        <div class="section-header">
-          <div class="section-title" data-loc="client.winners.title">Winners</div>
-        </div>
-        <div id="winnersStatus" class="section-subtitle"></div>
-        <div id="winnersEmpty" class="empty-card" data-loc="client.winners.empty">Winners will appear here soon.</div>
-        <div id="winnersList" class="winners-list"></div>
-      </div>
-    </section>
-
-    <section id="profileTabPanel" class="tab-panel stack" hidden>
-      <div id="profileHomeScreen" class="card stack profile-screen profile-home-screen">
-        <div class="profile-page-header">
-          <div class="profile-page-heading">
-                <div class="section-title" data-loc="client.profile.title">Profile</div>
-          </div>
-        </div>
-
-        <!-- Profile header subtitle and current balance removed from UI -->
-
-        <button id="openDepositScreenBtn" type="button" class="profile-menu-item">
-          <span class="profile-menu-icon profile-menu-icon-accent"><img src="@($"{baseUrl}images/icons/icon-deposit.svg")" alt="deposit" style="width:20px;height:20px;"/></span>
-          <span class="profile-menu-copy">
-            <span class="profile-menu-title" data-loc="client.profile.menuDeposit">Deposit Money</span>
-          </span>
-          <span class="profile-menu-arrow">›</span>
-        </button>
-
-        <button id="openInviteScreenBtn" type="button" class="profile-menu-item">
-           <span class="profile-menu-icon"><img src="@($"{baseUrl}images/icons/icon-invite.svg")" alt="invite" style="width:18px;height:18px;"/></span>
-          <span class="profile-menu-copy">
-            <span class="profile-menu-title" data-loc="client.profile.menuInvite">Invite Friend</span>
-          </span>
-          <span class="profile-menu-arrow">›</span>
-        </button>
-
-        <button id="openWithdrawScreenBtn" type="button" class="profile-menu-item">
-           <span class="profile-menu-icon"><img src="@($"{baseUrl}images/icons/icon-withdraw.svg")" alt="withdraw" style="width:18px;height:18px;"/></span>
-          <span class="profile-menu-copy">
-            <span class="profile-menu-title" data-loc="client.profile.menuWithdraw">Withdraw Money</span>
-          </span>
-          <span class="profile-menu-arrow">›</span>
-        </button>
-
-        <button id="openHistoryScreenBtn" type="button" class="profile-menu-item">
-           <span class="profile-menu-icon"><img src="@($"{baseUrl}images/icons/icon-transactions.svg")" alt="history" style="width:18px;height:18px;"/></span>
-          <span class="profile-menu-copy">
-            <span class="profile-menu-title" data-loc="client.profile.menuHistory">Transaction History</span>
-          </span>
-          <span class="profile-menu-arrow">›</span>
-        </button>
-      </div>
-
-      <div id="profileDepositScreen" class="card stack profile-screen profile-page-screen" hidden>
-        <div class="profile-screen-topbar">
-          <button id="backFromDepositBtn" type="button" class="profile-back-btn" data-loc-aria-label="client.button.back">←</button>
-          <div class="profile-screen-heading">
-            <div class="section-title" data-loc="client.profile.menuDeposit">Deposit Money</div>
-          </div>
-        </div>
-
-        <label class="profile-field-block" for="topUpAmountInput">
-          <span class="profile-field-label" data-loc="client.topup.amountLabel">Amount</span>
-          <span class="profile-amount-field">
-            <span class="profile-amount-prefix">$</span>
-            <input id="topUpAmountInput" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Top up amount" data-loc-placeholder="client.topup.amountPlaceholder" class="profile-input profile-amount-input" />
-          </span>
-        </label>
-
-        <div class="profile-field-label" data-loc="client.topup.methodTitle">Choose payment method</div>
-        <div id="paymentSystemsList" class="payment-systems-list payment-systems-icon-list"></div>
-
-        <div id="topUpStatus" class="muted profile-status"></div>
-        <button id="topUpBtn" type="button" class="profile-primary-cta" data-loc="client.button.continue">Continue</button>
-      </div>
-
-      <div id="profileTonDepositScreen" class="card stack profile-screen profile-page-screen profile-ton-screen" hidden>
-        <div class="profile-screen-topbar">
-          <button id="backFromTonDepositBtn" type="button" class="profile-back-btn" data-loc-aria-label="client.button.back">←</button>
-          <div class="profile-screen-heading">
-            <div class="section-title" data-loc="client.topup.system.telegramTon.title">TON Connect</div>
-            <div class="section-subtitle" data-loc="client.topup.tonConnect.screenHint">Connect your wallet, approve the transfer, and keep the memo unchanged.</div>
-          </div>
-        </div>
-
-        <section id="tonConnectPanel" class="ton-connect-panel" hidden>
-          <div class="ton-connect-panel-header">
-            <div>
-              <div class="section-subtitle ton-connect-title" data-loc="client.topup.tonConnect.title">TON Connect wallet</div>
-              <div id="tonConnectStatus" class="muted" data-loc="client.topup.tonConnect.notConnected">No TON wallet connected yet.</div>
-            </div>
-          </div>
-          <div class="ton-connect-panel-actions">
-            <button id="tonConnectConnectBtn" type="button" class="secondary-btn" data-loc="client.topup.tonConnect.connectWallet">Connect wallet</button>
-            <button id="tonConnectDisconnectBtn" type="button" class="secondary-btn" data-loc="client.topup.tonConnect.disconnectWallet" hidden>Disconnect</button>
-          </div>
-        </section>
-
-        <div id="topUpTonStatus" class="muted profile-status"></div>
-
-        <section id="depositDetailsCard" class="deposit-details-card" hidden>
-          <div class="section-header">
-            <div class="section-title deposit-details-title" data-loc="client.topup.detailsTitle">Payment details</div>
-          </div>
-          <div class="deposit-details-grid">
-            <div class="deposit-details-row">
-              <span class="deposit-details-label" data-loc="client.topup.detailsAmount">Amount to send</span>
-              <strong id="depositDetailsAmount" class="deposit-details-value">-</strong>
-            </div>
-            <div class="deposit-details-row">
-              <span class="deposit-details-label" data-loc="client.topup.detailsAddress">Destination wallet</span>
-              <strong id="depositDetailsAddress" class="deposit-details-value">-</strong>
-            </div>
-            <div class="deposit-details-row">
-              <span class="deposit-details-label" data-loc="client.topup.detailsMemo">Memo / comment</span>
-              <strong id="depositDetailsMemo" class="deposit-details-value">-</strong>
-            </div>
-            <div class="deposit-details-row">
-              <span class="deposit-details-label" data-loc="client.topup.detailsTx">Transaction id</span>
-              <strong id="depositDetailsTx" class="deposit-details-value">-</strong>
-            </div>
-          </div>
-          <div class="deposit-details-actions">
-            <button id="openDepositWalletBtn" type="button" class="secondary-btn" data-loc="client.topup.openWallet">Open wallet</button>
-            <button id="openDepositAltBtn" type="button" class="secondary-btn" data-loc="client.topup.openAlternative">Open fallback link</button>
-            <button id="copyDepositAddressBtn" type="button" class="secondary-btn" data-loc="client.topup.copyAddress">Copy address</button>
-            <button id="copyDepositMemoBtn" type="button" class="secondary-btn" data-loc="client.topup.copyMemo">Copy memo</button>
-            <button id="copyDepositTxBtn" type="button" class="secondary-btn" data-loc="client.topup.copyTx">Copy tx id</button>
-            <button id="checkDepositStatusBtn" type="button" class="secondary-btn" data-loc="client.topup.checkStatus">Check status</button>
-          </div>
-        </section>
-      </div>
-
-      <div id="profileInviteScreen" class="card stack profile-screen profile-page-screen" hidden>
-        <div class="profile-screen-topbar">
-          <button id="backFromInviteBtn" type="button" class="profile-back-btn" data-loc-aria-label="client.button.back">←</button>
-          <div class="profile-screen-heading">
-            <div class="section-title" data-loc="client.profile.menuInvite">Invite Friend</div>
-          </div>
-        </div>
-
-        <div class="profile-field-label" data-loc="client.profile.promoTitle">Enter promo code</div>
-        <input id="promoCodeInput" type="text" maxlength="64" placeholder="Promo code" data-loc-placeholder="client.profile.promoPlaceholder" class="profile-input" />
-        <button id="applyPromoBtn" type="button" class="profile-primary-cta" data-loc="client.button.applyPromo">Apply promo code</button>
-        <div id="promoStatus" class="muted profile-status"></div>
-
-        <div class="profile-field-label" data-loc="client.referral.title">Invite friends</div>
-        <div class="draw-meta-row"><span data-loc="client.referral.codeLabel">Your invite code:</span> <strong id="referralCodeText">-</strong></div>
-        <button id="copyReferralLinkBtn" type="button" class="secondary-btn" data-loc="client.referral.copyLink">Copy invite link</button>
-        <div id="referralStatus" class="muted profile-status"></div>
-      </div>
-
-      <div id="profileWithdrawScreen" class="card stack profile-screen profile-page-screen" hidden>
-        <div class="profile-screen-topbar">
-          <button id="backFromWithdrawBtn" type="button" class="profile-back-btn" data-loc-aria-label="client.button.back">←</button>
-          <div class="profile-screen-heading">
-            <div class="section-title" data-loc="client.profile.menuWithdraw">Withdraw Money</div>
-          </div>
-        </div>
-
-        <label class="profile-field-block" for="withdrawAmountInput">
-          <span class="profile-field-label" data-loc="client.profile.withdrawTitle">Request withdrawal</span>
-          <span class="profile-amount-field">
-            <span class="profile-amount-prefix">$</span>
-            <input id="withdrawAmountInput" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Amount" data-loc-placeholder="client.profile.amountPlaceholder" class="profile-input profile-amount-input" />
-          </span>
-        </label>
-
-        <div class="profile-field-label" data-loc="client.withdraw.assetTitle">Choose coin</div>
-        <div id="withdrawAssetList" class="payment-systems-list payment-systems-icon-list"></div>
-
-        <section id="withdrawBitcoinFields" class="withdraw-payout-card">
-          <div class="profile-field-label" data-loc="client.withdraw.btcAddressLabel">Bitcoin payout address</div>
-          <input id="withdrawBitcoinAddressInput" type="text" maxlength="256" placeholder="Bitcoin wallet address" data-loc-placeholder="client.withdraw.btcAddressPlaceholder" class="profile-input" />
-          <label class="profile-checkbox-row" for="withdrawSaveBitcoinAddressCheckbox">
-            <input id="withdrawSaveBitcoinAddressCheckbox" type="checkbox" class="profile-checkbox-input" />
-            <span data-loc="client.withdraw.saveBtcAddress">Save this Bitcoin address for later</span>
-          </label>
-        </section>
-
-        <section id="withdrawTonFields" class="withdraw-payout-card" hidden>
-          <div class="profile-field-label" data-loc="client.withdraw.tonWalletLabel">TON payout wallet</div>
-          <div class="section-subtitle" data-loc="client.withdraw.tonWalletHint">Connect your TON wallet or paste a TON address below.</div>
-          <div class="withdraw-ton-connect-card">
-            <div id="withdrawTonConnectStatus" class="muted" data-loc="client.withdraw.tonConnectNotConnected">No TON wallet connected yet. You can connect one now or paste a TON address below.</div>
-            <div class="ton-connect-panel-actions withdraw-ton-connect-actions">
-              <button id="withdrawTonConnectBtn" type="button" class="secondary-btn" data-loc="client.topup.tonConnect.connectWallet">Connect wallet</button>
-              <button id="withdrawTonDisconnectBtn" type="button" class="secondary-btn" data-loc="client.topup.tonConnect.disconnectWallet" hidden>Disconnect</button>
-            </div>
-          </div>
-          <input id="withdrawTonAddressInput" type="text" maxlength="256" placeholder="TON wallet address" data-loc-placeholder="client.withdraw.tonAddressPlaceholder" class="profile-input" />
-          <label class="profile-checkbox-row" for="withdrawSaveTonAddressCheckbox">
-            <input id="withdrawSaveTonAddressCheckbox" type="checkbox" class="profile-checkbox-input" />
-            <span data-loc="client.withdraw.saveTonAddress">Save this TON address for later</span>
-          </label>
-        </section>
-
-        <button id="withdrawBtn" type="button" class="profile-primary-cta" data-loc="client.button.continue">Continue</button>
-        <div id="withdrawStatus" class="muted profile-status"></div>
-      </div>
-
-      <div id="profileHistoryScreen" class="card stack profile-screen profile-page-screen" hidden>
-        <div class="profile-screen-topbar">
-          <button id="closeHistoryBtn" type="button" class="profile-back-btn" data-loc-aria-label="client.button.back">←</button>
-          <div class="profile-screen-heading">
-            <div class="section-title" data-loc="client.history.title">Transaction history</div>
-          </div>
-        </div>
-        <div id="historyStatus" class="muted profile-status"></div>
-        <div id="historyEmpty" class="empty-card" data-loc="client.history.empty">No transactions yet.</div>
-        <div id="historyList" class="history-list"></div>
-      </div>
-    </section>
-  </main>
-
-  <div id="ticketPurchaseScreen" class="purchase-screen" hidden>
-    <div id="ticketPurchasePanel" class="purchase-screen-panel" role="dialog" aria-modal="true" aria-label="Pick your tickets" data-loc-aria-label="client.purchaseScreen.title">
-      <div class="purchase-screen-header">
-        <button id="closeTicketPurchaseScreenBtn" type="button" class="purchase-screen-close-btn" aria-label="Close purchase screen" data-loc-aria-label="client.purchaseScreen.closeAria">×</button>
-      </div>
-
-      <div class="purchase-screen-copy">
-        <div class="section-title" data-loc="client.purchaseScreen.title">Pick your tickets</div>
-        <div id="ticketPurchaseSubtitle" class="muted purchase-screen-subtitle" data-loc="client.purchaseScreen.subtitle">Complete one or more tickets to buy them together.</div>
-        <div id="ticketPurchaseBulkActions" class="purchase-screen-bulk-actions" hidden>
-          <button id="randomizeAllOfferTicketsBtn" type="button" class="purchase-screen-bulk-btn" data-loc="client.purchaseScreen.randomizeAll">Randomize all</button>
-        </div>
-      </div>
-
-      <div id="ticketPurchaseDrawsStrip" class="purchase-screen-draws-strip" hidden></div>
-
-      <div id="ticketPurchaseScreenStatus" class="muted purchase-screen-status"></div>
-      <div id="ticketPurchaseTicketsList" class="purchase-ticket-list"></div>
-
-      <div id="ticketPurchaseFooter" class="purchase-screen-footer" hidden>
-        <button id="submitTicketPurchaseBtn" type="button" class="purchase-screen-submit-btn">
-          <span id="submitTicketPurchaseLabel">Purchase tickets</span>
-          <span id="submitTicketPurchaseCost">$0.00</span>
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- TAB BAR (Figma: Tab Bar) -->
-  <nav class="tabbar" aria-label="Bottom tabs" data-loc-aria-label="client.tabbar.aria">
-      <button id="lotteryTabBtn" type="button" class="tabbar-btn tabbar-btn-active">
-       <img src="@(Url.Content("~/images/icons/icon-deposit.svg"))" alt="home" class="tabbar-btn-icon-img" />
-      <span data-loc="client.tab.home">Главная</span>
-    </button>
-     <button id="ticketsTabBtn" type="button" class="tabbar-btn">
-       <img src="@(Url.Content("~/images/icons/icon-transactions.svg"))" alt="tickets" class="tabbar-btn-icon-img" />
-      <span data-loc="client.tab.tickets">Мои билеты</span>
-      <span id="ticketsWinningPin" class="tickets-winning-pin" hidden>0</span>
-    </button>
-     <button id="winnersTabBtn" type="button" class="tabbar-btn">
-       <img src="@(Url.Content("~/images/icons/icon-invite.svg"))" alt="winners" class="tabbar-btn-icon-img" />
-      <span data-loc="client.tab.winners">Победители</span>
-    </button>
-     <button id="profileTabBtn" type="button" class="tabbar-btn">
-       <img src="@(Url.Content("~/images/icons/icon-profile.svg"))" alt="profile" class="tabbar-btn-icon-img" />
-      <span data-loc="client.tab.profile">Профиль</span>
-    </button>
-  </nav>
-
-  <div id="centerPopup" class="center-popup" hidden>
-    <div id="centerPopupBackdrop" class="center-popup-backdrop"></div>
-    <div class="center-popup-card" role="dialog" aria-modal="true" aria-labelledby="centerPopupMessage">
-      <div class="center-popup-header" data-loc="client.popup.error">Error</div>
-      <div id="centerPopupMessage" class="center-popup-message"></div>
-      <div id="centerPopupActions" class="center-popup-actions center-popup-actions-single">
-        <button id="centerPopupTopUpBtn" type="button" class="center-popup-topup" data-loc="client.popup.topUp" hidden>Top up</button>
-        <button id="centerPopupConfirmBtn" type="button" class="center-popup-confirm" data-loc="client.popup.confirm">Confirm</button>
-      </div>
-    </div>
-  </div>
-
-  <script src="~/js/miniapp.js" asp-append-version="true"></script>
+      window.setTimeout(function () {
+        if (appRoot.children.length === 0 && !appRoot.innerHTML.trim()) {
+          appRoot.innerHTML = '<div style="padding:16px;font-family:Arial,sans-serif;color:#111">Frontend did not mount. Open <code>/debug/frontend-status</code> and browser console.</div>';
+        }
+      }, 2500);
+    });
+  </script>
 </body>
 </html>

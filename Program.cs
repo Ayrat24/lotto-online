@@ -169,6 +169,58 @@ var provider = new FileExtensionContentTypeProvider
 };
 app.UseStaticFiles(new StaticFileOptions { ContentTypeProvider = provider });
 
+if (localDebugEnabled)
+{
+    EnsureFrontendDistExists(app.Environment.ContentRootPath, app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("FrontendDebug"));
+
+    var frontendDistPath = ResolveFrontendDistPath(app.Environment.ContentRootPath);
+    var frontendAssetsPath = Path.Combine(frontendDistPath, "assets");
+    var frontendJsPath = Path.Combine(frontendAssetsPath, "index.js");
+    var frontendCssPath = Path.Combine(frontendAssetsPath, "index.css");
+    var startupLogger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("FrontendDebug");
+
+    startupLogger.LogInformation("Local debug frontend diagnostics: distPath={DistPath}, distExists={DistExists}, jsPath={JsPath}, jsExists={JsExists}, cssPath={CssPath}, cssExists={CssExists}",
+        frontendDistPath,
+        Directory.Exists(frontendDistPath),
+        frontendJsPath,
+        File.Exists(frontendJsPath),
+        frontendCssPath,
+        File.Exists(frontendCssPath));
+
+    app.MapGet("/debug/frontend-status", () => Results.Json(new
+    {
+        distPath = frontendDistPath,
+        distExists = Directory.Exists(frontendDistPath),
+        assetsPath = frontendAssetsPath,
+        jsPath = frontendJsPath,
+        jsExists = File.Exists(frontendJsPath),
+        cssPath = frontendCssPath,
+        cssExists = File.Exists(frontendCssPath),
+        distFiles = Directory.Exists(frontendDistPath)
+            ? Directory.GetFiles(frontendDistPath, "*", SearchOption.AllDirectories)
+                .Select(path => Path.GetRelativePath(frontendDistPath, path).Replace('\\', '/'))
+                .OrderBy(path => path)
+                .ToArray()
+            : Array.Empty<string>()
+    }));
+
+    app.MapGet("/debug/frontend-assets/index.js", () =>
+    {
+        if (!File.Exists(frontendJsPath))
+            return Results.NotFound(new { error = "Frontend JS asset not found.", path = frontendJsPath });
+
+        return Results.File(frontendJsPath, "text/javascript; charset=utf-8", enableRangeProcessing: false);
+    });
+
+    app.MapGet("/debug/frontend-assets/index.css", () =>
+    {
+        if (!File.Exists(frontendCssPath))
+            return Results.NotFound(new { error = "Frontend CSS asset not found.", path = frontendCssPath });
+
+        return Results.File(frontendCssPath, "text/css; charset=utf-8", enableRangeProcessing: false);
+    });
+}
+
 app.UseRouting();
 
 app.UseAuthentication();
@@ -365,6 +417,64 @@ if (telegramEnabled)
 }
 
 app.Run();
+
+static void EnsureFrontendDistExists(string contentRootPath, ILogger logger)
+{
+    var frontendPath = Path.Combine(contentRootPath, "frontend");
+    var distPath = Path.Combine(frontendPath, "dist");
+
+    if (Directory.Exists(distPath))
+        return;
+
+    try
+    {
+        var npmCommand = OperatingSystem.IsWindows() ? "npm.cmd" : "npm";
+        var startInfo = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = npmCommand,
+            Arguments = "run build",
+            WorkingDirectory = frontendPath,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        using var process = System.Diagnostics.Process.Start(startInfo);
+        if (process is null)
+        {
+            logger.LogWarning("Failed to start frontend build process for local debug.");
+            return;
+        }
+
+        var stdOut = process.StandardOutput.ReadToEnd();
+        var stdErr = process.StandardError.ReadToEnd();
+        process.WaitForExit(30000);
+
+        logger.LogInformation("Local debug frontend autobuild exitCode={ExitCode}; stdout={StdOut}; stderr={StdErr}", process.ExitCode, stdOut, stdErr);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Local debug frontend autobuild failed.");
+    }
+}
+
+static string ResolveFrontendDistPath(string contentRootPath)
+{
+    var candidates = new[]
+    {
+        Path.Combine(contentRootPath, "frontend", "dist"),
+        Path.Combine(contentRootPath, "wwwroot", "dist")
+    };
+
+    foreach (var candidate in candidates)
+    {
+        if (Directory.Exists(candidate))
+            return candidate;
+    }
+
+    return candidates[0];
+}
 
 static void ApplyLocalDotEnvConfiguration(WebApplicationBuilder builder)
 {

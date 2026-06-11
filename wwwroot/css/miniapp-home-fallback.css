@@ -1,0 +1,170 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #f6f2ff;
+  font-family: 'Manrope', Arial, sans-serif;
+  color: #18142b;
+}
+
+* { box-sizing: border-box; }
+
+.home-page {
+  min-height: 100vh;
+  padding: 20px 16px 32px;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.brand-block {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #7f5cff, #d16bff);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 20px;
+}
+
+.brand-name { font-size: 18px; font-weight: 800; }
+.brand-meta { font-size: 12px; color: #7b7494; }
+
+.balance-card {
+  background: #18142b;
+  color: #fff;
+  border-radius: 18px;
+  padding: 12px 14px;
+  min-width: 120px;
+}
+
+.balance-label { font-size: 11px; opacity: .7; }
+.balance-value { font-size: 18px; font-weight: 800; margin-top: 4px; }
+
+.home-content {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+
+.news-banner {
+  border-radius: 24px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(44, 28, 88, 0.08);
+}
+
+.news-banner-image {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.sort-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.sort-tab {
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 14px;
+  background: #ebe6ff;
+  color: #564a7a;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sort-tab.active {
+  background: #7f5cff;
+  color: #fff;
+}
+
+.status-card,
+.draw-card {
+  background: #fff;
+  border-radius: 24px;
+  box-shadow: 0 10px 30px rgba(44, 28, 88, 0.08);
+}
+
+.status-card {
+  padding: 18px;
+}
+
+.status-card-error { color: #a12648; }
+
+.retry-btn {
+  margin-top: 12px;
+  border: 0;
+  border-radius: 12px;
+  background: #7f5cff;
+  color: #fff;
+  padding: 10px 14px;
+  font-weight: 700;
+}
+
+.draw-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.draw-card {
+  padding: 18px;
+}
+
+.draw-card-gold { background: linear-gradient(135deg, #fff2bf, #ffffff); }
+.draw-card-teal { background: linear-gradient(135deg, #c4fff6, #ffffff); }
+.draw-card-pink { background: linear-gradient(135deg, #ffd3f0, #ffffff); }
+.draw-card-blue { background: linear-gradient(135deg, #d7e6ff, #ffffff); }
+.draw-card-orange { background: linear-gradient(135deg, #ffe0c5, #ffffff); }
+
+.draw-card-top,
+.draw-footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.draw-title { font-weight: 800; font-size: 18px; }
+.draw-timer { font-weight: 800; color: #7f5cff; }
+.draw-jackpot-label,
+.draw-cost-label { margin-top: 12px; font-size: 12px; color: #736a8c; }
+.draw-jackpot-value { font-size: 32px; font-weight: 800; margin-top: 4px; }
+.draw-cost-value { font-size: 18px; font-weight: 800; margin-top: 4px; }
+
+.draw-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.draw-badge {
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: rgba(24, 20, 43, 0.08);
+  font-size: 12px;
+  font-weight: 700;
+}
