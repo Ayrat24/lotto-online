@@ -6,6 +6,7 @@ import HomeScreen from './screens/HomeScreen.vue'
 import TicketSelectionScreen from './screens/TicketSelectionScreen.vue'
 import MyTicketsScreen from './screens/MyTicketsScreen.vue'
 import WinnersScreen from './screens/WinnersScreen.vue'
+import ProfileScreen from './screens/ProfileScreen.vue'
 
 const DRAW_SORTS = {
   closest: 'closest',
@@ -37,6 +38,7 @@ function getInitialScreen() {
   if (screen === 'ticket-selection') return 'ticket-selection'
   if (screen === 'tickets') return 'tickets'
   if (screen === 'winners') return 'winners'
+  if (screen === 'profile') return 'profile'
   return 'home'
 }
 
@@ -150,6 +152,9 @@ const userSubtitle = computed(() => {
   }
   if (currentScreen.value === 'tickets') {
     return 'Ваши приобретённые билеты'
+  }
+  if (currentScreen.value === 'profile') {
+    return 'Профиль'
   }
   return '3 билета в игре · 1 выигрыш'
 })
@@ -267,11 +272,14 @@ function handleTabNavigate(tab) {
   } else {
     currentScreen.value = tab
   }
-  // Load winners data when navigating to winners tab
   if (tab === 'winners' && !state.winners.length) {
     loadWinners()
   }
   updateUrl()
+}
+
+function openProfileAction(target) {
+  console.log(`[MiniApp] profile action: ${target}`)
 }
 
 function handleBalanceUpdated(newBalance) {
@@ -285,6 +293,8 @@ function updateUrl() {
     url.searchParams.set('drawId', String(selectedDrawId.value))
   } else if (currentScreen.value === 'tickets') {
     url.searchParams.set('screen', 'tickets')
+  } else if (currentScreen.value === 'profile') {
+    url.searchParams.set('screen', 'profile')
   } else {
     url.searchParams.delete('screen')
     url.searchParams.delete('drawId')
@@ -438,10 +448,26 @@ onBeforeUnmount(() => {
         :winners="state.winners"
       />
 
-      <div v-else-if="currentScreen === 'profile'" class="placeholder-screen">
-        <div class="placeholder-title">Профиль</div>
-        <div class="placeholder-text">Экран в разработке</div>
-      </div>
+      <ProfileScreen
+        v-else-if="currentScreen === 'profile'"
+        :locale="state.locale"
+        :user-name="userName"
+        :avatar-letter="avatarLetter"
+        :balance="formattedBalance"
+        :subtitle="userSubtitle"
+        :texts="{
+          balanceLabel: texts.balanceLabel,
+          profileTitle: 'Профиль',
+          topUpBalance: 'Пополнить баланс',
+          inviteFriend: 'Пригласить друга',
+          withdrawMoney: 'Вывести деньги',
+          transactionHistory: 'История транзакций'
+        }"
+        @open-top-up="openProfileAction('top-up')"
+        @open-invite="openProfileAction('invite')"
+        @open-withdraw="openProfileAction('withdraw')"
+        @open-transactions="openProfileAction('transactions')"
+      />
     </main>
 
     <!-- Persistent Tab Bar -->
