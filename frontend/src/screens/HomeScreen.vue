@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 const props = defineProps({
   timeline: { type: Object, default: null },
@@ -60,7 +60,6 @@ function compareDraws(mode) {
 }
 
 const intlLocale = computed(() => props.locale === 'ru' ? 'ru-RU' : props.locale === 'uz' ? 'uz-UZ' : 'en-US')
-const featuredBanner = computed(() => props.banners[0] || null)
 const sortOptions = computed(() => ([
   { value: DRAW_SORTS.closest, label: props.texts.closestSort },
   { value: DRAW_SORTS.jackpot, label: props.texts.jackpotSort },
@@ -85,8 +84,87 @@ const formattedDraws = computed(() => activeDraws.value.map((draw, index) => {
   }
 }))
 
-const bannerTitle = computed(() => featuredBanner.value?.title || featuredBanner.value?.name || 'Не знаешь, как получить крипту?')
-const bannerSubtitle = computed(() => featuredBanner.value?.subtitle || featuredBanner.value?.description || 'Переходи по ссылке в боте')
+const carouselBanners = computed(() => Array.isArray(props.banners) ? props.banners.filter(banner => banner && banner.imageUrl) : [])
+const activeBannerIndex = ref(0)
+const bannerTouchStartX = ref(0)
+const bannerTouchEndX = ref(0)
+const bannerRotationDelayMs = 5000
+let bannerRotationTimer = null
+
+function clampBannerIndex(index) {
+  const total = carouselBanners.value.length
+  if (!total) return 0
+  return ((index % total) + total) % total
+}
+
+function setActiveBannerIndex(index) {
+  activeBannerIndex.value = clampBannerIndex(index)
+}
+
+function showNextBanner() {
+  if (!carouselBanners.value.length) return
+  setActiveBannerIndex(activeBannerIndex.value + 1)
+}
+
+function showPreviousBanner() {
+  if (!carouselBanners.value.length) return
+  setActiveBannerIndex(activeBannerIndex.value - 1)
+}
+
+function startBannerRotation() {
+  stopBannerRotation()
+  if (carouselBanners.value.length <= 1) return
+  bannerRotationTimer = window.setInterval(showNextBanner, bannerRotationDelayMs)
+}
+
+function stopBannerRotation() {
+  if (bannerRotationTimer !== null) {
+    window.clearInterval(bannerRotationTimer)
+    bannerRotationTimer = null
+  }
+}
+
+function restartBannerRotation() {
+  startBannerRotation()
+}
+
+function handleBannerPointerDown(event) {
+  bannerTouchStartX.value = event.clientX
+  bannerTouchEndX.value = event.clientX
+  stopBannerRotation()
+}
+
+function handleBannerPointerMove(event) {
+  bannerTouchEndX.value = event.clientX
+}
+
+function handleBannerPointerUp() {
+  const delta = bannerTouchEndX.value - bannerTouchStartX.value
+  const swipeThreshold = 40
+  if (delta <= -swipeThreshold) {
+    showNextBanner()
+  } else if (delta >= swipeThreshold) {
+    showPreviousBanner()
+  }
+  restartBannerRotation()
+}
+
+watch(() => carouselBanners.value.length, () => {
+  if (activeBannerIndex.value >= carouselBanners.value.length) {
+    activeBannerIndex.value = 0
+  }
+  startBannerRotation()
+}, { immediate: true })
+
+onMounted(() => {
+  startBannerRotation()
+})
+
+onBeforeUnmount(() => {
+  stopBannerRotation()
+})
+
+const activeBanner = computed(() => carouselBanners.value[activeBannerIndex.value] || null)
 
 const primaryOffer = { kicker: 'БОНУС НОВИЧКА', title: '3 бесплатных билета', actionText: 'Получить' }
 const secondaryOffer = { kicker: 'ПРИГЛАШАЙ И ЗАРАБАТЫВАЙ', title: '$5 за каждого друга', actionText: 'Поделиться' }
@@ -105,12 +183,38 @@ function handleDrawClick(draw) {
     <div class="news"><div class="text-wrapper-27">{{ texts.newsTitle }}</div></div>
 
     <section class="margin-subsection">
-      <div class="background-border">
-        <img v-if="featuredBanner?.imageUrl" class="image-dynamic" :src="featuredBanner.imageUrl" alt="Banner image" />
-        <div class="background"><div class="div" /><div class="text-wrapper">{{ texts.bannerBadge }}</div></div>
-        <p class="p">{{ bannerTitle }}</p>
-        <p class="text-wrapper-2">{{ bannerSubtitle }}</p>
-        <div class="container"><div class="background-2" /><div class="background-3" /><div class="background-3" /><div class="background-3" /></div>
+      <div
+        class="background-border"
+        @pointerdown="handleBannerPointerDown"
+        @pointermove="handleBannerPointerMove"
+        @pointerup="handleBannerPointerUp"
+        @pointercancel="handleBannerPointerUp"
+        @pointerleave="handleBannerPointerUp"
+      >
+        <template v-if="carouselBanners.length">
+          <img
+            v-for="(banner, index) in carouselBanners"
+            :key="banner.id || banner.imageUrl || index"
+            v-show="index === activeBannerIndex"
+            class="image-dynamic"
+            :src="banner.imageUrl"
+            alt="Banner image"
+            draggable="false"
+          />
+          <div class="container">
+            <button
+              v-for="(banner, index) in carouselBanners"
+              :key="banner.id || `${banner.imageUrl || 'banner'}-indicator-${index}`"
+              type="button"
+              class="banner-indicator"
+              :class="{ 'banner-indicator-active': index === activeBannerIndex }"
+              :aria-label="`Show banner ${index + 1}`"
+              @click="setActiveBannerIndex(index)"
+            >
+              <span v-if="index === activeBannerIndex" class="banner-indicator-line" />
+            </button>
+          </div>
+        </template>
       </div>
     </section>
 
@@ -188,5 +292,58 @@ function handleDrawClick(draw) {
   flex-direction: column;
   width: 100%;
   align-items: center;
+}
+
+.background-border {
+  position: relative;
+  overflow: hidden;
+}
+
+.background-border .image-dynamic {
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.container {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 2;
+}
+
+.banner-indicator {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  height: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.banner-indicator::before {
+  content: '';
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.25);
+  transition: all 0.2s ease;
+}
+
+.banner-indicator-active::before {
+  width: 24px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.banner-indicator-line {
+  display: none;
 }
 </style>

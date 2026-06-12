@@ -37,6 +37,7 @@ public static class LocalDebugSeed
         await DeduplicateUsersAsync(db, seeds.Select(x => x.TelegramUserId).ToArray(), ct);
 
         await EnsureWinnerEntriesAsync(db, now, ct);
+        await EnsureNewsBannersAsync(db, now, ct);
 
         var debugUser = await db.Users
             .Where(x => x.TelegramUserId == debugTelegramUserId)
@@ -396,6 +397,47 @@ public static class LocalDebugSeed
                 IsPublished = true,
                 CreatedAtUtc = now.AddMinutes(-10),
                 UpdatedAtUtc = now.AddMinutes(-10)
+            });
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    private static async Task EnsureNewsBannersAsync(AppDbContext db, DateTimeOffset now, CancellationToken ct)
+    {
+        var hasPublishedBanners = await db.NewsBanners
+            .AsNoTracking()
+            .AnyAsync(x => x.IsPublished, ct);
+
+        if (hasPublishedBanners)
+            return;
+
+        db.NewsBanners.AddRange(
+            new NewsBanner
+            {
+                ImagePath = "/img/debug-banners/banner-1.jpg",
+                DisplayOrder = 0,
+                IsPublished = true,
+                ActionType = "none",
+                CreatedAtUtc = now.AddMinutes(-30),
+                UpdatedAtUtc = now.AddMinutes(-30)
+            },
+            new NewsBanner
+            {
+                ImagePath = "/img/debug-banners/banner-2.jpg",
+                DisplayOrder = 1,
+                IsPublished = true,
+                ActionType = "none",
+                CreatedAtUtc = now.AddMinutes(-29),
+                UpdatedAtUtc = now.AddMinutes(-29)
+            },
+            new NewsBanner
+            {
+                ImagePath = "/img/debug-banners/banner-3.jpg",
+                DisplayOrder = 2,
+                IsPublished = true,
+                ActionType = "none",
+                CreatedAtUtc = now.AddMinutes(-28),
+                UpdatedAtUtc = now.AddMinutes(-28)
             });
 
         await db.SaveChangesAsync(ct);
