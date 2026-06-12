@@ -90,6 +90,19 @@ const bannerTouchStartX = ref(0)
 const bannerTouchEndX = ref(0)
 const bannerRotationDelayMs = 5000
 let bannerRotationTimer = null
+let sortScrollPointerStartX = 0
+let sortScrollStartLeft = 0
+let sortScrollDragging = false
+let sortScrollElement = null
+let sortScrollMoved = false
+let sortScrollPointerTarget = null
+let sortScrollClickAllowed = true
+let drawScrollPointerStartX = 0
+let drawScrollStartLeft = 0
+let drawScrollDragging = false
+let drawScrollElement = null
+let drawScrollMoved = false
+let drawScrollPointerTarget = null
 
 function clampBannerIndex(index) {
   const total = carouselBanners.value.length
@@ -173,8 +186,103 @@ function handleSortChange(value) {
   emit('update:sortMode', value)
 }
 
+function handleSortScrollPointerDown(event) {
+  if (event.pointerType === 'mouse' && event.button !== 0) return
+  const target = event.target instanceof HTMLElement ? event.target : null
+  const button = target?.closest?.('.sort-option-button')
+  const el = event.currentTarget
+  if (!el) return
+  sortScrollPointerStartX = event.clientX
+  sortScrollStartLeft = el.scrollLeft
+  sortScrollDragging = true
+  sortScrollMoved = false
+  sortScrollPointerTarget = button
+  sortScrollClickAllowed = true
+  sortScrollElement = el
+  try {
+    el.setPointerCapture(event.pointerId)
+  } catch {}
+}
+
+function handleSortScrollPointerMove(event) {
+  if (!sortScrollDragging || !sortScrollElement) return
+  const delta = event.clientX - sortScrollPointerStartX
+  if (Math.abs(delta) > 4) {
+    sortScrollMoved = true
+    sortScrollClickAllowed = false
+  }
+  sortScrollElement.scrollLeft = sortScrollStartLeft - delta
+}
+
+function handleSortScrollPointerUp(event) {
+  if (sortScrollElement) {
+    try {
+      if (sortScrollElement.hasPointerCapture?.(event.pointerId)) {
+        sortScrollElement.releasePointerCapture(event.pointerId)
+      }
+    } catch {}
+  }
+  if (!sortScrollMoved && sortScrollPointerTarget) {
+    sortScrollPointerTarget.click()
+  }
+  sortScrollDragging = false
+  sortScrollElement = null
+  sortScrollPointerTarget = null
+  window.setTimeout(() => {
+    sortScrollMoved = false
+    sortScrollClickAllowed = true
+  }, 0)
+}
+
+function handleSortButtonClick(value) {
+  handleSortChange(value)
+}
+
 function handleDrawClick(draw) {
   emit('openDraw', draw.raw)
+}
+
+function handleDrawScrollPointerDown(event) {
+  if (event.pointerType === 'mouse' && event.button !== 0) return
+  const target = event.target instanceof HTMLElement ? event.target : null
+  const card = target?.closest?.('.draw-card-button')
+  const el = event.currentTarget
+  if (!el) return
+  drawScrollPointerStartX = event.clientX
+  drawScrollStartLeft = el.scrollLeft
+  drawScrollDragging = true
+  drawScrollMoved = false
+  drawScrollPointerTarget = card
+  drawScrollElement = el
+  try {
+    el.setPointerCapture(event.pointerId)
+  } catch {}
+}
+
+function handleDrawScrollPointerMove(event) {
+  if (!drawScrollDragging || !drawScrollElement) return
+  const delta = event.clientX - drawScrollPointerStartX
+  if (Math.abs(delta) > 4) drawScrollMoved = true
+  drawScrollElement.scrollLeft = drawScrollStartLeft - delta
+}
+
+function handleDrawScrollPointerUp(event) {
+  if (drawScrollElement) {
+    try {
+      if (drawScrollElement.hasPointerCapture?.(event.pointerId)) {
+        drawScrollElement.releasePointerCapture(event.pointerId)
+      }
+    } catch {}
+  }
+  if (!drawScrollMoved && drawScrollPointerTarget) {
+    drawScrollPointerTarget.click()
+  }
+  drawScrollDragging = false
+  drawScrollElement = null
+  drawScrollPointerTarget = null
+  window.setTimeout(() => {
+    drawScrollMoved = false
+  }, 0)
 }
 </script>
 
@@ -219,41 +327,69 @@ function handleDrawClick(draw) {
     </section>
 
     <section class="segmented-margin-subsection">
-      <button v-for="option in sortOptions" :key="option.value" :class="option.value === sortMode ? 'div-wrapper' : 'border'" type="button" @click="handleSortChange(option.value)">
-        <div :class="option.value === sortMode ? 'text-wrapper-3' : 'text-wrapper-4'">{{ option.label }}</div>
-      </button>
+      <div
+        class="sort-options-scroll"
+        @pointerdown="handleSortScrollPointerDown"
+        @pointermove="handleSortScrollPointerMove"
+        @pointerup="handleSortScrollPointerUp"
+        @pointercancel="handleSortScrollPointerUp"
+        @pointerleave="handleSortScrollPointerUp"
+      >
+        <div class="sort-options-track">
+          <button
+            v-for="option in sortOptions"
+            :key="option.value"
+            :class="['sort-option-button', option.value === sortMode ? 'div-wrapper' : 'border']"
+            type="button"
+            @click="handleSortButtonClick(option.value)"
+          >
+            <div :class="option.value === sortMode ? 'text-wrapper-3' : 'text-wrapper-4'">{{ option.label }}</div>
+          </button>
+        </div>
+      </div>
     </section>
 
     <section class="draw-cards-subsection">
-      <div v-if="loading || error || !formattedDraws.length" class="draw-status-card" :class="{ 'draw-status-card-error': !!error }">
-        <template v-if="loading">{{ texts.loadingText }}</template>
-        <template v-else-if="error">{{ error }}</template>
-        <template v-else>{{ texts.emptyDrawsText }}</template>
-      </div>
-      <button
-        v-for="draw in formattedDraws"
-        v-else
-        :key="draw.id"
-        class="draw-card-button"
-        :class="draw.theme === 'blue' ? 'background-shadow-2' : 'background-shadow'"
-        type="button"
-        @click="handleDrawClick(draw)"
+      <div
+        class="draw-cards-scroll"
+        @pointerdown="handleDrawScrollPointerDown"
+        @pointermove="handleDrawScrollPointerMove"
+        @pointerup="handleDrawScrollPointerUp"
+        @pointercancel="handleDrawScrollPointerUp"
+        @pointerleave="handleDrawScrollPointerUp"
       >
-        <div class="draw-card-shell">
-          <div class="container-2">
-            <div class="container-3"><div class="text-wrapper-5">{{ draw.title }}</div></div>
-            <div class="overlay"><div class="text-wrapper-6">{{ draw.countdown }}</div></div>
+        <div class="draw-cards-track">
+          <div v-if="loading || error || !formattedDraws.length" class="draw-status-card" :class="{ 'draw-status-card-error': !!error }">
+            <template v-if="loading">{{ texts.loadingText }}</template>
+            <template v-else-if="error">{{ error }}</template>
+            <template v-else>{{ texts.emptyDrawsText }}</template>
           </div>
-          <div class="container-4">
-            <div class="container-5"><div class="text-wrapper-7">{{ texts.jackpotLabel }}</div></div>
-            <div class="container-5"><div :class="draw.theme === 'blue' ? 'text-wrapper-11' : 'text-wrapper-8'">{{ draw.jackpot }}</div></div>
-          </div>
-          <div class="overlay-overlayblur">
-            <div class="container-3"><div class="text-wrapper-9">{{ texts.ticketPriceLabel }}</div></div>
-            <div class="container-3"><div class="text-wrapper-10">{{ draw.ticketPrice }}</div></div>
-          </div>
+          <button
+            v-for="draw in formattedDraws"
+            v-else
+            :key="draw.id"
+            class="draw-card-button"
+            :class="draw.theme === 'blue' ? 'background-shadow-2' : 'background-shadow'"
+            type="button"
+            @click="handleDrawClick(draw)"
+          >
+            <div class="draw-card-shell">
+              <div class="container-2">
+                <div class="container-3"><div class="text-wrapper-5">{{ draw.title }}</div></div>
+                <div class="overlay"><div class="text-wrapper-6">{{ draw.countdown }}</div></div>
+              </div>
+              <div class="container-4">
+                <div class="container-5"><div class="text-wrapper-7">{{ texts.jackpotLabel }}</div></div>
+                <div class="container-5"><div :class="draw.theme === 'blue' ? 'text-wrapper-11' : 'text-wrapper-8'">{{ draw.jackpot }}</div></div>
+              </div>
+              <div class="overlay-overlayblur">
+                <div class="container-3"><div class="text-wrapper-9">{{ texts.ticketPriceLabel }}</div></div>
+                <div class="container-3"><div class="text-wrapper-10">{{ draw.ticketPrice }}</div></div>
+              </div>
+            </div>
+          </button>
         </div>
-      </button>
+      </div>
     </section>
 
     <section class="container-subsection">
@@ -345,5 +481,61 @@ function handleDrawClick(draw) {
 
 .banner-indicator-line {
   display: none;
+}
+
+.segmented-margin-subsection {
+  width: 100%;
+  overflow: hidden;
+}
+
+.sort-options-scroll {
+  width: 100%;
+  overflow: hidden;
+  cursor: grab;
+  user-select: none;
+}
+
+.sort-options-scroll:active {
+  cursor: grabbing;
+}
+
+.sort-options-track {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  width: max-content;
+  min-width: 100%;
+  will-change: transform;
+  transform: translateX(0);
+}
+
+.sort-option-button {
+  flex: 0 0 auto;
+  width: fit-content;
+  white-space: nowrap;
+}
+
+.sort-option-button > div {
+  white-space: nowrap;
+}
+
+.draw-cards-scroll {
+  width: 100%;
+  overflow: hidden;
+  cursor: grab;
+  user-select: none;
+  background: #fff;
+}
+
+.draw-cards-scroll:active {
+  cursor: grabbing;
+}
+
+.draw-cards-track {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 12px;
+  width: max-content;
+  min-width: 100%;
 }
 </style>
