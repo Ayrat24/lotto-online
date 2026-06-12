@@ -20,22 +20,6 @@ const emit = defineEmits([
 
 const profileTitle = computed(() => props.texts.profileTitle || 'Профиль')
 const profileCardSubtitle = computed(() => props.subtitle || props.texts.profileCardSubtitle || '')
-
-const icons = {
-  topUp: '/images/icons/plus.svg',
-  invite: '/images/icons/presenticon.svg',
-  withdraw: '/images/icons/arrowup.svg',
-  transactions: '/images/icons/clock.svg',
-  chevron: '/images/icons/arrowright.svg'
-}
-
-function fallbackIconMarkup(key) {
-  if (key === 'topUp') return '+'
-  if (key === 'invite') return '🎁'
-  if (key === 'withdraw') return '↗'
-  if (key === 'transactions') return '◔'
-  return '›'
-}
 </script>
 
 <template>
@@ -54,34 +38,34 @@ function fallbackIconMarkup(key) {
       <div class="profile-actions">
         <button type="button" class="profile-action" @click="emit('open-top-up')">
           <span class="profile-action__icon profile-action__icon--topup">
-            <img :src="icons.topUp" alt="" aria-hidden="true" />
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M9.99999 4.16675V15.8334M4.16666 10.0001H15.8333" stroke="#1AA873" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </span>
           <span class="profile-action__text">{{ texts.topUpBalance }}</span>
-          <img class="profile-action__chevron" :src="icons.chevron" alt="" aria-hidden="true" />
+          <svg class="profile-action__chevron" width="8" height="14" viewBox="0 0 8 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M1 1L7 7L1 13" stroke="#8A8A92" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
 
         <button type="button" class="profile-action" @click="emit('open-invite')">
           <span class="profile-action__icon profile-action__icon--invite">
-            <img :src="icons.invite" alt="" aria-hidden="true" />
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M16.6667 10V16.6667C16.6667 16.8877 16.5789 17.0996 16.4226 17.2559C16.2663 17.4122 16.0544 17.5 15.8333 17.5H4.16668C3.94566 17.5 3.7337 17.4122 3.57742 17.2559C3.42114 17.0996 3.33334 16.8877 3.33334 16.6667V10" stroke="#E09A1F" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M17.5 5.83325H2.49999C2.03975 5.83325 1.66666 6.20635 1.66666 6.66659V9.16659C1.66666 9.62682 2.03975 9.99992 2.49999 9.99992H17.5C17.9602 9.99992 18.3333 9.62682 18.3333 9.16659V6.66659C18.3333 6.20635 17.9602 5.83325 17.5 5.83325Z" stroke="#E09A1F" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 17.4999V5.83325" stroke="#E09A1F" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.99999 5.83343C8.33332 5.83343 6.66666 4.16676 6.66666 2.91676C6.66666 1.66676 7.49999 1.66676 8.33332 2.08343C9.16666 2.50009 9.99999 4.16676 9.99999 5.83343ZM9.99999 5.83343C9.99999 4.16676 10.8333 2.08343 11.6667 2.08343C12.5 2.08343 13.3333 1.66676 13.3333 2.91676C13.3333 4.16676 11.6667 5.83343 9.99999 5.83343Z" stroke="#E09A1F" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </span>
           <span class="profile-action__text">{{ texts.inviteFriend }}</span>
-          <img class="profile-action__chevron" :src="icons.chevron" alt="" aria-hidden="true" />
+          <svg class="profile-action__chevron" width="8" height="14" viewBox="0 0 8 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M1 1L7 7L1 13" stroke="#8A8A92" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
 
         <button type="button" class="profile-action" @click="emit('open-withdraw')">
           <span class="profile-action__icon profile-action__icon--withdraw">
-            <img :src="icons.withdraw" alt="" aria-hidden="true" />
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M5.83334 14.1666L14.1667 5.83325" stroke="#F97316" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M6.66666 5.83325H14.1667V13.3333" stroke="#F97316" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </span>
           <span class="profile-action__text">{{ texts.withdrawMoney }}</span>
-          <img class="profile-action__chevron" :src="icons.chevron" alt="" aria-hidden="true" />
+          <svg class="profile-action__chevron" width="8" height="14" viewBox="0 0 8 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M1 1L7 7L1 13" stroke="#8A8A92" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
 
         <button type="button" class="profile-action profile-action--last" @click="emit('open-transactions')">
           <span class="profile-action__icon profile-action__icon--transactions">
-            <img :src="icons.transactions" alt="" aria-hidden="true" />
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M10 17.5C14.1421 17.5 17.5 14.1421 17.5 10C17.5 5.85786 14.1421 2.5 10 2.5C5.85786 2.5 2.5 5.85786 2.5 10C2.5 14.1421 5.85786 17.5 10 17.5Z" stroke="#3B82F6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 5.83325V9.99992L12.5 11.6666" stroke="#3B82F6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </span>
           <span class="profile-action__text">{{ texts.transactionHistory }}</span>
-          <img class="profile-action__chevron" :src="icons.chevron" alt="" aria-hidden="true" />
+          <svg class="profile-action__chevron" width="8" height="14" viewBox="0 0 8 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M1 1L7 7L1 13" stroke="#8A8A92" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
       </div>
     </section>
@@ -245,7 +229,7 @@ function fallbackIconMarkup(key) {
   overflow: hidden;
 }
 
-.profile-action__icon img {
+.profile-action__icon svg {
   display: block;
   width: 20px;
   height: 20px;
@@ -255,6 +239,7 @@ function fallbackIconMarkup(key) {
   width: 8px;
   height: 14px;
   flex-shrink: 0;
+  display: block;
 }
 
 .profile-action__icon--topup {
@@ -281,10 +266,4 @@ function fallbackIconMarkup(key) {
   color: #0f0f12;
 }
 
-.profile-action__chevron {
-  color: #9aa0a6;
-  font-size: 24px;
-  line-height: 1;
-  flex-shrink: 0;
-}
 </style>
