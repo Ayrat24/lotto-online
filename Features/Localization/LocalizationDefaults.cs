@@ -859,6 +859,7 @@ internal static class LocalizationDefaults
             ["client.tickets.winUpTo"] = ("Win up to", "Выиграй до", "Gacha yuting"),
             ["client.tickets.timeIn"] = ("in", "через", "orqali"),
             ["client.tickets.subtitle"] = ("{0} active · {1} awaiting", "{0} активных · {1} ожидают", "{0} faol · {1} kutmoqda"),
+            ["client.tickets.emptySubtitle"] = ("All your tickets will appear here", "Все ваши билеты появятся здесь", "Barcha biletlaringiz bu yerda ko'rinadi"),
 
             // Winners screen additions
             ["client.winners.sort.day"] = ("Day", "За день", "Kun"),

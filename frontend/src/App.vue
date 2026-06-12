@@ -288,7 +288,8 @@ const myTicketsTexts = computed(() => ({
   winUpTo: getText('client.tickets.winUpTo', 'Выиграй до'),
   drawPrefix: getText('client.history.drawPrefix', 'Тираж #'),
   timeIn: getText('client.tickets.timeIn', 'in'),
-  subtitleFormat: getText('client.tickets.subtitle', '{0} active · {1} awaiting')
+  subtitleFormat: getText('client.tickets.subtitle', '{0} active · {1} awaiting'),
+  noTicketsSubtitle: getText('client.tickets.emptySubtitle', 'Все ваши билеты появятся здесь')
 }))
 
 const winnersTexts = computed(() => ({
@@ -698,7 +699,8 @@ onBeforeUnmount(() => {
   background-color: #ffffff;
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100%;
+  overflow: hidden;
   position: relative;
   width: 100%;
 }
@@ -715,7 +717,9 @@ onBeforeUnmount(() => {
   flex: 1;
   flex-direction: column;
   max-width: 100%;
+  min-height: 0;
   overflow-y: auto;
+  scrollbar-width: none;
   padding-bottom: 100px;
   position: relative;
   width: 390px;

@@ -290,7 +290,16 @@ const emptyMessage = computed(() => {
     <!-- Loading / Error / Empty -->
     <div v-if="loading" class="mt-state">{{ texts.loadingText || 'Загрузка...' }}</div>
     <div v-else-if="error" class="mt-state mt-state--error">{{ error }}</div>
-    <div v-else-if="filteredTickets.length === 0" class="mt-state mt-state--empty">{{ emptyMessage }}</div>
+    <div v-else-if="filteredTickets.length === 0" class="mt-empty-card">
+      <div class="mt-empty-icon-wrap">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4 12C4 10.895 4.895 10 6 10H26C27.105 10 28 10.895 28 12V14.25C26.757 14.25 25.75 15.257 25.75 16.5C25.75 17.743 26.757 18.75 28 18.75V21C28 22.105 27.105 23 26 23H6C4.895 23 4 22.105 4 21V18.75C5.243 18.75 6.25 17.743 6.25 16.5C6.25 15.257 5.243 14.25 4 14.25V12Z" stroke="#FFA300" stroke-width="1.75" stroke-linejoin="round"/>
+          <path d="M12 10V23" stroke="#FFA300" stroke-width="1.75" stroke-dasharray="2.5 2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="mt-empty-title">{{ emptyMessage }}</div>
+      <div class="mt-empty-subtitle">{{ texts.noTicketsSubtitle || 'Все ваши билеты появятся здесь' }}</div>
+    </div>
 
     <!-- Ticket cards -->
     <div v-else class="mt-list">
@@ -393,9 +402,9 @@ const emptyMessage = computed(() => {
   justify-content: center;
   align-items: center;
   gap: 4px;
-  padding: 12px 0 13px;
+  padding: 8px 0 9px;
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   border-radius: 100px;
   font-family: 'Inter', Helvetica, sans-serif;
   font-weight: 700;
@@ -408,12 +417,8 @@ const emptyMessage = computed(() => {
 
 .mt-seg-btn--active {
   background: #FFFFFF;
-  border: 1px solid rgba(15, 15, 20, 0.06);
+  border-color: rgba(15, 15, 20, 0.06);
   box-shadow: 0 1px 2px rgba(15,15,20,0.04), 0 4px 20px rgba(15,15,20,0.04);
-}
-
-.mt-seg-btn:not(.mt-seg-btn--active) {
-  color: #111111;
 }
 
 .mt-seg-dot {
@@ -439,6 +444,48 @@ const emptyMessage = computed(() => {
 
 .mt-state--empty {
   color: #8A8A8A;
+}
+
+/* ── Empty state card ──────────────────────────────── */
+.mt-empty-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px 24px;
+  margin: 16px;
+  background: #FFFFFF;
+  border: 1px solid rgba(15, 15, 20, 0.06);
+  border-radius: 20px;
+  box-shadow: 0 1px 2px rgba(15,15,20,0.04), 0 4px 20px rgba(15,15,20,0.04);
+}
+
+.mt-empty-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  background: #FFF8EC;
+  border-radius: 18px;
+  margin-bottom: 4px;
+}
+
+.mt-empty-title {
+  font-family: 'Manrope', Helvetica, sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  color: #0F0F12;
+  text-align: center;
+}
+
+.mt-empty-subtitle {
+  font-family: 'Inter', Helvetica, sans-serif;
+  font-weight: 400;
+  font-size: 13px;
+  color: #8A8A8A;
+  text-align: center;
 }
 
 /* ── Ticket list ───────────────────────────────────── */
