@@ -576,6 +576,7 @@ function handleDrawScrollPointerUp(event) {
   flex-direction: column;
   width: 100%;
   align-items: center;
+  padding-bottom: 100px;
 }
 
 .background-border {
@@ -716,6 +717,11 @@ function handleDrawScrollPointerUp(event) {
   background: transparent;
   touch-action: pan-x;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.draw-cards-scroll::-webkit-scrollbar {
+  display: none;
 }
 
 .draw-cards-scroll:active {
@@ -728,5 +734,7 @@ function handleDrawScrollPointerUp(event) {
   gap: 12px;
   width: max-content;
   min-width: 100%;
+  padding: 4px 20px 10px;
+  box-sizing: border-box;
 }
 </style>

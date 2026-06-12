@@ -103,6 +103,10 @@ body {
     position: relative;
 }
 
+.container-4 {
+    gap: 3px;
+}
+
 .text-wrapper-23 {
     color: #0f0f12;
     font-size: 15px;
@@ -140,7 +144,7 @@ body {
 .news {
     display: flex;
     flex-direction: column;
-    padding: 0 20px 10px;
+    padding: 14px 20px 10px;
     width: 390px;
     max-width: 100%;
 }
@@ -155,7 +159,6 @@ body {
 .margin-subsection {
     display: flex;
     flex-direction: column;
-    height: 158px;
     padding: 0 20px;
     position: relative;
     width: 390px;
@@ -168,7 +171,7 @@ body {
     border: 1px solid #ffffff1a;
     border-radius: 22px;
     box-shadow: 0 2px 6px #0f0f140a, 0 8px 24px #0f0f140f;
-    height: 158px;
+    min-height: 158px;
     overflow: hidden;
     position: relative;
     width: 100%;
@@ -299,7 +302,7 @@ body {
 .border {
     align-items: center;
     background-color: #ffffff;
-    border: 1px solid #0f0f140f;
+    border: 1px solid #e4e4e7;
 }
 
 .text-wrapper-3 {
@@ -316,12 +319,11 @@ body {
 
 .draw-cards-subsection {
     display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    justify-content: center;
-    padding: 14px 20px;
+    flex-direction: column;
+    padding: 10px 0 4px;
     width: 390px;
     max-width: 100%;
+    overflow: hidden;
 }
 
 .draw-card-button {
@@ -329,9 +331,9 @@ body {
     background: transparent;
     border: 0;
     cursor: pointer;
-    flex: 0;
+    flex: 0 0 163px;
+    width: 163px;
     font: inherit;
-    min-width: calc(50% - 6px);
     padding: 0;
     pointer-events: auto;
     position: relative;
@@ -382,14 +384,14 @@ body {
     box-shadow: inset 0 1px 0 #ffffff59;
     color: #ffffff;
     display: flex;
-    flex: 1;
     flex-direction: column;
-    flex-grow: 1;
+    width: 100%;
     height: 178px;
     justify-content: space-between;
     overflow: hidden;
     padding: 16px;
     pointer-events: auto;
+    box-sizing: border-box;
 }
 
 .background-shadow {
@@ -488,7 +490,7 @@ body {
     align-items: center;
     display: flex;
     justify-content: space-between;
-    padding: 10px 20px 14px;
+    padding: 12px 20px 14px;
     width: 390px;
     max-width: 100%;
 }
@@ -536,7 +538,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    padding: 0 20px 100px;
+    padding: 0 20px;
     width: 390px;
     max-width: 100%;
 }
