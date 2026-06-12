@@ -220,6 +220,7 @@ function handleSortChange(value) {
 }
 
 function handleSortScrollPointerDown(event) {
+  if (event.pointerType === 'touch') return
   if (event.pointerType === 'mouse' && event.button !== 0) return
   const target = event.target instanceof HTMLElement ? event.target : null
   const button = target?.closest?.('.sort-option-button')
@@ -276,6 +277,7 @@ function handleDrawClick(draw) {
 }
 
 function handleDrawScrollPointerDown(event) {
+  if (event.pointerType === 'touch') return
   if (event.pointerType === 'mouse' && event.button !== 0) return
   const target = event.target instanceof HTMLElement ? event.target : null
   const card = target?.closest?.('.draw-card-button')
@@ -498,11 +500,13 @@ function handleDrawScrollPointerUp(event) {
   flex: 0 0 100%;
   width: 100%;
   height: 100%;
+  max-width: 100%;
+  display: block;
 }
 
 .background-border .image-dynamic {
-  position: absolute;
-  inset: 0 auto auto 0;
+  position: relative;
+  inset: auto;
   user-select: none;
   -webkit-user-drag: none;
   object-fit: cover;
@@ -558,9 +562,19 @@ function handleDrawScrollPointerUp(event) {
 
 .sort-options-scroll {
   width: 100%;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   cursor: grab;
   user-select: none;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.sort-options-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .sort-options-scroll:active {
@@ -589,10 +603,13 @@ function handleDrawScrollPointerUp(event) {
 
 .draw-cards-scroll {
   width: 100%;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   cursor: grab;
   user-select: none;
-  background: #fff;
+  background: transparent;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
 }
 
 .draw-cards-scroll:active {

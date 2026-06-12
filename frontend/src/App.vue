@@ -326,6 +326,17 @@ async function loadTimeline() {
 }
 
 async function loadBanners() {
+  if (state.isLocalDebug) {
+    const debugColors = ['#ef4444', '#3b82f6', '#22c55e']
+    state.banners = debugColors.map((color, index) => {
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="320"><rect width="100%" height="100%" fill="${color}"/></svg>`
+      return {
+        id: `debug-${index + 1}`,
+        imageUrl: `data:image/svg+xml,${encodeURIComponent(svg)}`
+      }
+    })
+    return
+  }
   const res = await postJson('/api/news-banners', { initData: state.initData, locale: state.locale })
   state.banners = res && res.ok && Array.isArray(res.banners) ? res.banners : []
 }
