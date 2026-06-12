@@ -28,8 +28,8 @@ const sortOptions = computed(() => [
 ])
 
 function getTicketStatusValue(status) {
-  if (status === 'WinningsAvailable' || status === 'WinningsClaimed') return 'won'
-  if (status === 'AwaitingDraw') return 'active'
+  if (status === 'winnings_available' || status === 'winnings_claimed') return 'won'
+  if (status === 'awaiting_draw') return 'active'
   return 'lost'
 }
 
@@ -198,15 +198,15 @@ const activeTicketCount = computed(() => {
   for (const g of [...all, ...hist]) {
     const tickets = Array.isArray(g.tickets) ? g.tickets : []
     for (const t of tickets) {
-      if (t.status === 'AwaitingDraw') awaiting++
-      else if (t.status === 'WinningsAvailable' || t.status === 'WinningsClaimed') {}
+      if (t.status === 'awaiting_draw') awaiting++
+      else if (t.status === 'winnings_available' || t.status === 'winnings_claimed') {}
       else active++
     }
   }
   // also check currentTickets
   const ct = Array.isArray(props.timeline?.currentTickets) ? props.timeline.currentTickets : []
   for (const t of ct) {
-    if (t.status === 'AwaitingDraw') awaiting++
+    if (t.status === 'awaiting_draw') awaiting++
   }
   return { active, awaiting }
 })
@@ -230,10 +230,10 @@ function parseNumbers(numbersStr) {
 
 function getStatusText(status) {
   switch (status) {
-    case 'AwaitingDraw': return props.texts.statusAwaitingDraw || 'Ожидает розыгрыша'
-    case 'WinningsAvailable': return props.texts.statusWon || 'Выигрыш'
-    case 'WinningsClaimed': return props.texts.statusClaimed || 'Выплачено'
-    case 'ExpiredNoWin': return props.texts.statusLost || 'Не выиграл'
+    case 'awaiting_draw': return props.texts.statusAwaitingDraw || 'Ожидает розыгрыша'
+    case 'winnings_available': return props.texts.statusWon || 'Выигрыш'
+    case 'winnings_claimed': return props.texts.statusClaimed || 'Выплачено'
+    case 'expired_no_win': return props.texts.statusLost || 'Не выиграл'
     default: return status
   }
 }
@@ -331,7 +331,7 @@ const emptyMessage = computed(() => {
                 class="mt-card-num"
               >{{ num }}</span>
             </div>
-            <div class="mt-card-dot" v-if="entry.ticket.status === 'WinningsAvailable'"></div>
+            <div class="mt-card-dot" v-if="entry.ticket.status === 'winnings_available'"></div>
           </div>
           <div class="mt-card-winup">{{ texts.winUpTo || 'Выиграй до' }} <strong>{{ formatCurrency(entry.draw?.prizePoolMatch5 || entry.draw?.prizePool || 0) }}</strong></div>
         </div>
@@ -617,9 +617,10 @@ const emptyMessage = computed(() => {
 .mt-card-right {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: center;
   align-items: flex-end;
   flex-shrink: 0;
+  gap: 3px;
   padding: 2px 0;
 }
 
