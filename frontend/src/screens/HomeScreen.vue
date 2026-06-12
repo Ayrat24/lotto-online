@@ -32,9 +32,9 @@ function formatJackpot(value, locale = 'en-US') {
   return '$' + Math.round(Number.isFinite(amount) ? amount : 0).toLocaleString(locale)
 }
 
-function formatCountdown(targetUtc) {
+function formatCountdown(targetUtc, schedulePending = 'Schedule pending') {
   const targetMs = Date.parse(targetUtc || '')
-  if (!Number.isFinite(targetMs)) return 'Schedule pending'
+  if (!Number.isFinite(targetMs)) return schedulePending
   const remaining = Math.max(0, Math.floor((targetMs - Date.now()) / 1000))
   const hours = Math.floor(remaining / 3600)
   const minutes = Math.floor((remaining % 3600) / 60)
@@ -75,8 +75,8 @@ const formattedDraws = computed(() => activeDraws.value.map((draw, index) => {
   const color = String(draw?.cardColor || 'gold').toLowerCase()
   return {
     id: draw.id,
-    title: `Тираж #${draw.id}`,
-    countdown: formatCountdown(draw.purchaseClosesAtUtc),
+    title: `${props.texts.drawTitlePrefix || 'Тираж #'}${draw.id}`,
+    countdown: formatCountdown(draw.purchaseClosesAtUtc, props.texts.schedulePending),
     jackpot: formatJackpot(draw.prizePoolMatch5, intlLocale.value),
     ticketPrice: formatCurrency(draw.ticketCost, intlLocale.value).replace('.', ','),
     theme: color === 'blue' || index % 2 === 1 ? 'blue' : 'orange',
@@ -302,8 +302,8 @@ onBeforeUnmount(() => {
 
 const activeBanner = computed(() => carouselBanners.value[activeBannerIndex.value] || null)
 
-const primaryOffer = { kicker: 'БОНУС НОВИЧКА', title: '3 бесплатных билета', actionText: 'Получить' }
-const secondaryOffer = { kicker: 'ПРИГЛАШАЙ И ЗАРАБАТЫВАЙ', title: '$5 за каждого друга', actionText: 'Поделиться' }
+const primaryOffer = computed(() => props.texts.primaryOffer || { kicker: 'БОНУС НОВИЧКА', title: '3 бесплатных билета', actionText: 'Получить' })
+const secondaryOffer = computed(() => props.texts.secondaryOffer || { kicker: 'ПРИГЛАШАЙ И ЗАРАБАТЫВАЙ', title: '$5 за каждого друга', actionText: 'Поделиться' })
 
 function handleSortChange(value) {
   emit('update:sortMode', value)

@@ -829,7 +829,46 @@ internal static class LocalizationDefaults
             ["bot.invalidNumber"] = ("I could not read a valid phone number. Please tap 'Share my contact' or send the number as text.", "Не удалось распознать номер. Нажмите 'Поделиться контактом' или отправьте номер текстом.", "Raqamni oqib bolmadi. 'Kontaktni yuborish' tugmasini bosing yoki raqamni matn qilib yuboring."),
             ["bot.languageUpdated"] = ("Language updated.", "Язык обновлен.", "Til yangilandi."),
             ["bot.languageBeforePhone"] = ("First choose a language.", "Сначала выберите язык.", "Avval tilni tanlang."),
-            ["bot.askPhonePlaceholder"] = ("Tap the button to share your phone number", "Нажмите кнопку, чтобы поделиться номером", "Telefon raqamingizni yuborish uchun tugmani bosing")
+            ["bot.askPhonePlaceholder"] = ("Tap the button to share your phone number", "Нажмите кнопку, чтобы поделиться номером", "Telefon raqamingizni yuborish uchun tugmani bosing"),
+
+            // Home screen
+            ["client.home.bannerBadge"] = ("ANNOUNCEMENT", "АНОНС", "E'LON"),
+            ["client.home.offersTitle"] = ("Today's offers", "Сегодняшние предложения", "Bugungi takliflar"),
+            ["client.home.seeAll"] = ("See all", "Смотреть все", "Barchasini ko'rish"),
+            ["client.home.loading"] = ("Loading...", "Загрузка...", "Yuklanmoqda..."),
+            ["client.home.primaryOffer.kicker"] = ("BEGINNER BONUS", "БОНУС НОВИЧКА", "BOSHLANG'ICH BONUS"),
+            ["client.home.primaryOffer.title"] = ("3 free tickets", "3 бесплатных билета", "3 ta bepul bilet"),
+            ["client.home.primaryOffer.action"] = ("Get", "Получить", "Olish"),
+            ["client.home.secondaryOffer.kicker"] = ("INVITE & EARN", "ПРИГЛАШАЙ И ЗАРАБАТЫВАЙ", "TAKLIF VA ISHLANG"),
+            ["client.home.secondaryOffer.title"] = ("$5 for every friend", "$5 за каждого друга", "Har bir do'st uchun $5"),
+            ["client.home.secondaryOffer.action"] = ("Share", "Поделиться", "Ulashish"),
+
+            // Ticket purchase screen additions
+            ["client.purchaseScreen.totalLabel"] = ("Total:", "Итого:", "Jami:"),
+            ["client.purchaseScreen.chooseNumbers"] = ("Choose {0} more number(s)", "Выберите еще {0} число(а)", "Yana {0} ta raqam tanlang"),
+
+            // My tickets screen additions
+            ["client.tickets.loading"] = ("Loading tickets...", "Загрузка билетов...", "Biletlar yuklanmoqda..."),
+            ["client.tickets.filter.all"] = ("All", "Все", "Barchasi"),
+            ["client.tickets.filter.active"] = ("Active", "Активные", "Faol"),
+            ["client.tickets.filter.won"] = ("Winning", "Выигрышные", "Yutuqli"),
+            ["client.tickets.filter.past"] = ("Past", "Прошедшие", "O'tgan"),
+            ["client.tickets.noActive"] = ("No active tickets", "Нет активных билетов", "Faol biletlar yo'q"),
+            ["client.tickets.noWon"] = ("No winning tickets", "Нет выигрышных билетов", "Yutuqli biletlar yo'q"),
+            ["client.tickets.noPast"] = ("No past tickets", "Нет прошедших билетов", "O'tgan biletlar yo'q"),
+            ["client.tickets.winUpTo"] = ("Win up to", "Выиграй до", "Gacha yuting"),
+            ["client.tickets.timeIn"] = ("in", "через", "orqali"),
+            ["client.tickets.subtitle"] = ("{0} active · {1} awaiting", "{0} активных · {1} ожидают", "{0} faol · {1} kutmoqda"),
+
+            // Winners screen additions
+            ["client.winners.sort.day"] = ("Day", "За день", "Kun"),
+            ["client.winners.sort.week"] = ("Week", "За неделю", "Hafta"),
+            ["client.winners.sort.month"] = ("Month", "За месяц", "Oy"),
+            ["client.winners.sort.year"] = ("Year", "За год", "Yil"),
+
+            // App header subtitles
+            ["client.header.ticketSelection"] = ("Choose ticket numbers", "Выберите номера для билета", "Bilet raqamlarini tanlang"),
+            ["client.header.myTickets"] = ("Your purchased tickets", "Ваши приобретённые билеты", "Sotib olingan biletlaringiz")
         };
 }
 

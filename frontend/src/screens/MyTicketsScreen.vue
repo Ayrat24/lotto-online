@@ -22,9 +22,9 @@ const SORT_MODES = {
 const activeSort = ref(SORT_MODES.active)
 
 const sortOptions = computed(() => [
-  { value: SORT_MODES.active, label: 'Активные' },
-  { value: SORT_MODES.past, label: 'Прошедшие' },
-  { value: SORT_MODES.won, label: 'Выигранные' }
+  { value: SORT_MODES.active, label: props.texts.activeSort || 'Активные' },
+  { value: SORT_MODES.past, label: props.texts.pastSort || 'Прошедшие' },
+  { value: SORT_MODES.won, label: props.texts.wonSort || 'Выигранные' }
 ])
 
 function getTicketStatusValue(status) {
@@ -213,7 +213,8 @@ const activeTicketCount = computed(() => {
 
 const subtitleText = computed(() => {
   const a = activeTicketCount.value
-  return `${a.active} active · ${a.awaiting} awaiting draw`
+  const fmt = props.texts.subtitleFormat || '{0} active · {1} awaiting'
+  return fmt.replace('{0}', a.active).replace('{1}', a.awaiting)
 })
 
 function handleTicketClick(entry) {
@@ -229,10 +230,10 @@ function parseNumbers(numbersStr) {
 
 function getStatusText(status) {
   switch (status) {
-    case 'AwaitingDraw': return 'Ожидает розыгрыша'
-    case 'WinningsAvailable': return 'Выигрыш'
-    case 'WinningsClaimed': return 'Выплачено'
-    case 'ExpiredNoWin': return 'Не выиграл'
+    case 'AwaitingDraw': return props.texts.statusAwaitingDraw || 'Ожидает розыгрыша'
+    case 'WinningsAvailable': return props.texts.statusWon || 'Выигрыш'
+    case 'WinningsClaimed': return props.texts.statusClaimed || 'Выплачено'
+    case 'ExpiredNoWin': return props.texts.statusLost || 'Не выиграл'
     default: return status
   }
 }
@@ -257,10 +258,10 @@ const hasActiveTickets = computed(() => {
 })
 
 const emptyMessage = computed(() => {
-  if (activeSort.value === SORT_MODES.active) return 'Нет активных билетов'
-  if (activeSort.value === SORT_MODES.won) return 'Нет выигрышных билетов'
-  if (activeSort.value === SORT_MODES.past) return 'Нет прошедших билетов'
-  return 'У вас пока нет билетов'
+  if (activeSort.value === SORT_MODES.active) return props.texts.noActiveTickets || 'Нет активных билетов'
+  if (activeSort.value === SORT_MODES.won) return props.texts.noWonTickets || 'Нет выигрышных билетов'
+  if (activeSort.value === SORT_MODES.past) return props.texts.noPastTickets || 'Нет прошедших билетов'
+  return props.texts.noTickets || 'У вас пока нет билетов'
 })
 </script>
 
@@ -268,7 +269,7 @@ const emptyMessage = computed(() => {
   <div class="mt-screen">
     <!-- Title row -->
     <div class="mt-title-row">
-      <div class="mt-title">Мои билеты</div>
+      <div class="mt-title">{{ texts.title || 'Мои билеты' }}</div>
       <div class="mt-subtitle">{{ subtitleText }}</div>
     </div>
 
@@ -312,7 +313,7 @@ const emptyMessage = computed(() => {
 
         <!-- Middle: draw name, numbers, win amount -->
         <div class="mt-card-body">
-          <div class="mt-card-name">Draw #{{ entry.drawId }}</div>
+          <div class="mt-card-name">{{ texts.drawPrefix || 'Тираж #' }}{{ entry.drawId }}</div>
           <div class="mt-card-row">
             <div class="mt-card-nums">
               <span
@@ -323,12 +324,12 @@ const emptyMessage = computed(() => {
             </div>
             <div class="mt-card-dot" v-if="entry.ticket.status === 'WinningsAvailable'"></div>
           </div>
-          <div class="mt-card-winup">Выиграй до <strong>{{ formatCurrency(entry.draw?.prizePoolMatch5 || entry.draw?.prizePool || 0) }}</strong></div>
+          <div class="mt-card-winup">{{ texts.winUpTo || 'Выиграй до' }} <strong>{{ formatCurrency(entry.draw?.prizePoolMatch5 || entry.draw?.prizePool || 0) }}</strong></div>
         </div>
 
         <!-- Right: countdown / status -->
         <div class="mt-card-right">
-          <div class="mt-card-time-label" v-if="entry.draw?.state === 'active'">in</div>
+          <div class="mt-card-time-label" v-if="entry.draw?.state === 'active'">{{ texts.timeIn || 'in' }}</div>
           <div v-else class="mt-card-time-label">{{ getStatusText(entry.ticket.status) }}</div>
           <div class="mt-card-time-value" v-if="entry.draw?.state === 'active'">
             {{ formatCountdown(entry.draw?.purchaseClosesAtUtc) }}

@@ -160,10 +160,10 @@ const localizedBalanceLabel = computed(() => getText('client.balance.label', tex
 
 const userSubtitle = computed(() => {
   if (currentScreen.value === 'ticket-selection') {
-    return 'Выберите номера для билета'
+    return getText('client.header.ticketSelection', 'Выберите номера для билета')
   }
   if (currentScreen.value === 'tickets') {
-    return 'Ваши приобретённые билеты'
+    return getText('client.header.myTickets', 'Ваши приобретённые билеты')
   }
   if (currentScreen.value === 'profile') return getText('client.profile.title', 'Профиль')
   if (currentScreen.value === 'profile-edit') return getText('client.profile.edit.title', 'Профиль')
@@ -228,45 +228,77 @@ const ticketPurchase = computed(() => {
 })
 
 const homeTexts = computed(() => ({
-  newsTitle: texts.newsTitle,
-  bannerBadge: texts.bannerBadge,
-  jackpotLabel: texts.jackpotLabel,
-  ticketPriceLabel: texts.ticketPriceLabel,
-  loadingText: texts.loadingText,
-  emptyDrawsText: texts.emptyDrawsText,
-  offersTitle: texts.offersTitle,
-  seeAllText: texts.seeAllText,
-  closestSort: texts.closestSort,
-  jackpotSort: texts.jackpotSort,
-  cheapSort: texts.cheapSort
+  newsTitle: getText('client.news.title', texts.newsTitle),
+  bannerBadge: getText('client.home.bannerBadge', texts.bannerBadge),
+  jackpotLabel: getText('client.drawCard.jackpotLabel', texts.jackpotLabel),
+  ticketPriceLabel: getText('client.drawCard.ticketCostLabel', texts.ticketPriceLabel),
+  loadingText: getText('client.home.loading', texts.loadingText),
+  emptyDrawsText: getText('client.status.noActiveDraw', texts.emptyDrawsText),
+  offersTitle: getText('client.home.offersTitle', texts.offersTitle),
+  seeAllText: getText('client.home.seeAll', texts.seeAllText),
+  closestSort: getText('client.drawSort.closest', texts.closestSort),
+  jackpotSort: getText('client.drawSort.biggestJackpot', texts.jackpotSort),
+  cheapSort: getText('client.drawSort.cheaperTickets', texts.cheapSort),
+  drawTitlePrefix: getText('client.drawCard.titlePrefix', 'Тираж #'),
+  schedulePending: getText('client.drawCard.noSchedule', 'Schedule pending'),
+  primaryOffer: {
+    kicker: getText('client.home.primaryOffer.kicker', 'БОНУС НОВИЧКА'),
+    title: getText('client.home.primaryOffer.title', '3 бесплатных билета'),
+    actionText: getText('client.home.primaryOffer.action', 'Получить')
+  },
+  secondaryOffer: {
+    kicker: getText('client.home.secondaryOffer.kicker', 'ПРИГЛАШАЙ И ЗАРАБАТЫВАЙ'),
+    title: getText('client.home.secondaryOffer.title', '$5 за каждого друга'),
+    actionText: getText('client.home.secondaryOffer.action', 'Поделиться')
+  }
 }))
 
 const ticketTexts = computed(() => ({
-  title: texts.ticketSelectionTitle,
-  loadingText: texts.ticketSelectionLoading,
-  ticketLabel: texts.ticketLabel,
-  randomizeText: texts.randomizeText,
-  clearText: texts.clearText,
-  selectText: texts.selectText,
-  ticketCostLabel: texts.ticketCostLabel,
-  totalLabel: texts.totalLabel,
-  purchaseText: texts.purchaseText,
-  purchasingText: texts.purchasingText,
-  noDrawText: texts.noDrawText
+  title: getText('client.purchaseScreen.title', texts.ticketSelectionTitle),
+  loadingText: getText('client.home.loading', texts.ticketSelectionLoading),
+  ticketTitlePrefix: getText('client.purchaseScreen.ticketPrefix', texts.ticketLabel),
+  randomizeText: getText('client.purchaseScreen.random', 'Случайные числа'),
+  clearText: getText('client.purchaseScreen.clear', 'Очистить'),
+  ticketCostLabel: getText('client.currentDraw.ticketCostPrefix', texts.ticketCostLabel),
+  totalLabel: getText('client.purchaseScreen.totalLabel', texts.totalLabel),
+  purchaseText: getText('client.button.purchase', texts.purchaseText),
+  purchasingText: getText('client.purchaseScreen.purchasing', texts.purchasingText),
+  noDrawText: getText('client.currentDraw.noActiveTitle', texts.noDrawText),
+  instructionsMain: getText('client.purchaseScreen.subtitle', 'Заполните один или несколько билетов, чтобы купить их вместе.'),
+  instructionsHint: getText('client.purchaseScreen.selectAtLeastOne', 'Заполните хотя бы один билет, чтобы продолжить.'),
+  choosePrefix: getText('client.purchaseScreen.choosePrefix', 'Выберите еще '),
+  chooseSuffix: getText('client.purchaseScreen.chooseSuffix', ' число(а)')
 }))
 
 const myTicketsTexts = computed(() => ({
-  loadingText: texts.myTicketsLoading,
-  allTicketsSort: texts.allTicketsSort,
-  activeSort: texts.activeSort,
-  wonSort: texts.wonSort,
-  statusAwaitingDraw: texts.statusAwaitingDraw,
-  statusWon: texts.statusWon,
-  statusClaimed: texts.statusClaimed,
-  statusLost: texts.statusLost,
-  noTickets: texts.noTickets,
-  noActiveTickets: texts.noActiveTickets,
-  noWonTickets: texts.noWonTickets
+  title: getText('client.tickets.title', texts.myTicketsTitle),
+  loadingText: getText('client.tickets.loading', texts.myTicketsLoading),
+  allTicketsSort: getText('client.tickets.filter.all', texts.allTicketsSort),
+  activeSort: getText('client.tickets.filter.active', texts.activeSort),
+  wonSort: getText('client.tickets.filter.won', texts.wonSort),
+  pastSort: getText('client.tickets.filter.past', 'Прошедшие'),
+  statusAwaitingDraw: getText('client.ticket.status.awaiting', texts.statusAwaitingDraw),
+  statusWon: getText('client.ticket.status.winningsAvailable', texts.statusWon),
+  statusClaimed: getText('client.ticket.status.winningsClaimed', texts.statusClaimed),
+  statusLost: getText('client.ticket.status.expired', texts.statusLost),
+  noTickets: getText('client.tickets.empty', texts.noTickets),
+  noActiveTickets: getText('client.tickets.noActive', texts.noActiveTickets),
+  noWonTickets: getText('client.tickets.noWon', texts.noWonTickets),
+  noPastTickets: getText('client.tickets.noPast', 'Нет прошедших билетов'),
+  winUpTo: getText('client.tickets.winUpTo', 'Выиграй до'),
+  drawPrefix: getText('client.history.drawPrefix', 'Тираж #'),
+  timeIn: getText('client.tickets.timeIn', 'in'),
+  subtitleFormat: getText('client.tickets.subtitle', '{0} active · {1} awaiting')
+}))
+
+const winnersTexts = computed(() => ({
+  title: getText('client.winners.title', 'Победители'),
+  loading: getText('client.winners.loading', 'Загрузка победителей...'),
+  empty: getText('client.winners.empty', 'Победители пока не объявлены'),
+  sortDay: getText('client.winners.sort.day', 'За день'),
+  sortWeek: getText('client.winners.sort.week', 'За неделю'),
+  sortMonth: getText('client.winners.sort.month', 'За месяц'),
+  sortYear: getText('client.winners.sort.year', 'За год')
 }))
 
 const winnersError = ref('')
@@ -592,6 +624,7 @@ onBeforeUnmount(() => {
         :error="winnersError"
         :locale="state.locale"
         :winners="state.winners"
+        :texts="winnersTexts"
       />
 
       <ProfileScreen

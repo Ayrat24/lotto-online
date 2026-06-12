@@ -179,8 +179,8 @@ onMounted(() => {
 
     <!-- Instructions -->
     <div v-if="!loading && !error && draw" class="ts-instructions">
-      <p class="ts-instructions-main">Заполните один или несколько билетов, чтобы купить их вместе.</p>
-      <p class="ts-instructions-hint">Заполните хотя бы один билет, чтобы продолжить.</p>
+      <p class="ts-instructions-main">{{ texts.instructionsMain || 'Заполните один или несколько билетов, чтобы купить их вместе.' }}</p>
+      <p class="ts-instructions-hint">{{ texts.instructionsHint || 'Заполните хотя бы один билет, чтобы продолжить.' }}</p>
     </div>
 
     <!-- Loading/Error States -->
@@ -202,8 +202,8 @@ onMounted(() => {
         class="ts-ticket-card"
       >
         <!-- Ticket Title -->
-        <div class="ts-ticket-title">Билет {{ ticket.ticketNumber }}</div>
-        <div class="ts-ticket-subtitle">Выберите еще {{ remainingCount(ticket) }} число(а)</div>
+        <div class="ts-ticket-title">{{ texts.ticketTitlePrefix || 'Билет' }} {{ ticket.ticketNumber }}</div>
+        <div class="ts-ticket-subtitle">{{ texts.choosePrefix || 'Выберите еще ' }}{{ remainingCount(ticket) }}{{ texts.chooseSuffix || ' число(а)' }}</div>
 
         <!-- Progress Slots -->
         <div class="ts-slots">
@@ -233,10 +233,10 @@ onMounted(() => {
         <!-- Action Buttons -->
         <div class="ts-actions">
           <button class="ts-action-btn ts-action-btn--secondary" type="button" @click="randomizeTicket(ticket.id)">
-            Случайные числа
+            {{ texts.randomizeText || 'Случайные числа' }}
           </button>
           <button class="ts-action-btn ts-action-btn--primary" type="button" @click="clearTicket(ticket.id)">
-            Очистить
+            {{ texts.clearText || 'Очистить' }}
           </button>
         </div>
       </div>

@@ -5,7 +5,8 @@ const props = defineProps({
   loading: { type: Boolean, default: false },
   error: { type: String, default: '' },
   locale: { type: String, default: 'en' },
-  winners: { type: Array, default: () => [] }
+  winners: { type: Array, default: () => [] },
+  texts: { type: Object, default: () => ({}) }
 })
 
 const SORT_MODES = {
@@ -20,10 +21,10 @@ const sortMenuOpen = ref(false)
 let sortMenuCloseTimer = null
 
 const sortOptions = computed(() => [
-  { value: SORT_MODES.day, label: 'За день' },
-  { value: SORT_MODES.week, label: 'За неделю' },
-  { value: SORT_MODES.month, label: 'За месяц' },
-  { value: SORT_MODES.year, label: 'За год' }
+  { value: SORT_MODES.day, label: props.texts.sortDay || 'За день' },
+  { value: SORT_MODES.week, label: props.texts.sortWeek || 'За неделю' },
+  { value: SORT_MODES.month, label: props.texts.sortMonth || 'За месяц' },
+  { value: SORT_MODES.year, label: props.texts.sortYear || 'За год' }
 ])
 
 const intlLocale = computed(() => props.locale === 'ru' ? 'ru-RU' : props.locale === 'uz' ? 'uz-UZ' : 'en-US')
@@ -78,7 +79,7 @@ onBeforeUnmount(() => {
   if (sortMenuCloseTimer) window.clearTimeout(sortMenuCloseTimer)
 })
 
-const emptyMessage = 'Победители пока не объявлены'
+const emptyMessage = computed(() => props.texts.empty || 'Победители пока не объявлены')
 </script>
 
 <template>
@@ -86,7 +87,7 @@ const emptyMessage = 'Победители пока не объявлены'
     <!-- Title -->
     <div class="ws-header-row">
       <div class="ws-title-row">
-        <div class="ws-title">Победители</div>
+        <div class="ws-title">{{ texts.title || 'Победители' }}</div>
       </div>
 
       <div class="ws-sort-wrap" @mouseleave="scheduleCloseSortMenu">
@@ -96,7 +97,7 @@ const emptyMessage = 'Победители пока не объявлены'
           type="button"
           @click="toggleSortMenu"
         >
-          {{ sortOptions.find((opt) => opt.value === activeSort)?.label || 'За неделю' }}
+          {{ sortOptions.find((opt) => opt.value === activeSort)?.label || texts.sortWeek || 'За неделю' }}
         </button>
 
         <div v-if="sortMenuOpen" class="ws-sort-menu" @mouseenter="sortMenuOpen = true" @mouseleave="scheduleCloseSortMenu">
@@ -114,7 +115,7 @@ const emptyMessage = 'Победители пока не объявлены'
     </div>
 
     <!-- Loading / Error / Empty -->
-    <div v-if="loading" class="ws-state">Загрузка победителей...</div>
+    <div v-if="loading" class="ws-state">{{ texts.loading || 'Загрузка победителей...' }}</div>
     <div v-else-if="error" class="ws-state ws-state--error">{{ error }}</div>
     <div v-else-if="!winners.length" class="ws-state ws-state--empty">{{ emptyMessage }}</div>
 
