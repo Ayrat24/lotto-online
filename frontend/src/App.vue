@@ -656,8 +656,10 @@ onBeforeUnmount(() => {
       <TopUpScreen
         v-else-if="currentScreen === 'top-up'"
         :texts="topUpTexts"
+        :init-data="state.initData"
+        :post-json="postJson"
         @back="openProfileAction('profile')"
-        @continue="openProfileAction('profile')"
+        @balance-updated="handleBalanceUpdated"
       />
 
       <InviteFriendScreen
@@ -679,8 +681,11 @@ onBeforeUnmount(() => {
       <WithdrawScreen
         v-else-if="currentScreen === 'withdraw'"
         :texts="withdrawTexts"
+        :init-data="state.initData"
+        :post-json="postJson"
+        :balance="formattedBalance"
         @back="openProfileAction('profile')"
-        @continue="openProfileAction('profile')"
+        @balance-updated="handleBalanceUpdated"
       />
     </main>
 
