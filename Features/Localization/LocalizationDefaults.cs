@@ -93,6 +93,8 @@ internal static class LocalizationDefaults
             ["client.withdraw.assetTitle"] = ("Choose coin", "Выберите монету", "Tangani tanlang"),
             ["client.withdraw.asset.btc"] = ("Bitcoin", "Биткоин", "Bitcoin"),
             ["client.withdraw.asset.ton"] = ("TON", "TON", "TON"),
+            ["client.withdraw.asset.usd"] = ("USD", "USD", "USD"),
+            ["client.withdraw.availableHint"] = ("≈ available {0}", "≈ доступно {0}", "≈ mavjud {0}"),
             ["client.withdraw.btcAddressLabel"] = ("Bitcoin payout address", "Bitcoin адрес для выплаты", "Bitcoin to'lov manzili"),
             ["client.withdraw.btcAddressPlaceholder"] = ("Bitcoin wallet address", "Bitcoin адрес кошелька", "Bitcoin hamyon manzili"),
             ["client.withdraw.saveBtcAddress"] = ("Save this Bitcoin address for later", "Сохранить этот Bitcoin адрес на будущее", "Ushbu Bitcoin manzilini keyin uchun saqlash"),

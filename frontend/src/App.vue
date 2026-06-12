@@ -11,6 +11,7 @@ import ProfileEditScreen from './screens/ProfileEditScreen.vue'
 import TopUpScreen from './screens/TopUpScreen.vue'
 import InviteFriendScreen from './screens/InviteFriendScreen.vue'
 import TransactionHistoryScreen from './screens/TransactionHistoryScreen.vue'
+import WithdrawScreen from './screens/WithdrawScreen.vue'
 
 const DRAW_SORTS = {
   closest: 'closest',
@@ -47,6 +48,7 @@ function getInitialScreen() {
   if (screen === 'top-up') return 'top-up'
   if (screen === 'invite-friend') return 'invite-friend'
   if (screen === 'transactions') return 'transactions'
+  if (screen === 'withdraw') return 'withdraw'
   return 'home'
 }
 
@@ -168,6 +170,7 @@ const userSubtitle = computed(() => {
   if (currentScreen.value === 'top-up') return getText('client.topup.title', 'Пополнить баланс')
   if (currentScreen.value === 'invite-friend') return getText('client.invite.title', 'Пригласить друга')
   if (currentScreen.value === 'transactions') return getText('client.history.title', 'История транзакций')
+  if (currentScreen.value === 'withdraw') return getText('client.profile.withdrawTitle', 'Запрос на вывод')
   return '3 билета в игре · 1 выигрыш'
 })
 
@@ -186,7 +189,8 @@ const activeTab = computed(() => {
     || currentScreen.value === 'profile-edit'
     || currentScreen.value === 'top-up'
     || currentScreen.value === 'invite-friend'
-    || currentScreen.value === 'transactions') return 'profile'
+    || currentScreen.value === 'transactions'
+    || currentScreen.value === 'withdraw') return 'profile'
   return 'home'
 })
 
@@ -320,6 +324,42 @@ const transactionTexts = computed(() => ({
   emptySubtitle: getText('client.history.emptySubtitle', 'Все ваши пополнения и выплаты появятся здесь')
 }))
 
+const withdrawTexts = computed(() => ({
+  title: getText('client.profile.menuWithdraw', 'Вывести деньги'),
+  requestTitle: getText('client.profile.withdrawTitle', 'Запрос на вывод'),
+  amountPlaceholder: getText('client.profile.amountPlaceholder', 'Сумма'),
+  availableText: getText('client.withdraw.availableHint', '≈ доступно {0}')
+    .replace('{0}', formattedBalance.value),
+  assetTitle: getText('client.withdraw.assetTitle', 'Выберите монету'),
+  btcAddressLabel: getText('client.withdraw.btcAddressLabel', 'Bitcoin адрес для выплаты'),
+  btcAddressPlaceholder: getText('client.withdraw.btcAddressPlaceholder', 'Bitcoin адрес кошелька'),
+  saveBtcAddress: getText('client.withdraw.saveBtcAddress', 'Сохранить этот Bitcoin адрес на будущее'),
+  tonAddressLabel: getText('client.withdraw.tonWalletLabel', 'TON кошелек для выплаты'),
+  tonAddressPlaceholder: getText('client.withdraw.tonAddressPlaceholder', 'TON адрес кошелька'),
+  saveTonAddress: getText('client.withdraw.saveTonAddress', 'Сохранить этот TON адрес на будущее'),
+  genericAddressLabel: getText('client.profile.walletPlaceholder', 'Адрес кошелька'),
+  genericAddressPlaceholder: getText('client.profile.walletPlaceholder', 'Адрес кошелька'),
+  saveGenericAddress: getText('client.button.saveWallet', 'Сохранить адрес'),
+  continueButton: getText('client.button.continue', 'Продолжить'),
+  assets: [
+    {
+      value: 'btc',
+      label: getText('client.withdraw.asset.btc', 'Bitcoin'),
+      icon: '₿'
+    },
+    {
+      value: 'ton',
+      label: getText('client.withdraw.asset.ton', 'TON'),
+      icon: '◈'
+    },
+    {
+      value: 'usd',
+      label: getText('client.withdraw.asset.usd', 'USD'),
+      icon: '$'
+    }
+  ]
+}))
+
 function openTicketSelection(draw) {
   if (!draw || draw.id == null) return
   selectedDrawId.value = draw.id
@@ -347,7 +387,7 @@ function handleTabNavigate(tab) {
 }
 
 function openProfileAction(target) {
-  const allowedScreens = ['profile', 'profile-edit', 'top-up', 'invite-friend', 'transactions']
+  const allowedScreens = ['profile', 'profile-edit', 'top-up', 'invite-friend', 'transactions', 'withdraw']
   if (!allowedScreens.includes(target)) {
     console.log(`[MiniApp] profile action: ${target}`)
     return
@@ -385,6 +425,8 @@ function updateUrl() {
     url.searchParams.set('screen', 'invite-friend')
   } else if (currentScreen.value === 'transactions') {
     url.searchParams.set('screen', 'transactions')
+  } else if (currentScreen.value === 'withdraw') {
+    url.searchParams.set('screen', 'withdraw')
   } else {
     url.searchParams.delete('screen')
     url.searchParams.delete('drawId')
@@ -598,6 +640,13 @@ onBeforeUnmount(() => {
         :texts="transactionTexts"
         :transactions="[]"
         @back="openProfileAction('profile')"
+      />
+
+      <WithdrawScreen
+        v-else-if="currentScreen === 'withdraw'"
+        :texts="withdrawTexts"
+        @back="openProfileAction('profile')"
+        @continue="openProfileAction('profile')"
       />
     </main>
 
