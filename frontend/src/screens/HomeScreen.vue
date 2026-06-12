@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 const props = defineProps({
   timeline: { type: Object, default: null },
   banners: { type: Array, default: () => [] },
+  promotions: { type: Array, default: () => [] },
   loading: { type: Boolean, default: false },
   error: { type: String, default: '' },
   sortMode: { type: String, default: 'closest' },
@@ -11,7 +12,7 @@ const props = defineProps({
   texts: { type: Object, required: true }
 })
 
-const emit = defineEmits(['update:sortMode', 'openDraw'])
+const emit = defineEmits(['update:sortMode', 'openDraw', 'seeAllPromotions', 'promotionAction'])
 
 const DRAW_SORTS = {
   closest: 'closest',
@@ -302,8 +303,17 @@ onBeforeUnmount(() => {
 
 const activeBanner = computed(() => carouselBanners.value[activeBannerIndex.value] || null)
 
-const primaryOffer = computed(() => props.texts.primaryOffer || { kicker: 'БОНУС НОВИЧКА', title: '3 бесплатных билета', actionText: 'Получить' })
-const secondaryOffer = computed(() => props.texts.secondaryOffer || { kicker: 'ПРИГЛАШАЙ И ЗАРАБАТЫВАЙ', title: '$5 за каждого друга', actionText: 'Поделиться' })
+const previewPromotions = computed(() => Array.isArray(props.promotions) ? props.promotions.slice(0, 2) : [])
+
+function handleSeeAllPromotions() {
+  emit('seeAllPromotions')
+}
+
+function handlePromotionClick(promotion) {
+  if (promotion.actionType && promotion.actionType !== 'none') {
+    emit('promotionAction', promotion)
+  }
+}
 
 function handleSortChange(value) {
   emit('update:sortMode', value)
@@ -530,32 +540,32 @@ function handleDrawScrollPointerUp(event) {
       </div>
     </section>
 
-    <section class="container-subsection">
+    <section v-if="previewPromotions.length || !loading" class="container-subsection">
       <div class="text-wrapper-12">{{ texts.offersTitle }}</div>
-      <button class="background-border-2 link-button" type="button" @click="console.log('[MiniApp] see all clicked')">
+      <button class="background-border-2 link-button" type="button" @click="handleSeeAllPromotions">
         <div class="text-wrapper-13">{{ texts.seeAllText }}</div>
       </button>
     </section>
 
-    <section class="container-wrapper-subsection">
-      <div class="background-4">
-        <div class="container-6">
-          <div class="container-7"><div class="text-wrapper-14">{{ primaryOffer.kicker }}</div><div class="text-wrapper-15">{{ primaryOffer.title }}</div></div>
-          <button class="background-5 link-button" type="button" @click="console.log('[MiniApp] primary offer clicked')">
-            <div class="text-wrapper-16">{{ primaryOffer.actionText }}</div>
-          </button>
+    <section v-if="previewPromotions.length" class="container-wrapper-subsection">
+      <button
+        v-for="promo in previewPromotions"
+        :key="promo.id"
+        class="promo-card link-button"
+        :class="`promo-card-${promo.cardStyle || 'gold'}`"
+        type="button"
+        @click="handlePromotionClick(promo)"
+      >
+        <div class="promo-card-inner">
+          <div class="promo-card-text">
+            <div class="promo-card-kicker">{{ promo.title }}</div>
+            <div class="promo-card-title">{{ promo.subtitle }}</div>
+          </div>
+          <div class="promo-card-btn" v-if="promo.buttonText">{{ promo.buttonText }}</div>
         </div>
-        <div class="background-6" /><div class="background-7" />
-      </div>
-      <div class="background-border-3">
-        <div class="container-8">
-          <div class="container-7"><div class="text-wrapper-17">{{ secondaryOffer.kicker }}</div><div class="text-wrapper-18">{{ secondaryOffer.title }}</div></div>
-          <button class="background-8 link-button" type="button" @click="console.log('[MiniApp] secondary offer clicked')">
-            <div class="text-wrapper-19">{{ secondaryOffer.actionText }}</div>
-          </button>
-        </div>
-        <div class="background-9" /><div class="background-10" />
-      </div>
+        <div class="promo-card-dot promo-card-dot-left" />
+        <div class="promo-card-dot promo-card-dot-right" />
+      </button>
     </section>
   </div>
 </template>

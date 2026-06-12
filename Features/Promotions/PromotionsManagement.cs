@@ -1,4 +1,5 @@
 using MiniApp.Data;
+using MiniApp.Features.Offers;
 
 namespace MiniApp.Features.Promotions;
 
@@ -8,6 +9,10 @@ public static class PromotionsManagement
     public const string ActionTypeAppSection = "app_section";
     public const string ActionTypeExternalUrl = "external_url";
     public const string ActionTypeDiscountedOffer = "discounted_offer";
+
+    public const string CardStyleGold = "gold";
+    public const string CardStyleDark = "dark";
+    public const string CardStyleRed = "red";
 
     private static readonly string[] SupportedAppSections = ["home", "tickets", "winners", "profile", "deposit", "withdraw", "invite"];
 
@@ -32,6 +37,18 @@ public static class PromotionsManagement
         var normalized = NormalizeStoredActionType(actionType);
         if (normalized == ActionTypeNone) return null;
         return value;
+    }
+
+    public static string NormalizeCardStyle(string? value)
+    {
+        var v = (value ?? string.Empty).Trim().ToLowerInvariant();
+        return v switch
+        {
+            "gold" => CardStyleGold,
+            "dark" => CardStyleDark,
+            "red" => CardStyleRed,
+            _ => CardStyleGold
+        };
     }
 
     public static bool TryNormalizeAction(string? actionType, string? actionValue, out string normalizedType, out string? normalizedValue, out string validationError)
@@ -119,16 +136,39 @@ public static class PromotionsManagement
         return SupportedAppSections;
     }
 
-    public static PromotionDto ToDto(Promotion promotion)
+    public static PromotionDto ToDto(Promotion promotion, string? locale = null, DiscountedTicketOfferDto? offer = null)
     {
+        var normalizedLocale = NormalizeLocale(locale);
+        var normalizedType = NormalizeStoredActionType(promotion.ActionType);
+        var resolvedOffer = string.Equals(normalizedType, ActionTypeDiscountedOffer, StringComparison.Ordinal) ? offer : null;
         return new PromotionDto(
             promotion.Id,
-            promotion.Title,
-            promotion.Subtitle,
-            promotion.ButtonText,
-            NormalizeStoredActionType(promotion.ActionType),
-            NormalizeStoredActionValue(promotion.ActionType, promotion.ActionValue),
-            promotion.BackgroundColor);
+            ResolveText(promotion.Title, promotion.TitleRu, promotion.TitleUz, normalizedLocale),
+            ResolveText(promotion.Subtitle, promotion.SubtitleRu, promotion.SubtitleUz, normalizedLocale),
+            ResolveText(promotion.ButtonText, promotion.ButtonTextRu, promotion.ButtonTextUz, normalizedLocale),
+            normalizedType,
+            resolvedOffer is not null ? resolvedOffer.Id.ToString() : NormalizeStoredActionValue(promotion.ActionType, promotion.ActionValue),
+            NormalizeCardStyle(promotion.CardStyle),
+            resolvedOffer);
+    }
+
+    private static string NormalizeLocale(string? locale)
+    {
+        var v = (locale ?? string.Empty).Trim().ToLowerInvariant();
+        if (v.StartsWith("ru", StringComparison.Ordinal)) return "ru";
+        if (v.StartsWith("uz", StringComparison.Ordinal)) return "uz";
+        return "en";
+    }
+
+    private static string ResolveText(string en, string ru, string uz, string normalizedLocale)
+    {
+        var localized = normalizedLocale switch
+        {
+            "ru" => ru,
+            "uz" => uz,
+            _ => en
+        };
+        return string.IsNullOrWhiteSpace(localized) ? en : localized;
     }
 
     private static string String(string value) => value ?? string.Empty;

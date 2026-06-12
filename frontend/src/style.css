@@ -900,3 +900,195 @@ body {
     font: inherit;
     font-weight: 700;
 }
+
+/* Promotion cards */
+.promo-card {
+    position: relative;
+    border-radius: 22px;
+    height: 90px;
+    overflow: hidden;
+    width: 100%;
+    display: flex;
+    align-items: stretch;
+    text-align: left;
+    cursor: pointer;
+    box-sizing: border-box;
+}
+
+.promo-card:active {
+    transform: scale(0.97);
+}
+
+.promo-card-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 20px;
+    width: 100%;
+    position: relative;
+    z-index: 1;
+}
+
+.promo-card-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+}
+
+.promo-card-kicker {
+    font-family: 'Manrope', Helvetica, sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.promo-card-title {
+    font-family: 'Manrope', Helvetica, sans-serif;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.promo-card-btn {
+    flex-shrink: 0;
+    border-radius: 100px;
+    padding: 11px 14px 12px;
+    font-family: 'Manrope', Helvetica, sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.promo-card-dot {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    top: calc(50% - 8px);
+    z-index: 0;
+}
+
+.promo-card-dot-left {
+    left: -8px;
+}
+
+.promo-card-dot-right {
+    right: -8px;
+}
+
+.promo-card-gold {
+    background-color: #ffb929;
+}
+
+.promo-card-gold .promo-card-kicker {
+    color: #3a3a3a;
+}
+
+.promo-card-gold .promo-card-title {
+    color: #111111;
+}
+
+.promo-card-gold .promo-card-btn {
+    background-color: #111111;
+    color: #ffffff;
+}
+
+.promo-card-gold .promo-card-dot {
+    background-color: #fafaf7;
+}
+
+.promo-card-dark {
+    background-color: #1c2140;
+    border: 1px solid rgba(255,255,255,0.08);
+}
+
+.promo-card-dark .promo-card-kicker {
+    color: #8a8aaa;
+}
+
+.promo-card-dark .promo-card-title {
+    color: #ffffff;
+}
+
+.promo-card-dark .promo-card-btn {
+    background-color: #ffb929;
+    color: #111111;
+}
+
+.promo-card-dark .promo-card-dot {
+    background-color: #111827;
+}
+
+.promo-card-red {
+    background-color: #d42b3a;
+}
+
+.promo-card-red .promo-card-kicker {
+    color: rgba(255,255,255,0.75);
+}
+
+.promo-card-red .promo-card-title {
+    color: #ffffff;
+}
+
+.promo-card-red .promo-card-btn {
+    background-color: rgba(255,255,255,0.2);
+    color: #ffffff;
+    border: 1px solid rgba(255,255,255,0.4);
+}
+
+.promo-card-red .promo-card-dot {
+    background-color: #b8202e;
+}
+
+/* Promotions screen */
+.promotions-screen {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding-bottom: 24px;
+}
+
+.promotions-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px 8px;
+}
+
+.promotions-back-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+}
+
+.promotions-heading {
+    color: #0f0f12;
+    font-family: 'Manrope', Helvetica, sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.promotions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 8px 16px 0;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.promotions-empty {
+    color: #8a8a8a;
+    font-family: 'Manrope', Helvetica, sans-serif;
+    font-size: 14px;
+    text-align: center;
+    padding: 32px 0;
+}

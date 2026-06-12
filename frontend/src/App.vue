@@ -12,6 +12,7 @@ import TopUpScreen from './screens/TopUpScreen.vue'
 import InviteFriendScreen from './screens/InviteFriendScreen.vue'
 import TransactionHistoryScreen from './screens/TransactionHistoryScreen.vue'
 import WithdrawScreen from './screens/WithdrawScreen.vue'
+import PromotionsScreen from './screens/PromotionsScreen.vue'
 
 const DRAW_SORTS = {
   closest: 'closest',
@@ -49,6 +50,7 @@ function getInitialScreen() {
   if (screen === 'invite-friend') return 'invite-friend'
   if (screen === 'transactions') return 'transactions'
   if (screen === 'withdraw') return 'withdraw'
+  if (screen === 'promotions') return 'promotions'
   return 'home'
 }
 
@@ -91,6 +93,7 @@ const state = reactive({
   user: { firstName: 'Player', lastName: '', username: '', birthDate: '', balance: 0 },
   timeline: null,
   banners: [],
+  promotions: [],
   winners: [],
   localizationStrings: {},
   loading: true,
@@ -171,6 +174,7 @@ const userSubtitle = computed(() => {
   if (currentScreen.value === 'invite-friend') return getText('client.invite.title', 'Пригласить друга')
   if (currentScreen.value === 'transactions') return getText('client.history.title', 'История транзакций')
   if (currentScreen.value === 'withdraw') return getText('client.profile.withdrawTitle', 'Запрос на вывод')
+  if (currentScreen.value === 'promotions') return getText('client.home.offersTitle', texts.offersTitle)
   return '3 билета в игре · 1 выигрыш'
 })
 
@@ -182,7 +186,7 @@ const tabTexts = computed(() => ({
 }))
 
 const activeTab = computed(() => {
-  if (currentScreen.value === 'home' || currentScreen.value === 'ticket-selection') return 'home'
+  if (currentScreen.value === 'home' || currentScreen.value === 'ticket-selection' || currentScreen.value === 'promotions') return 'home'
   if (currentScreen.value === 'tickets') return 'tickets'
   if (currentScreen.value === 'winners') return 'winners'
   if (currentScreen.value === 'profile'
@@ -236,21 +240,12 @@ const homeTexts = computed(() => ({
   emptyDrawsText: getText('client.status.noActiveDraw', texts.emptyDrawsText),
   offersTitle: getText('client.home.offersTitle', texts.offersTitle),
   seeAllText: getText('client.home.seeAll', texts.seeAllText),
+  noOffersText: getText('client.home.noOffers', 'No promotions available.'),
   closestSort: getText('client.drawSort.closest', texts.closestSort),
   jackpotSort: getText('client.drawSort.biggestJackpot', texts.jackpotSort),
   cheapSort: getText('client.drawSort.cheaperTickets', texts.cheapSort),
   drawTitlePrefix: getText('client.drawCard.titlePrefix', 'Тираж #'),
-  schedulePending: getText('client.drawCard.noSchedule', 'Schedule pending'),
-  primaryOffer: {
-    kicker: getText('client.home.primaryOffer.kicker', 'БОНУС НОВИЧКА'),
-    title: getText('client.home.primaryOffer.title', '3 бесплатных билета'),
-    actionText: getText('client.home.primaryOffer.action', 'Получить')
-  },
-  secondaryOffer: {
-    kicker: getText('client.home.secondaryOffer.kicker', 'ПРИГЛАШАЙ И ЗАРАБАТЫВАЙ'),
-    title: getText('client.home.secondaryOffer.title', '$5 за каждого друга'),
-    actionText: getText('client.home.secondaryOffer.action', 'Поделиться')
-  }
+  schedulePending: getText('client.drawCard.noSchedule', 'Schedule pending')
 }))
 
 const ticketTexts = computed(() => ({
@@ -429,6 +424,60 @@ function openProfileAction(target) {
   updateUrl()
 }
 
+function openSeeAllPromotions() {
+  currentScreen.value = 'promotions'
+  updateUrl()
+}
+
+function handlePromotionAction(promotion) {
+  const actionType = promotion?.actionType
+  const actionValue = promotion?.actionValue
+  if (!actionType || actionType === 'none') return
+
+  if (actionType === 'app_section') {
+    const sectionMap = {
+      home: 'home',
+      tickets: 'tickets',
+      winners: 'winners',
+      profile: 'profile',
+      deposit: 'top-up',
+      withdraw: 'withdraw',
+      invite: 'invite-friend'
+    }
+    const screen = sectionMap[actionValue]
+    if (screen) {
+      currentScreen.value = screen
+      selectedDrawId.value = null
+      updateUrl()
+    }
+    return
+  }
+
+  if (actionType === 'external_url' && actionValue) {
+    try {
+      if (window.Telegram?.WebApp?.openLink) {
+        window.Telegram.WebApp.openLink(actionValue)
+      } else {
+        window.open(actionValue, '_blank', 'noopener,noreferrer')
+      }
+    } catch {}
+    return
+  }
+
+  if (actionType === 'discounted_offer') {
+    const offer = promotion?.offer
+    if (offer?.drawId) {
+      const draw = state.timeline?.activeDraws?.find(d => d && Number(d.id) === Number(offer.drawId))
+      if (draw) {
+        openTicketSelection(draw)
+        return
+      }
+    }
+    currentScreen.value = 'tickets'
+    updateUrl()
+  }
+}
+
 function handleProfileSave(payload) {
   state.user.firstName = payload.firstName
   state.user.lastName = payload.lastName
@@ -460,6 +509,8 @@ function updateUrl() {
     url.searchParams.set('screen', 'transactions')
   } else if (currentScreen.value === 'withdraw') {
     url.searchParams.set('screen', 'withdraw')
+  } else if (currentScreen.value === 'promotions') {
+    url.searchParams.set('screen', 'promotions')
   } else {
     url.searchParams.delete('screen')
     url.searchParams.delete('drawId')
@@ -509,6 +560,11 @@ async function loadBanners() {
   state.banners = res && res.ok && Array.isArray(res.banners) ? res.banners : []
 }
 
+async function loadPromotions() {
+  const res = await postJson('/api/promotions', { initData: state.initData, locale: state.locale })
+  state.promotions = res && res.ok && Array.isArray(res.promotions) ? res.promotions : []
+}
+
 async function loadWinners() {
   if (winnersLoading.value) return
   winnersLoading.value = true
@@ -535,7 +591,7 @@ async function loadAll() {
   try {
     await loadLocale()
     await loadAuth()
-    await Promise.all([loadTimeline(), loadBanners()])
+    await Promise.all([loadTimeline(), loadBanners(), loadPromotions()])
   } catch (error) {
     state.error = error && error.message ? error.message : 'Failed to load home screen.'
   } finally {
@@ -555,6 +611,7 @@ onMounted(() => {
   pollId = window.setInterval(() => {
     loadTimeline().catch(() => {})
     loadBanners().catch(() => {})
+    loadPromotions().catch(() => {})
   }, 4000)
 })
 
@@ -584,6 +641,7 @@ onBeforeUnmount(() => {
         v-if="currentScreen === 'home'"
         :timeline="state.timeline"
         :banners="state.banners"
+        :promotions="state.promotions"
         :loading="state.loading"
         :error="state.error"
         :sort-mode="state.sortMode"
@@ -591,6 +649,8 @@ onBeforeUnmount(() => {
         :texts="homeTexts"
         @update:sort-mode="state.sortMode = $event"
         @open-draw="openTicketSelection"
+        @see-all-promotions="openSeeAllPromotions"
+        @promotion-action="handlePromotionAction"
       />
 
       <TicketSelectionScreen
@@ -686,6 +746,14 @@ onBeforeUnmount(() => {
         :balance="formattedBalance"
         @back="openProfileAction('profile')"
         @balance-updated="handleBalanceUpdated"
+      />
+
+      <PromotionsScreen
+        v-else-if="currentScreen === 'promotions'"
+        :promotions="state.promotions"
+        :texts="homeTexts"
+        @back="handleBack"
+        @promotion-action="handlePromotionAction"
       />
     </main>
 

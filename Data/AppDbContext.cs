@@ -400,11 +400,17 @@ public sealed class AppDbContext : DbContext
             b.HasIndex(x => x.UpdatedAtUtc);
 
             b.Property(x => x.Title).HasMaxLength(256).IsRequired();
+            b.Property(x => x.TitleRu).HasMaxLength(256).IsRequired().HasDefaultValue(string.Empty);
+            b.Property(x => x.TitleUz).HasMaxLength(256).IsRequired().HasDefaultValue(string.Empty);
             b.Property(x => x.Subtitle).HasMaxLength(512).IsRequired();
+            b.Property(x => x.SubtitleRu).HasMaxLength(512).IsRequired().HasDefaultValue(string.Empty);
+            b.Property(x => x.SubtitleUz).HasMaxLength(512).IsRequired().HasDefaultValue(string.Empty);
             b.Property(x => x.ButtonText).HasMaxLength(128).IsRequired();
+            b.Property(x => x.ButtonTextRu).HasMaxLength(128).IsRequired().HasDefaultValue(string.Empty);
+            b.Property(x => x.ButtonTextUz).HasMaxLength(128).IsRequired().HasDefaultValue(string.Empty);
             b.Property(x => x.ActionType).HasMaxLength(32).IsRequired().HasDefaultValue("none");
             b.Property(x => x.ActionValue).HasMaxLength(1024);
-            b.Property(x => x.BackgroundColor).HasMaxLength(32).IsRequired().HasDefaultValue("#FFB929");
+            b.Property(x => x.CardStyle).HasMaxLength(32).IsRequired().HasDefaultValue("gold");
             b.Property(x => x.DisplayOrder).IsRequired();
             b.Property(x => x.IsPublished).IsRequired().HasDefaultValue(true);
             b.Property(x => x.CreatedAtUtc).IsRequired();

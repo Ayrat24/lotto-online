@@ -1,3 +1,5 @@
+using MiniApp.Features.Offers;
+
 namespace MiniApp.Features.Promotions;
 
 public sealed record PromotionDto(
@@ -7,7 +9,8 @@ public sealed record PromotionDto(
     string ButtonText,
     string ActionType,
     string? ActionValue,
-    string BackgroundColor);
+    string CardStyle,
+    DiscountedTicketOfferDto? Offer = null);
 
 public sealed record PromotionsRequest(string? InitData, string? Locale);
 

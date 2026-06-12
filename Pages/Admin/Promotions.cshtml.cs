@@ -15,17 +15,26 @@ public sealed class PromotionsModel : LocalizedAdminPageModel
     public sealed record AdminPromotionRow(
         long Id,
         string Title,
+        string TitleRu,
+        string TitleUz,
         string Subtitle,
+        string SubtitleRu,
+        string SubtitleUz,
         string ButtonText,
+        string ButtonTextRu,
+        string ButtonTextUz,
         string ActionType,
         string? ActionValue,
-        string BackgroundColor,
+        string CardStyle,
+        string StylePreviewColor,
+        string StylePreviewTextColor,
         int DisplayOrder,
         bool IsPublished,
         DateTimeOffset CreatedAtUtc,
         DateTimeOffset UpdatedAtUtc);
 
     public sealed record ActionTypeOption(string Value, string LabelKey, string FallbackLabel);
+    public sealed record CardStyleOption(string Value, string Label);
     public sealed record DiscountedOfferOption(long Id, long DrawId, int NumberOfDiscountedTickets, decimal Cost);
 
     private readonly AppDbContext _db;
@@ -43,6 +52,13 @@ public sealed class PromotionsModel : LocalizedAdminPageModel
         new(PromotionsManagement.ActionTypeAppSection, "admin.promotions.actionType.appSection", "Open app section"),
         new(PromotionsManagement.ActionTypeExternalUrl, "admin.promotions.actionType.externalUrl", "Open external link"),
         new(PromotionsManagement.ActionTypeDiscountedOffer, "admin.promotions.actionType.discountedOffer", "Open discounted offer")
+    ];
+
+    public IReadOnlyList<CardStyleOption> CardStyleOptions { get; } =
+    [
+        new(PromotionsManagement.CardStyleGold, "Gold (yellow)"),
+        new(PromotionsManagement.CardStyleDark, "Dark (charcoal)"),
+        new(PromotionsManagement.CardStyleRed, "Red")
     ];
 
     public IReadOnlyList<string> AppSectionOptions { get; } = PromotionsManagement.GetSupportedAppSections();
@@ -65,9 +81,15 @@ public sealed class PromotionsModel : LocalizedAdminPageModel
 
     public async Task<IActionResult> OnPostCreateAsync(
         string title,
+        string titleRu,
+        string titleUz,
         string subtitle,
+        string subtitleRu,
+        string subtitleUz,
         string buttonText,
-        string backgroundColor,
+        string buttonTextRu,
+        string buttonTextUz,
+        string cardStyle,
         int displayOrder,
         bool isPublished,
         string actionType,
@@ -95,9 +117,15 @@ public sealed class PromotionsModel : LocalizedAdminPageModel
         var promotion = new Promotion
         {
             Title = title?.Trim() ?? string.Empty,
+            TitleRu = titleRu?.Trim() ?? string.Empty,
+            TitleUz = titleUz?.Trim() ?? string.Empty,
             Subtitle = subtitle?.Trim() ?? string.Empty,
+            SubtitleRu = subtitleRu?.Trim() ?? string.Empty,
+            SubtitleUz = subtitleUz?.Trim() ?? string.Empty,
             ButtonText = buttonText?.Trim() ?? string.Empty,
-            BackgroundColor = (backgroundColor?.Trim() ?? string.Empty).Length > 0 ? backgroundColor!.Trim() : "#FFB929",
+            ButtonTextRu = buttonTextRu?.Trim() ?? string.Empty,
+            ButtonTextUz = buttonTextUz?.Trim() ?? string.Empty,
+            CardStyle = PromotionsManagement.NormalizeCardStyle(cardStyle),
             ActionType = normalizedActionType,
             ActionValue = normalizedActionValue,
             DisplayOrder = Math.Max(0, displayOrder),
@@ -125,9 +153,15 @@ public sealed class PromotionsModel : LocalizedAdminPageModel
     public async Task<IActionResult> OnPostUpdateAsync(
         long id,
         string title,
+        string titleRu,
+        string titleUz,
         string subtitle,
+        string subtitleRu,
+        string subtitleUz,
         string buttonText,
-        string backgroundColor,
+        string buttonTextRu,
+        string buttonTextUz,
+        string cardStyle,
         int displayOrder,
         bool isPublished,
         string actionType,
@@ -160,9 +194,15 @@ public sealed class PromotionsModel : LocalizedAdminPageModel
         }
 
         promotion.Title = title?.Trim() ?? string.Empty;
+        promotion.TitleRu = titleRu?.Trim() ?? string.Empty;
+        promotion.TitleUz = titleUz?.Trim() ?? string.Empty;
         promotion.Subtitle = subtitle?.Trim() ?? string.Empty;
+        promotion.SubtitleRu = subtitleRu?.Trim() ?? string.Empty;
+        promotion.SubtitleUz = subtitleUz?.Trim() ?? string.Empty;
         promotion.ButtonText = buttonText?.Trim() ?? string.Empty;
-        promotion.BackgroundColor = (backgroundColor?.Trim() ?? string.Empty).Length > 0 ? backgroundColor!.Trim() : "#FFB929";
+        promotion.ButtonTextRu = buttonTextRu?.Trim() ?? string.Empty;
+        promotion.ButtonTextUz = buttonTextUz?.Trim() ?? string.Empty;
+        promotion.CardStyle = PromotionsManagement.NormalizeCardStyle(cardStyle);
         promotion.DisplayOrder = Math.Max(0, displayOrder);
         promotion.IsPublished = isPublished;
         promotion.ActionType = normalizedActionType;
@@ -224,11 +264,19 @@ public sealed class PromotionsModel : LocalizedAdminPageModel
             .Select(x => new AdminPromotionRow(
                 x.Id,
                 x.Title,
+                x.TitleRu,
+                x.TitleUz,
                 x.Subtitle,
+                x.SubtitleRu,
+                x.SubtitleUz,
                 x.ButtonText,
+                x.ButtonTextRu,
+                x.ButtonTextUz,
                 PromotionsManagement.NormalizeStoredActionType(x.ActionType),
                 PromotionsManagement.NormalizeStoredActionValue(x.ActionType, x.ActionValue),
-                x.BackgroundColor,
+                PromotionsManagement.NormalizeCardStyle(x.CardStyle),
+                GetStylePreviewColor(x.CardStyle),
+                GetStylePreviewTextColor(x.CardStyle),
                 x.DisplayOrder,
                 x.IsPublished,
                 x.CreatedAtUtc,
@@ -267,6 +315,21 @@ public sealed class PromotionsModel : LocalizedAdminPageModel
             _ => null
         };
     }
+
+    private static string GetStylePreviewColor(string? cardStyle) =>
+        PromotionsManagement.NormalizeCardStyle(cardStyle) switch
+        {
+            PromotionsManagement.CardStyleDark => "#1C2140",
+            PromotionsManagement.CardStyleRed => "#D42B3A",
+            _ => "#FFB929"
+        };
+
+    private static string GetStylePreviewTextColor(string? cardStyle) =>
+        PromotionsManagement.NormalizeCardStyle(cardStyle) switch
+        {
+            PromotionsManagement.CardStyleGold => "#1C1C2E",
+            _ => "#FFFFFF"
+        };
 
     private async Task<bool> ValidateDiscountedOfferSelectionAsync(string normalizedActionType, string? normalizedActionValue, CancellationToken ct)
     {

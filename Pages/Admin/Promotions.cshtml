@@ -18,21 +18,59 @@
         <h5 class="card-title">@Model.T("admin.promotions.create.title", "Create promotion")</h5>
 
         <form method="post" asp-page-handler="Create" class="row g-3">
-            <div class="col-12 col-md-6">
-                <label for="promotionTitle" class="form-label">@Model.T("admin.promotions.create.title", "Title")</label>
+            <div class="col-12">
+                <h6 class="text-muted mb-2">English</h6>
+            </div>
+            <div class="col-12 col-md-4">
+                <label for="promotionTitle" class="form-label">@Model.T("admin.promotions.create.title", "Title (EN)")</label>
                 <input id="promotionTitle" name="title" type="text" maxlength="256" class="form-control" required />
             </div>
-            <div class="col-12 col-md-6">
-                <label for="promotionSubtitle" class="form-label">@Model.T("admin.promotions.create.subtitle", "Subtitle")</label>
+            <div class="col-12 col-md-4">
+                <label for="promotionSubtitle" class="form-label">@Model.T("admin.promotions.create.subtitle", "Subtitle (EN)")</label>
                 <input id="promotionSubtitle" name="subtitle" type="text" maxlength="512" class="form-control" required />
             </div>
-            <div class="col-12 col-md-6">
-                <label for="promotionButtonText" class="form-label">@Model.T("admin.promotions.create.buttonText", "Button text")</label>
+            <div class="col-12 col-md-4">
+                <label for="promotionButtonText" class="form-label">@Model.T("admin.promotions.create.buttonText", "Button text (EN)")</label>
                 <input id="promotionButtonText" name="buttonText" type="text" maxlength="128" class="form-control" required />
             </div>
+            <div class="col-12">
+                <h6 class="text-muted mb-2">Русский</h6>
+            </div>
+            <div class="col-12 col-md-4">
+                <label for="promotionTitleRu" class="form-label">Title (RU)</label>
+                <input id="promotionTitleRu" name="titleRu" type="text" maxlength="256" class="form-control" placeholder="Falls back to EN" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label for="promotionSubtitleRu" class="form-label">Subtitle (RU)</label>
+                <input id="promotionSubtitleRu" name="subtitleRu" type="text" maxlength="512" class="form-control" placeholder="Falls back to EN" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label for="promotionButtonTextRu" class="form-label">Button text (RU)</label>
+                <input id="promotionButtonTextRu" name="buttonTextRu" type="text" maxlength="128" class="form-control" placeholder="Falls back to EN" />
+            </div>
+            <div class="col-12">
+                <h6 class="text-muted mb-2">O'zbek</h6>
+            </div>
+            <div class="col-12 col-md-4">
+                <label for="promotionTitleUz" class="form-label">Title (UZ)</label>
+                <input id="promotionTitleUz" name="titleUz" type="text" maxlength="256" class="form-control" placeholder="Falls back to EN" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label for="promotionSubtitleUz" class="form-label">Subtitle (UZ)</label>
+                <input id="promotionSubtitleUz" name="subtitleUz" type="text" maxlength="512" class="form-control" placeholder="Falls back to EN" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label for="promotionButtonTextUz" class="form-label">Button text (UZ)</label>
+                <input id="promotionButtonTextUz" name="buttonTextUz" type="text" maxlength="128" class="form-control" placeholder="Falls back to EN" />
+            </div>
             <div class="col-6 col-md-3">
-                <label for="promotionBackgroundColor" class="form-label">@Model.T("admin.promotions.create.backgroundColor", "Background color")</label>
-                <input id="promotionBackgroundColor" name="backgroundColor" type="text" maxlength="32" value="#FFB929" class="form-control" />
+                <label for="promotionCardStyle" class="form-label">@Model.T("admin.promotions.create.cardStyle", "Card style")</label>
+                <select id="promotionCardStyle" name="cardStyle" class="form-select">
+                    @foreach (var style in Model.CardStyleOptions)
+                    {
+                        <option value="@style.Value">@style.Label</option>
+                    }
+                </select>
             </div>
             <div class="col-6 col-md-3">
                 <label for="promotionDisplayOrder" class="form-label">@Model.T("admin.promotions.create.order", "Display order")</label>
@@ -101,7 +139,7 @@ else
                         <th>@Model.T("admin.promotions.table.title", "Title")</th>
                         <th>@Model.T("admin.promotions.table.subtitle", "Subtitle")</th>
                         <th>@Model.T("admin.promotions.table.buttonText", "Button")</th>
-                        <th>@Model.T("admin.promotions.table.color", "Color")</th>
+                        <th>@Model.T("admin.promotions.table.cardStyle", "Style")</th>
                         <th>@Model.T("admin.promotions.table.actionType", "Tap action")</th>
                         <th>@Model.T("admin.promotions.table.actionValue", "Action target")</th>
                         <th>@Model.T("admin.promotions.table.order", "Order")</th>
@@ -117,18 +155,36 @@ else
                         <tr>
                             <form method="post" asp-page-handler="Update">
                                 <input type="hidden" name="id" value="@item.Id" />
-                                <td style="min-width: 180px;">
-                                    <input name="title" type="text" maxlength="256" value="@item.Title" class="form-control form-control-sm" />
+                                <td style="min-width: 220px;">
+                                    <input name="title" type="text" maxlength="256" value="@item.Title" class="form-control form-control-sm mb-1" placeholder="EN" />
+                                    <input name="titleRu" type="text" maxlength="256" value="@item.TitleRu" class="form-control form-control-sm mb-1" placeholder="RU" />
+                                    <input name="titleUz" type="text" maxlength="256" value="@item.TitleUz" class="form-control form-control-sm" placeholder="UZ" />
                                 </td>
-                                <td style="min-width: 200px;">
-                                    <input name="subtitle" type="text" maxlength="512" value="@item.Subtitle" class="form-control form-control-sm" />
+                                <td style="min-width: 220px;">
+                                    <input name="subtitle" type="text" maxlength="512" value="@item.Subtitle" class="form-control form-control-sm mb-1" placeholder="EN" />
+                                    <input name="subtitleRu" type="text" maxlength="512" value="@item.SubtitleRu" class="form-control form-control-sm mb-1" placeholder="RU" />
+                                    <input name="subtitleUz" type="text" maxlength="512" value="@item.SubtitleUz" class="form-control form-control-sm" placeholder="UZ" />
                                 </td>
-                                <td style="min-width: 140px;">
-                                    <input name="buttonText" type="text" maxlength="128" value="@item.ButtonText" class="form-control form-control-sm" />
+                                <td style="min-width: 160px;">
+                                    <input name="buttonText" type="text" maxlength="128" value="@item.ButtonText" class="form-control form-control-sm mb-1" placeholder="EN" />
+                                    <input name="buttonTextRu" type="text" maxlength="128" value="@item.ButtonTextRu" class="form-control form-control-sm mb-1" placeholder="RU" />
+                                    <input name="buttonTextUz" type="text" maxlength="128" value="@item.ButtonTextUz" class="form-control form-control-sm" placeholder="UZ" />
                                 </td>
                                 <td style="min-width: 120px;">
-                                    <input name="backgroundColor" type="text" maxlength="32" value="@item.BackgroundColor" class="form-control form-control-sm" />
-                                    <div class="mt-1" style="width: 40px; height: 24px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.1); background-color: @item.BackgroundColor;"></div>
+                                    <select name="cardStyle" class="form-select form-select-sm">
+                                        @foreach (var style in Model.CardStyleOptions)
+                                        {
+                                            if (string.Equals(item.CardStyle, style.Value, StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                <option value="@style.Value" selected>@style.Label</option>
+                                            }
+                                            else
+                                            {
+                                                <option value="@style.Value">@style.Label</option>
+                                            }
+                                        }
+                                    </select>
+                                    <div class="mt-1 p-1 rounded text-center small" style="background-color: @item.StylePreviewColor; color: @item.StylePreviewTextColor; border: 1px solid rgba(0,0,0,0.1);">@item.CardStyle</div>
                                 </td>
                                 <td style="min-width: 180px;">
                                     <select name="actionType" class="form-select form-select-sm">

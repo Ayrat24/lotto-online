@@ -14,7 +14,7 @@ public static class PromotionsEndpoints
     {
         endpoints.MapGet("/api/promotions", async (AppDbContext db, CancellationToken ct) =>
         {
-            var promotionDtos = await BuildPromotionDtosAsync(db, ct);
+            var promotionDtos = await BuildPromotionDtosAsync(db, null, ct);
             return Results.Ok(new PromotionsListResult(true, promotionDtos));
         });
 
@@ -33,14 +33,14 @@ public static class PromotionsEndpoints
 
             var telegramUserId = authResult.TelegramUserId!.Value;
             await users.TouchUserAsync(telegramUserId, ct);
-            var promotionDtos = await BuildPromotionDtosAsync(db, ct);
+            var promotionDtos = await BuildPromotionDtosAsync(db, req.Locale, ct);
             return Results.Ok(new PromotionsListResult(true, promotionDtos));
         });
 
         return endpoints;
     }
 
-    private static async Task<List<PromotionDto>> BuildPromotionDtosAsync(AppDbContext db, CancellationToken ct)
+    private static async Task<List<PromotionDto>> BuildPromotionDtosAsync(AppDbContext db, string? locale, CancellationToken ct)
     {
         var nowUtc = DateTimeOffset.UtcNow;
         var activeDraws = await db.Draws
@@ -85,7 +85,16 @@ public static class PromotionsEndpoints
                 }
                 return true;
             })
-            .Select(PromotionsManagement.ToDto)
+            .Select(x =>
+            {
+                DiscountedTicketOfferDto? offer = null;
+                if (string.Equals(PromotionsManagement.NormalizeStoredActionType(x.ActionType), PromotionsManagement.ActionTypeDiscountedOffer, StringComparison.Ordinal)
+                    && long.TryParse(x.ActionValue, out var offerId))
+                {
+                    offersById.TryGetValue(offerId, out offer);
+                }
+                return PromotionsManagement.ToDto(x, locale, offer);
+            })
             .ToList();
     }
 
