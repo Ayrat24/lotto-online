@@ -85,12 +85,21 @@ const formattedDraws = computed(() => activeDraws.value.map((draw, index) => {
 }))
 
 const carouselBanners = computed(() => Array.isArray(props.banners) ? props.banners.filter(banner => banner && banner.imageUrl) : [])
+const bannerSlides = computed(() => {
+  const banners = carouselBanners.value
+  if (banners.length <= 1) return banners
+  return [banners[banners.length - 1], ...banners, banners[0]]
+})
 const activeBannerIndex = ref(0)
+const bannerVisualIndex = ref(0)
 const bannerTouchStartX = ref(0)
 const bannerTouchEndX = ref(0)
+const bannerTouchStartY = ref(0)
+const bannerTouchEndY = ref(0)
 const bannerSwipeDistance = ref(0)
 const bannerIsDragging = ref(false)
 const bannerIsAnimating = ref(false)
+let bannerPointerId = null
 const bannerRotationDelayMs = 5000
 const bannerTransitionDurationMs = 320
 let bannerRotationTimer = null
@@ -117,18 +126,38 @@ function clampBannerIndex(index) {
 
 function setActiveBannerIndex(index) {
   activeBannerIndex.value = clampBannerIndex(index)
+  bannerVisualIndex.value = activeBannerIndex.value + (bannerSlides.value.length > 1 ? 1 : 0)
 }
 
 function animateBannerTo(index) {
-  if (!carouselBanners.value.length) return
-  if (index === activeBannerIndex.value) return
+  const total = carouselBanners.value.length
+  if (!total) return
+  const normalized = clampBannerIndex(index)
+  const current = activeBannerIndex.value
+  if (normalized === current) return
   bannerIsAnimating.value = true
-  setActiveBannerIndex(index)
+  if (total > 1 && current === total - 1 && normalized === 0) {
+    bannerVisualIndex.value = total + 1
+  } else if (total > 1 && current === 0 && normalized === total - 1) {
+    bannerVisualIndex.value = 0
+  } else {
+    bannerVisualIndex.value = normalized + 1
+  }
+  activeBannerIndex.value = normalized
   if (bannerSwitchResetTimer !== null) {
     window.clearTimeout(bannerSwitchResetTimer)
     bannerSwitchResetTimer = null
   }
   bannerSwitchResetTimer = window.setTimeout(() => {
+    if (bannerSlides.value.length > 1) {
+      if (bannerVisualIndex.value === 0) {
+        bannerIsAnimating.value = false
+        bannerVisualIndex.value = total
+      } else if (bannerVisualIndex.value === total + 1) {
+        bannerIsAnimating.value = false
+        bannerVisualIndex.value = 1
+      }
+    }
     bannerIsAnimating.value = false
     bannerSwitchResetTimer = null
   }, bannerTransitionDurationMs)
@@ -153,29 +182,29 @@ function startBannerRotation() {
 function stopBannerRotation() {
   if (bannerRotationTimer !== null) {
     window.clearInterval(bannerRotationTimer)
-    bannerRotationTimer = null
   }
+  bannerRotationTimer = null
 }
 
 function restartBannerRotation() {
   startBannerRotation()
 }
 
-function handleBannerPointerDown(event) {
+function startBannerVisualDrag(clientX) {
   bannerIsDragging.value = true
-  bannerTouchStartX.value = event.clientX
-  bannerTouchEndX.value = event.clientX
+  bannerTouchStartX.value = clientX
+  bannerTouchEndX.value = clientX
   bannerSwipeDistance.value = 0
   stopBannerRotation()
 }
 
-function handleBannerPointerMove(event) {
+function updateBannerVisualDrag(clientX) {
   if (!bannerIsDragging.value) return
-  bannerTouchEndX.value = event.clientX
+  bannerTouchEndX.value = clientX
   bannerSwipeDistance.value = bannerTouchEndX.value - bannerTouchStartX.value
 }
 
-function handleBannerPointerUp() {
+function finishBannerVisualDrag() {
   if (!bannerIsDragging.value) return
   bannerIsDragging.value = false
   const delta = bannerSwipeDistance.value
@@ -185,16 +214,77 @@ function handleBannerPointerUp() {
   } else if (delta >= swipeThreshold) {
     showPreviousBanner()
   } else {
-    setActiveBannerIndex(activeBannerIndex.value)
+    bannerVisualIndex.value = activeBannerIndex.value + (bannerSlides.value.length > 1 ? 1 : 0)
   }
   bannerSwipeDistance.value = 0
   restartBannerRotation()
+}
+
+function handleBannerPointerDown(event) {
+  if (event.pointerType === 'touch') return
+  if (event.pointerType === 'mouse' && event.button !== 0) return
+  bannerPointerId = event.pointerId
+  startBannerVisualDrag(event.clientX)
+  const el = event.currentTarget
+  if (el && el.setPointerCapture) {
+    try {
+      el.setPointerCapture(event.pointerId)
+    } catch {}
+  }
+}
+
+function handleBannerPointerMove(event) {
+  if (!bannerIsDragging.value || bannerPointerId !== event.pointerId) return
+  updateBannerVisualDrag(event.clientX)
+}
+
+function handleBannerPointerUp(event) {
+  if (!bannerIsDragging.value) return
+  const el = event?.currentTarget
+  if (el && bannerPointerId !== null) {
+    try {
+      if (el.hasPointerCapture?.(bannerPointerId)) {
+        el.releasePointerCapture(bannerPointerId)
+      }
+    } catch {}
+  }
+  bannerPointerId = null
+  finishBannerVisualDrag()
+}
+
+function handleBannerTouchStart(event) {
+  if (!event.touches.length) return
+  const touch = event.touches[0]
+  bannerTouchStartY.value = touch.clientY
+  bannerTouchEndY.value = touch.clientY
+  startBannerVisualDrag(touch.clientX)
+}
+
+function handleBannerTouchMove(event) {
+  if (!bannerIsDragging.value || !event.touches.length) return
+  const touch = event.touches[0]
+  bannerTouchEndY.value = touch.clientY
+  const deltaX = touch.clientX - bannerTouchStartX.value
+  const deltaY = touch.clientY - bannerTouchStartY.value
+  if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > 6) {
+    bannerIsDragging.value = false
+    bannerSwipeDistance.value = 0
+    restartBannerRotation()
+    return
+  }
+  event.preventDefault()
+  updateBannerVisualDrag(touch.clientX)
+}
+
+function handleBannerTouchEnd() {
+  finishBannerVisualDrag()
 }
 
 watch(() => carouselBanners.value.length, () => {
   if (activeBannerIndex.value >= carouselBanners.value.length) {
     activeBannerIndex.value = 0
   }
+  bannerVisualIndex.value = activeBannerIndex.value + (bannerSlides.value.length > 1 ? 1 : 0)
   startBannerRotation()
 }, { immediate: true })
 
@@ -333,19 +423,23 @@ function handleDrawScrollPointerUp(event) {
         @pointerup="handleBannerPointerUp"
         @pointercancel="handleBannerPointerUp"
         @pointerleave="handleBannerPointerUp"
+        @touchstart.passive="handleBannerTouchStart"
+        @touchmove="handleBannerTouchMove"
+        @touchend="handleBannerTouchEnd"
+        @touchcancel="handleBannerTouchEnd"
       >
-        <template v-if="carouselBanners.length">
+        <template v-if="bannerSlides.length">
           <div class="banner-stage">
             <div
               class="banner-strip"
               :class="{ 'banner-strip-animated': bannerIsAnimating }"
               :style="{
-                transform: `translateX(calc(${-activeBannerIndex * 100}% + ${bannerIsDragging ? bannerSwipeDistance : 0}px))`
+                transform: `translateX(calc(${-bannerVisualIndex * 100}% + ${bannerIsDragging ? bannerSwipeDistance : 0}px))`
               }"
             >
               <img
-                v-for="(banner, index) in carouselBanners"
-                :key="banner.id || banner.imageUrl || index"
+                v-for="(banner, index) in bannerSlides"
+                :key="banner.id || `${banner.imageUrl || 'banner'}-${index}`"
                 class="image-dynamic"
                 :src="banner.imageUrl"
                 alt="Banner image"
@@ -477,12 +571,14 @@ function handleDrawScrollPointerUp(event) {
 .background-border {
   position: relative;
   overflow: hidden;
+  touch-action: pan-y;
 }
 
 .banner-stage {
   position: relative;
   width: 100%;
   overflow: hidden;
+  touch-action: pan-y;
 }
 
 .banner-strip {
