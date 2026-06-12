@@ -7,6 +7,10 @@ import TicketSelectionScreen from './screens/TicketSelectionScreen.vue'
 import MyTicketsScreen from './screens/MyTicketsScreen.vue'
 import WinnersScreen from './screens/WinnersScreen.vue'
 import ProfileScreen from './screens/ProfileScreen.vue'
+import ProfileEditScreen from './screens/ProfileEditScreen.vue'
+import TopUpScreen from './screens/TopUpScreen.vue'
+import InviteFriendScreen from './screens/InviteFriendScreen.vue'
+import TransactionHistoryScreen from './screens/TransactionHistoryScreen.vue'
 
 const DRAW_SORTS = {
   closest: 'closest',
@@ -39,6 +43,10 @@ function getInitialScreen() {
   if (screen === 'tickets') return 'tickets'
   if (screen === 'winners') return 'winners'
   if (screen === 'profile') return 'profile'
+  if (screen === 'profile-edit') return 'profile-edit'
+  if (screen === 'top-up') return 'top-up'
+  if (screen === 'invite-friend') return 'invite-friend'
+  if (screen === 'transactions') return 'transactions'
   return 'home'
 }
 
@@ -78,10 +86,11 @@ const state = reactive({
   initData: runtime.initData,
   isLocalDebug: runtime.isLocalDebug,
   locale: 'en',
-  user: { firstName: 'Player', lastName: '', username: '', balance: 0 },
+  user: { firstName: 'Player', lastName: '', username: '', birthDate: '', balance: 0 },
   timeline: null,
   banners: [],
   winners: [],
+  localizationStrings: {},
   loading: true,
   error: '',
   sortMode: DRAW_SORTS.closest,
@@ -145,6 +154,7 @@ const userName = computed(() => {
 })
 const avatarLetter = computed(() => userName.value.slice(0, 1).toUpperCase())
 const formattedBalance = computed(() => formatCurrency(state.user.balance, intlLocale.value).replace('.', ','))
+const localizedBalanceLabel = computed(() => getText('client.balance.label', texts.balanceLabel))
 
 const userSubtitle = computed(() => {
   if (currentScreen.value === 'ticket-selection') {
@@ -153,24 +163,30 @@ const userSubtitle = computed(() => {
   if (currentScreen.value === 'tickets') {
     return 'Ваши приобретённые билеты'
   }
-  if (currentScreen.value === 'profile') {
-    return 'Профиль'
-  }
+  if (currentScreen.value === 'profile') return getText('client.profile.title', 'Профиль')
+  if (currentScreen.value === 'profile-edit') return getText('client.profile.edit.title', 'Профиль')
+  if (currentScreen.value === 'top-up') return getText('client.topup.title', 'Пополнить баланс')
+  if (currentScreen.value === 'invite-friend') return getText('client.invite.title', 'Пригласить друга')
+  if (currentScreen.value === 'transactions') return getText('client.history.title', 'История транзакций')
   return '3 билета в игре · 1 выигрыш'
 })
 
 const tabTexts = computed(() => ({
-  homeTab: texts.homeTab,
-  ticketsTab: texts.ticketsTab,
-  winnersTab: texts.winnersTab,
-  profileTab: texts.profileTab
+  homeTab: getText('client.tab.home', texts.homeTab),
+  ticketsTab: getText('client.tab.tickets', texts.ticketsTab),
+  winnersTab: getText('client.tab.winners', texts.winnersTab),
+  profileTab: getText('client.tab.profile', texts.profileTab)
 }))
 
 const activeTab = computed(() => {
   if (currentScreen.value === 'home' || currentScreen.value === 'ticket-selection') return 'home'
   if (currentScreen.value === 'tickets') return 'tickets'
   if (currentScreen.value === 'winners') return 'winners'
-  if (currentScreen.value === 'profile') return 'profile'
+  if (currentScreen.value === 'profile'
+    || currentScreen.value === 'profile-edit'
+    || currentScreen.value === 'top-up'
+    || currentScreen.value === 'invite-friend'
+    || currentScreen.value === 'transactions') return 'profile'
   return 'home'
 })
 
@@ -252,6 +268,58 @@ const myTicketsTexts = computed(() => ({
 const winnersError = ref('')
 const winnersLoading = ref(false)
 
+function getText(key, fallback) {
+  return state.localizationStrings?.[key] || fallback
+}
+
+const profileMenuTexts = computed(() => ({
+  balanceLabel: getText('client.balance.label', texts.balanceLabel),
+  profileTitle: getText('client.profile.title', 'Профиль'),
+  topUpBalance: getText('client.profile.menuDeposit', 'Пополнить баланс'),
+  inviteFriend: getText('client.profile.menuInvite', 'Пригласить друга'),
+  withdrawMoney: getText('client.profile.menuWithdraw', 'Вывести деньги'),
+  transactionHistory: getText('client.profile.menuHistory', 'История транзакций')
+}))
+
+const profileEditTexts = computed(() => ({
+  title: getText('client.profile.edit.title', 'Профиль'),
+  userSectionLabel: getText('client.profile.edit.sectionUser', 'Пользователь'),
+  firstNameLabel: getText('client.profile.edit.firstName', 'Имя'),
+  lastNameLabel: getText('client.profile.edit.lastName', 'Фамилия'),
+  birthDateLabel: getText('client.profile.edit.birthDate', 'День рождения'),
+  firstNamePlaceholder: getText('client.profile.edit.firstNamePlaceholder', 'Имя'),
+  lastNamePlaceholder: getText('client.profile.edit.lastNamePlaceholder', 'Фамилия'),
+  birthDatePlaceholder: getText('client.profile.edit.birthDatePlaceholder', '31.12.2026'),
+  saveButton: getText('client.profile.edit.save', 'Сохранить')
+}))
+
+const topUpTexts = computed(() => ({
+  title: getText('client.topup.title', 'Пополнить баланс'),
+  amountLabel: getText('client.topup.amountLabel', 'Сумма'),
+  paymentLabel: getText('client.topup.methodTitle', 'Выберите способ оплаты'),
+  continueButton: getText('client.button.continue', 'Продолжить'),
+  amountPresets: [10, 25, 50, 100]
+}))
+
+const inviteTexts = computed(() => ({
+  title: getText('client.invite.title', 'Пригласить друга'),
+  promoLabel: getText('client.profile.promoTitle', 'Введите промокод'),
+  promoPlaceholder: getText('client.profile.promoPlaceholder', 'Промокод'),
+  applyButton: getText('client.button.applyPromo', 'Применить промокод'),
+  inviteLabel: getText('client.invite.friendsLabel', 'Пригласите друзей'),
+  rewardTitle: getText('client.invite.rewardTitle', 'Получай $5 за каждого друга'),
+  rewardSubtitle: getText('client.invite.rewardSubtitle', 'Когда они пополнят баланс'),
+  codeLabel: getText('client.invite.codeLabel', 'Ваш код приглашения'),
+  codePlaceholder: getText('client.invite.codePlaceholder', '—'),
+  copyButton: getText('client.invite.copyButton', 'Скопировать ссылку')
+}))
+
+const transactionTexts = computed(() => ({
+  title: getText('client.history.title', 'История транзакций'),
+  emptyTitle: getText('client.history.empty', 'Пока нет транзакций'),
+  emptySubtitle: getText('client.history.emptySubtitle', 'Все ваши пополнения и выплаты появятся здесь')
+}))
+
 function openTicketSelection(draw) {
   if (!draw || draw.id == null) return
   selectedDrawId.value = draw.id
@@ -279,7 +347,21 @@ function handleTabNavigate(tab) {
 }
 
 function openProfileAction(target) {
-  console.log(`[MiniApp] profile action: ${target}`)
+  const allowedScreens = ['profile', 'profile-edit', 'top-up', 'invite-friend', 'transactions']
+  if (!allowedScreens.includes(target)) {
+    console.log(`[MiniApp] profile action: ${target}`)
+    return
+  }
+  currentScreen.value = target
+  updateUrl()
+}
+
+function handleProfileSave(payload) {
+  state.user.firstName = payload.firstName
+  state.user.lastName = payload.lastName
+  state.user.birthDate = payload.birthDate
+  currentScreen.value = 'profile'
+  updateUrl()
 }
 
 function handleBalanceUpdated(newBalance) {
@@ -295,6 +377,14 @@ function updateUrl() {
     url.searchParams.set('screen', 'tickets')
   } else if (currentScreen.value === 'profile') {
     url.searchParams.set('screen', 'profile')
+  } else if (currentScreen.value === 'profile-edit') {
+    url.searchParams.set('screen', 'profile-edit')
+  } else if (currentScreen.value === 'top-up') {
+    url.searchParams.set('screen', 'top-up')
+  } else if (currentScreen.value === 'invite-friend') {
+    url.searchParams.set('screen', 'invite-friend')
+  } else if (currentScreen.value === 'transactions') {
+    url.searchParams.set('screen', 'transactions')
   } else {
     url.searchParams.delete('screen')
     url.searchParams.delete('drawId')
@@ -304,7 +394,10 @@ function updateUrl() {
 
 async function loadLocale() {
   const res = await postJson('/api/localization/bootstrap', { initData: state.initData, locale: state.locale })
-  if (res && res.ok) state.locale = String(res.locale || 'en')
+  if (res && res.ok) {
+    state.locale = String(res.locale || 'en')
+    state.localizationStrings = res.strings || {}
+  }
 }
 
 async function loadAuth() {
@@ -403,7 +496,7 @@ onBeforeUnmount(() => {
       :avatar-letter="avatarLetter"
       :user-name="userName"
       :user-subtitle="userSubtitle"
-      :balance-label="texts.balanceLabel"
+      :balance-label="localizedBalanceLabel"
       :balance="formattedBalance"
     />
 
@@ -466,18 +559,45 @@ onBeforeUnmount(() => {
         :avatar-letter="avatarLetter"
         :balance="formattedBalance"
         :subtitle="userSubtitle"
-        :texts="{
-          balanceLabel: texts.balanceLabel,
-          profileTitle: 'Профиль',
-          topUpBalance: 'Пополнить баланс',
-          inviteFriend: 'Пригласить друга',
-          withdrawMoney: 'Вывести деньги',
-          transactionHistory: 'История транзакций'
-        }"
+        :texts="profileMenuTexts"
+        @open-profile="openProfileAction('profile-edit')"
         @open-top-up="openProfileAction('top-up')"
-        @open-invite="openProfileAction('invite')"
+        @open-invite="openProfileAction('invite-friend')"
         @open-withdraw="openProfileAction('withdraw')"
         @open-transactions="openProfileAction('transactions')"
+      />
+
+      <ProfileEditScreen
+        v-else-if="currentScreen === 'profile-edit'"
+        :first-name="state.user.firstName"
+        :last-name="state.user.lastName"
+        :birth-date="state.user.birthDate"
+        :texts="profileEditTexts"
+        @back="openProfileAction('profile')"
+        @save="handleProfileSave"
+      />
+
+      <TopUpScreen
+        v-else-if="currentScreen === 'top-up'"
+        :texts="topUpTexts"
+        @back="openProfileAction('profile')"
+        @continue="openProfileAction('profile')"
+      />
+
+      <InviteFriendScreen
+        v-else-if="currentScreen === 'invite-friend'"
+        :texts="inviteTexts"
+        invite-code="9472C62E21"
+        @back="openProfileAction('profile')"
+        @apply="openProfileAction('profile')"
+        @copy="openProfileAction('profile')"
+      />
+
+      <TransactionHistoryScreen
+        v-else-if="currentScreen === 'transactions'"
+        :texts="transactionTexts"
+        :transactions="[]"
+        @back="openProfileAction('profile')"
       />
     </main>
 

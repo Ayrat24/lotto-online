@@ -11,6 +11,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits([
+  'open-profile',
   'open-top-up',
   'open-invite',
   'open-withdraw',
@@ -42,13 +43,13 @@ function fallbackIconMarkup(key) {
     <section class="profile-section">
       <h1 class="profile-title">{{ profileTitle }}</h1>
 
-      <div class="profile-profile-card">
+      <button type="button" class="profile-profile-card profile-profile-card--clickable" @click="emit('open-profile')">
         <div class="profile-profile-card__avatar">{{ avatarLetter }}</div>
         <div class="profile-profile-card__content">
           <div class="profile-profile-card__name">{{ userName }}</div>
           <div class="profile-profile-card__subtitle">{{ profileCardSubtitle }}</div>
         </div>
-      </div>
+      </button>
 
       <div class="profile-actions">
         <button type="button" class="profile-action" @click="emit('open-top-up')">
@@ -182,6 +183,10 @@ function fallbackIconMarkup(key) {
 }
 
 .profile-profile-card {
+  border: 0;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -190,6 +195,10 @@ function fallbackIconMarkup(key) {
   background: linear-gradient(180deg, #fff7e5 0%, #ffffff 100%);
   border: 1px solid rgba(15, 15, 18, 0.05);
   box-shadow: 0 1px 2px rgba(15, 15, 20, 0.04), 0 8px 24px rgba(15, 15, 20, 0.05);
+}
+
+.profile-profile-card--clickable:hover {
+  box-shadow: 0 4px 16px rgba(15, 15, 20, 0.08);
 }
 
 .profile-actions {
