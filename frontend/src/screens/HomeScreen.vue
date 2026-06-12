@@ -88,8 +88,13 @@ const carouselBanners = computed(() => Array.isArray(props.banners) ? props.bann
 const activeBannerIndex = ref(0)
 const bannerTouchStartX = ref(0)
 const bannerTouchEndX = ref(0)
+const bannerSwipeDistance = ref(0)
+const bannerIsDragging = ref(false)
+const bannerIsAnimating = ref(false)
 const bannerRotationDelayMs = 5000
+const bannerTransitionDurationMs = 320
 let bannerRotationTimer = null
+let bannerSwitchResetTimer = null
 let sortScrollPointerStartX = 0
 let sortScrollStartLeft = 0
 let sortScrollDragging = false
@@ -114,14 +119,29 @@ function setActiveBannerIndex(index) {
   activeBannerIndex.value = clampBannerIndex(index)
 }
 
+function animateBannerTo(index) {
+  if (!carouselBanners.value.length) return
+  if (index === activeBannerIndex.value) return
+  bannerIsAnimating.value = true
+  setActiveBannerIndex(index)
+  if (bannerSwitchResetTimer !== null) {
+    window.clearTimeout(bannerSwitchResetTimer)
+    bannerSwitchResetTimer = null
+  }
+  bannerSwitchResetTimer = window.setTimeout(() => {
+    bannerIsAnimating.value = false
+    bannerSwitchResetTimer = null
+  }, bannerTransitionDurationMs)
+}
+
 function showNextBanner() {
   if (!carouselBanners.value.length) return
-  setActiveBannerIndex(activeBannerIndex.value + 1)
+  animateBannerTo(activeBannerIndex.value + 1)
 }
 
 function showPreviousBanner() {
   if (!carouselBanners.value.length) return
-  setActiveBannerIndex(activeBannerIndex.value - 1)
+  animateBannerTo(activeBannerIndex.value - 1)
 }
 
 function startBannerRotation() {
@@ -142,23 +162,32 @@ function restartBannerRotation() {
 }
 
 function handleBannerPointerDown(event) {
+  bannerIsDragging.value = true
   bannerTouchStartX.value = event.clientX
   bannerTouchEndX.value = event.clientX
+  bannerSwipeDistance.value = 0
   stopBannerRotation()
 }
 
 function handleBannerPointerMove(event) {
+  if (!bannerIsDragging.value) return
   bannerTouchEndX.value = event.clientX
+  bannerSwipeDistance.value = bannerTouchEndX.value - bannerTouchStartX.value
 }
 
 function handleBannerPointerUp() {
-  const delta = bannerTouchEndX.value - bannerTouchStartX.value
+  if (!bannerIsDragging.value) return
+  bannerIsDragging.value = false
+  const delta = bannerSwipeDistance.value
   const swipeThreshold = 40
   if (delta <= -swipeThreshold) {
     showNextBanner()
   } else if (delta >= swipeThreshold) {
     showPreviousBanner()
+  } else {
+    setActiveBannerIndex(activeBannerIndex.value)
   }
+  bannerSwipeDistance.value = 0
   restartBannerRotation()
 }
 
@@ -175,6 +204,10 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   stopBannerRotation()
+  if (bannerSwitchResetTimer !== null) {
+    window.clearTimeout(bannerSwitchResetTimer)
+    bannerSwitchResetTimer = null
+  }
 })
 
 const activeBanner = computed(() => carouselBanners.value[activeBannerIndex.value] || null)
@@ -300,15 +333,24 @@ function handleDrawScrollPointerUp(event) {
         @pointerleave="handleBannerPointerUp"
       >
         <template v-if="carouselBanners.length">
-          <img
-            v-for="(banner, index) in carouselBanners"
-            :key="banner.id || banner.imageUrl || index"
-            v-show="index === activeBannerIndex"
-            class="image-dynamic"
-            :src="banner.imageUrl"
-            alt="Banner image"
-            draggable="false"
-          />
+          <div class="banner-stage">
+            <div
+              class="banner-strip"
+              :class="{ 'banner-strip-animated': bannerIsAnimating }"
+              :style="{
+                transform: `translateX(calc(${-activeBannerIndex * 100}% + ${bannerIsDragging ? bannerSwipeDistance : 0}px))`
+              }"
+            >
+              <img
+                v-for="(banner, index) in carouselBanners"
+                :key="banner.id || banner.imageUrl || index"
+                class="image-dynamic"
+                :src="banner.imageUrl"
+                alt="Banner image"
+                draggable="false"
+              />
+            </div>
+          </div>
           <div class="container">
             <button
               v-for="(banner, index) in carouselBanners"
@@ -435,9 +477,35 @@ function handleDrawScrollPointerUp(event) {
   overflow: hidden;
 }
 
+.banner-stage {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+
+.banner-strip {
+  display: flex;
+  width: 100%;
+  will-change: transform;
+  transform: translateX(0);
+}
+
+.banner-strip-animated {
+  transition: transform 0.32s ease;
+}
+
+.banner-strip .image-dynamic {
+  flex: 0 0 100%;
+  width: 100%;
+  height: 100%;
+}
+
 .background-border .image-dynamic {
+  position: absolute;
+  inset: 0 auto auto 0;
   user-select: none;
   -webkit-user-drag: none;
+  object-fit: cover;
 }
 
 .container {
