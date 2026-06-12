@@ -13,6 +13,7 @@ public static class PromotionsManagement
     public const string CardStyleGold = "gold";
     public const string CardStyleDark = "dark";
     public const string CardStyleRed = "red";
+    public const string CardStyleWhite = "white";
 
     private static readonly string[] SupportedAppSections = ["home", "tickets", "winners", "profile", "deposit", "withdraw", "invite"];
 
@@ -47,6 +48,7 @@ public static class PromotionsManagement
             "gold" => CardStyleGold,
             "dark" => CardStyleDark,
             "red" => CardStyleRed,
+            "white" => CardStyleWhite,
             _ => CardStyleGold
         };
     }

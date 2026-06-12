@@ -561,6 +561,47 @@ async function loadBanners() {
 }
 
 async function loadPromotions() {
+  if (state.isLocalDebug) {
+    state.promotions = [
+      {
+        id: 1,
+        title: 'БОНУС НОВИЧКА',
+        subtitle: '3 бесплатных билета',
+        buttonText: 'Получить',
+        actionType: 'app_section',
+        actionValue: 'profile',
+        cardStyle: 'gold'
+      },
+      {
+        id: 2,
+        title: 'ПРИГЛАШАЙ И ЗАРАБАТЫВАЙ',
+        subtitle: '$5 за каждого друга',
+        buttonText: 'Поделиться',
+        actionType: 'app_section',
+        actionValue: 'invite',
+        cardStyle: 'dark'
+      },
+      {
+        id: 3,
+        title: 'СПЕШНОЕ ПРЕДЛОЖЕНИЕ',
+        subtitle: 'Только сегодня скидка',
+        buttonText: 'Подробнее',
+        actionType: 'external_url',
+        actionValue: 'https://example.com',
+        cardStyle: 'red'
+      },
+      {
+        id: 4,
+        title: 'НОВОЕ ПРЕДЛОЖЕНИЕ',
+        subtitle: 'Попробуй новое',
+        buttonText: 'Смотреть',
+        actionType: 'none',
+        actionValue: null,
+        cardStyle: 'white'
+      }
+    ]
+    return
+  }
   const res = await postJson('/api/promotions', { initData: state.initData, locale: state.locale })
   state.promotions = res && res.ok && Array.isArray(res.promotions) ? res.promotions : []
 }

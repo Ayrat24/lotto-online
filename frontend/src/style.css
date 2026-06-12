@@ -494,11 +494,11 @@ body {
 }
 
 .background-border-2 {
-    background-color: #fafaf7;
-    border: 1px solid #0f0f140f;
+    background-color: #ffffff;
+    border: 1.5px solid #b8b8c0;
     border-radius: 100px;
     display: inline-flex;
-    padding: 6px 10px;
+    padding: 6px 12px;
 }
 
 .link-button {
@@ -970,6 +970,8 @@ body {
     border-radius: 50%;
     top: calc(50% - 8px);
     z-index: 0;
+    background-color: #ffffff;
+    box-shadow: inset 0 0 0 0.5px rgba(0,0,0,0.1);
 }
 
 .promo-card-dot-left {
@@ -997,9 +999,6 @@ body {
     color: #ffffff;
 }
 
-.promo-card-gold .promo-card-dot {
-    background-color: #fafaf7;
-}
 
 .promo-card-dark {
     background-color: #1c2140;
@@ -1020,8 +1019,10 @@ body {
 }
 
 .promo-card-dark .promo-card-dot {
-    background-color: #111827;
+    background-color: #ffffff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
+
 
 .promo-card-red {
     background-color: #d42b3a;
@@ -1036,13 +1037,30 @@ body {
 }
 
 .promo-card-red .promo-card-btn {
-    background-color: rgba(255,255,255,0.2);
-    color: #ffffff;
-    border: 1px solid rgba(255,255,255,0.4);
+    background-color: #ffffff;
+    color: #000000;
 }
 
-.promo-card-red .promo-card-dot {
-    background-color: #b8202e;
+.promo-card-white {
+    background-color: #ffffff;
+    border: 1px solid rgba(0,0,0,0.08);
+}
+
+.promo-card-white .promo-card-kicker {
+    color: #8a8a8a;
+}
+
+.promo-card-white .promo-card-title {
+    color: #0f0f12;
+}
+
+.promo-card-white .promo-card-btn {
+    background-color: #ffb929;
+    color: #000000;
+}
+
+.promo-card-white .promo-card-dot {
+    background-color: #e8e8e8;
 }
 
 /* Promotions screen */

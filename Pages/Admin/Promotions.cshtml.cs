@@ -58,7 +58,8 @@ public sealed class PromotionsModel : LocalizedAdminPageModel
     [
         new(PromotionsManagement.CardStyleGold, "Gold (yellow)"),
         new(PromotionsManagement.CardStyleDark, "Dark (charcoal)"),
-        new(PromotionsManagement.CardStyleRed, "Red")
+        new(PromotionsManagement.CardStyleRed, "Red"),
+        new(PromotionsManagement.CardStyleWhite, "White")
     ];
 
     public IReadOnlyList<string> AppSectionOptions { get; } = PromotionsManagement.GetSupportedAppSections();
@@ -321,6 +322,7 @@ public sealed class PromotionsModel : LocalizedAdminPageModel
         {
             PromotionsManagement.CardStyleDark => "#1C2140",
             PromotionsManagement.CardStyleRed => "#D42B3A",
+            PromotionsManagement.CardStyleWhite => "#FFFFFF",
             _ => "#FFB929"
         };
 
@@ -328,6 +330,7 @@ public sealed class PromotionsModel : LocalizedAdminPageModel
         PromotionsManagement.NormalizeCardStyle(cardStyle) switch
         {
             PromotionsManagement.CardStyleGold => "#1C1C2E",
+            PromotionsManagement.CardStyleWhite => "#0F0F12",
             _ => "#FFFFFF"
         };
 
