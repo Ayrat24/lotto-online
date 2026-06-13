@@ -797,9 +797,15 @@ async function loadAll() {
 
 onMounted(() => {
   try {
-    if (window.Telegram?.WebApp) {
-      window.Telegram.WebApp.ready()
-      window.Telegram.WebApp.expand()
+    const tg = window.Telegram?.WebApp
+    if (tg) {
+      tg.ready()
+      tg.expand()
+      // Force a light theme on Telegram's native chrome (the bars above the
+      // header and below the tab bar) so they match the white app surface.
+      try { tg.setHeaderColor && tg.setHeaderColor('#ffffff') } catch {}
+      try { tg.setBackgroundColor && tg.setBackgroundColor('#ffffff') } catch {}
+      try { tg.setBottomBarColor && tg.setBottomBarColor('#ffffff') } catch {}
     }
   } catch {}
   // Seed name + avatar from Telegram so the header is populated immediately,
