@@ -52,6 +52,12 @@ public sealed class AppDbContext : DbContext
             b.Property(x => x.CreatedAtUtc).IsRequired();
             b.Property(x => x.LastSeenAtUtc).IsRequired();
 
+            // Optimistic concurrency: PostgreSQL system column "xmin" guards against
+            // lost updates / double-spend on balance mutations. Only mapped for the
+            // relational (Npgsql) provider; the local-debug in-memory provider skips it.
+            if (Database.IsNpgsql())
+                b.Property<uint>("xmin").IsRowVersion();
+
             b.HasOne<MiniAppUser>()
                 .WithMany()
                 .HasForeignKey(x => x.ReferredByUserId)
@@ -263,6 +269,10 @@ public sealed class AppDbContext : DbContext
             b.Property(x => x.Id).ValueGeneratedNever();
             b.Property(x => x.Balance).HasPrecision(18, 2).IsRequired();
             b.Property(x => x.UpdatedAtUtc).IsRequired();
+
+            // Optimistic concurrency guard for the shared server wallet balance.
+            if (Database.IsNpgsql())
+                b.Property<uint>("xmin").IsRowVersion();
         });
 
         modelBuilder.Entity<WalletTransaction>(b =>
@@ -278,6 +288,19 @@ public sealed class AppDbContext : DbContext
             b.HasIndex(x => x.CreatedAtUtc);
             b.HasIndex(x => new { x.UserId, x.CreatedAtUtc });
             b.HasIndex(x => x.Type);
+
+            // Database-level idempotency backstop: each (Type, Reference) for crediting/
+            // refunding/claiming operations can only be written once, so a concurrent
+            // double-credit or double-claim hits a unique-violation instead of paying twice.
+            // Excludes TicketPurchase / WithdrawalRequested whose references are intentionally
+            // non-unique. Only applied on PostgreSQL (filtered indexes are unsupported in-memory).
+            if (Database.IsNpgsql())
+            {
+                b.HasIndex(x => new { x.Type, x.Reference })
+                    .IsUnique()
+                    .HasDatabaseName("IX_wallet_transactions_Idempotent_Type_Reference")
+                    .HasFilter("\"Reference\" IS NOT NULL AND \"Type\" IN ('CryptoDepositCredited', 'WinningsClaimed', 'WithdrawalConfirmed', 'WithdrawalDeniedRefund', 'ReferralInviterBonus', 'ReferralInviteeBonus')");
+            }
 
             b.Property(x => x.Type)
                 .HasConversion<string>()

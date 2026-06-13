@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.Options;
@@ -38,8 +40,20 @@ public static class AdminAuth
     }
 
     public static bool ValidateCredentials(AdminOptions opts, string? username, string? password)
-        => string.Equals(opts.Username, username, StringComparison.Ordinal)
-           && string.Equals(opts.Password, password, StringComparison.Ordinal);
+    {
+        // Constant-time comparison of both fields to avoid leaking credentials via timing.
+        // Both comparisons are always evaluated (no short-circuit) for the same reason.
+        var usernameOk = FixedTimeEquals(opts.Username, username);
+        var passwordOk = FixedTimeEquals(opts.Password, password);
+        return usernameOk && passwordOk;
+    }
+
+    private static bool FixedTimeEquals(string? expected, string? actual)
+    {
+        var expectedBytes = Encoding.UTF8.GetBytes(expected ?? string.Empty);
+        var actualBytes = Encoding.UTF8.GetBytes(actual ?? string.Empty);
+        return CryptographicOperations.FixedTimeEquals(expectedBytes, actualBytes);
+    }
 
     public static ClaimsPrincipal CreateAdminPrincipal(string username)
     {

@@ -7,7 +7,6 @@ using MiniApp.Data;
 using MiniApp.Features.Auth;
 using MiniApp.Features.Draws;
 using MiniApp.Features.Tickets;
-using MiniApp.Features.Users;
 using MiniApp.Features.Timeline;
 using MiniApp.Features.Wallet;
 using MiniApp.Features.Payments;
@@ -46,6 +45,18 @@ if (string.IsNullOrWhiteSpace(botMode)) botMode = "Polling";
 var webAppUrl = builder.Configuration["BotWebAppUrl"]; // public https base url for the mini app (domain or reverse proxy)
 var miniAppText = builder.Configuration["MiniApp:Text"] ?? "(No MiniApp:Text configured)";
 
+// Secret token shared with Telegram (sent as X-Telegram-Bot-Api-Secret-Token on every webhook
+// delivery). Required in Webhook mode so forged updates to /bot are rejected.
+var botWebhookSecret = (builder.Configuration["BotWebhookSecretToken"] ?? string.Empty).Trim();
+if (telegramEnabled
+    && string.Equals(botMode, "Webhook", StringComparison.OrdinalIgnoreCase)
+    && string.IsNullOrWhiteSpace(botWebhookSecret))
+{
+    throw new InvalidOperationException(
+        "Set BotWebhookSecretToken (1-256 chars, A-Z a-z 0-9 _ -) when BotMode=Webhook. " +
+        "It authenticates incoming Telegram webhook calls to /bot.");
+}
+
 // ===== Services =====
 builder.Services.AddRazorPages();
 builder.Services.AddMemoryCache();
@@ -54,8 +65,40 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor
         | ForwardedHeaders.XForwardedProto
         | ForwardedHeaders.XForwardedHost;
-    options.KnownIPNetworks.Clear();
+
+    // Only honor X-Forwarded-* from trusted reverse proxies. Configure the proxy address(es)
+    // / network(s) (e.g. your nginx or load balancer) so clients cannot spoof their IP, scheme
+    // or host. Falls back to trusting all hops only when nothing is configured (logged below).
+    var configuredProxies = (builder.Configuration["ForwardedHeaders:KnownProxies"] ?? string.Empty)
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    var configuredNetworks = (builder.Configuration["ForwardedHeaders:KnownNetworks"] ?? string.Empty)
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
     options.KnownProxies.Clear();
+    options.KnownIPNetworks.Clear();
+
+    foreach (var proxy in configuredProxies)
+    {
+        if (System.Net.IPAddress.TryParse(proxy, out var ip))
+            options.KnownProxies.Add(ip);
+    }
+
+    foreach (var network in configuredNetworks)
+    {
+        if (System.Net.IPNetwork.TryParse(network, out var parsed))
+            options.KnownIPNetworks.Add(parsed);
+    }
+
+    if (options.KnownProxies.Count == 0 && options.KnownIPNetworks.Count == 0)
+    {
+        // No trusted proxy configured: accept forwarded headers from any hop (legacy behavior).
+        // Set ForwardedHeaders:KnownProxies/KnownNetworks in production to prevent IP spoofing.
+        options.ForwardLimit = null;
+    }
+    else
+    {
+        options.ForwardLimit = configuredNetworks.Length + configuredProxies.Length;
+    }
 });
 
 // Admin panel (cookie auth)
@@ -300,7 +343,6 @@ app.MapPost("/Admin/set-language", async (HttpContext http, CancellationToken ct
 
 // ===== Mini app backend APIs =====
 app.MapGet("/api/text", () => Results.Ok(new { text = miniAppText }));
-app.MapUsersEndpoints();
 app.MapTelegramAuthEndpoints();
 app.MapTicketsEndpoints();
 app.MapDrawsEndpoints();
@@ -384,7 +426,7 @@ if (telegramEnabled)
             return Results.BadRequest("Set BotWebAppUrl to your public https:// domain first. Do not use localhost.");
 
         var webhookUrl = baseUrl!.TrimEnd('/') + "/bot";
-        await bot.SetWebhook(webhookUrl, cancellationToken: ct);
+        await bot.SetWebhook(webhookUrl, secretToken: botWebhookSecret, cancellationToken: ct);
         return Results.Text($"Webhook set to {webhookUrl}");
     });
 
@@ -405,6 +447,7 @@ if (telegramEnabled)
     // Webhook receiver endpoint (Telegram will POST updates here in Webhook mode)
     app.MapPost("/bot", async (
         [FromBody] Update update,
+        HttpContext http,
         TelegramBotClient bot,
         BotSettings settings,
         ILoggerFactory loggerFactory,
@@ -416,6 +459,15 @@ if (telegramEnabled)
         {
             logger.LogWarning("Received /bot POST but BotMode is {Mode}. Ignoring.", settings.Mode);
             return Results.Ok();
+        }
+
+        // Reject forged updates: Telegram echoes our configured secret in this header on every
+        // legitimate delivery. Constant-time comparison avoids leaking the secret via timing.
+        var providedSecret = http.Request.Headers["X-Telegram-Bot-Api-Secret-Token"].ToString();
+        if (!FixedTimeStringEquals(providedSecret, botWebhookSecret))
+        {
+            logger.LogWarning("Rejected /bot POST with missing/invalid secret token.");
+            return Results.Unauthorized();
         }
 
         try
@@ -432,6 +484,13 @@ if (telegramEnabled)
 }
 
 app.Run();
+
+static bool FixedTimeStringEquals(string? a, string? b)
+{
+    var aBytes = System.Text.Encoding.UTF8.GetBytes(a ?? string.Empty);
+    var bBytes = System.Text.Encoding.UTF8.GetBytes(b ?? string.Empty);
+    return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(aBytes, bBytes);
+}
 
 static void EnsureFrontendDistExists(string contentRootPath, ILogger logger)
 {

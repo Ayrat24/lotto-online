@@ -19,6 +19,12 @@ services:
       BotMode: "Webhook"
       BotToken: ${BOT_TOKEN}
       BotWebAppUrl: ${BOT_WEBAPP_URL}
+      # Required in Webhook mode: secret echoed by Telegram so forged calls to /bot are rejected.
+      BotWebhookSecretToken: ${BOT_WEBHOOK_SECRET_TOKEN}
+      # Optional hardening: restrict which reverse proxy may set X-Forwarded-* (prevents IP/host
+      # spoofing). Comma-separated. Leave unset to trust all hops (legacy behavior).
+      # ForwardedHeaders__KnownProxies: ${FORWARDED_KNOWN_PROXIES:-}
+      # ForwardedHeaders__KnownNetworks: ${FORWARDED_KNOWN_NETWORKS:-}
 
       # Admin panel credentials (set via .env on server!)
       Admin__Username: ${ADMIN_USERNAME}
