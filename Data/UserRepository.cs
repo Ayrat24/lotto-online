@@ -20,12 +20,29 @@ public sealed class UserRepository : IUserRepository
         var existing = await _db.Users.SingleOrDefaultAsync(x => x.TelegramUserId == telegramUserId, ct);
         if (existing is not null)
         {
-            if (string.IsNullOrWhiteSpace(existing.AcquisitionDeepLink) && !string.IsNullOrWhiteSpace(normalizedDeepLink))
-                existing.AcquisitionDeepLink = normalizedDeepLink;
+            // The mini app fires several /api calls at once on launch, each upserting this user
+            // to bump LastSeenAtUtc. The user row is under optimistic concurrency (xmin), so
+            // simultaneous bumps race: the loser's UPDATE affects 0 rows and throws. The bump is
+            // best-effort, so reload the current row and retry rather than 500-ing the request.
+            for (var attempt = 0; ; attempt++)
+            {
+                if (string.IsNullOrWhiteSpace(existing.AcquisitionDeepLink) && !string.IsNullOrWhiteSpace(normalizedDeepLink))
+                    existing.AcquisitionDeepLink = normalizedDeepLink;
 
-            existing.LastSeenAtUtc = DateTimeOffset.UtcNow;
-            await _db.SaveChangesAsync(ct);
-            return existing;
+                existing.LastSeenAtUtc = DateTimeOffset.UtcNow;
+
+                try
+                {
+                    await _db.SaveChangesAsync(ct);
+                    return existing;
+                }
+                catch (DbUpdateConcurrencyException) when (attempt < 5)
+                {
+                    // Refresh the tracked entity (including its xmin) from the row a concurrent
+                    // request just wrote, then re-apply our changes and try again.
+                    await _db.Entry(existing).ReloadAsync(ct);
+                }
+            }
         }
 
         var user = new MiniAppUser
@@ -45,19 +62,38 @@ public sealed class UserRepository : IUserRepository
     public async Task<MiniAppUser> SetNumberAsync(long telegramUserId, string number, CancellationToken ct)
     {
         var user = await UpsertByTelegramUserIdAsync(telegramUserId, ct);
-        user.Number = number;
-        user.LastSeenAtUtc = DateTimeOffset.UtcNow;
-        await _db.SaveChangesAsync(ct);
-        return user;
+        return await SaveUserWithRetryAsync(user, () => user.Number = number, ct);
     }
 
     public async Task<MiniAppUser> SetPreferredLanguageAsync(long telegramUserId, string preferredLanguage, CancellationToken ct)
     {
         var user = await UpsertByTelegramUserIdAsync(telegramUserId, ct);
-        user.PreferredLanguage = preferredLanguage;
-        user.LastSeenAtUtc = DateTimeOffset.UtcNow;
-        await _db.SaveChangesAsync(ct);
-        return user;
+        return await SaveUserWithRetryAsync(user, () => user.PreferredLanguage = preferredLanguage, ct);
+    }
+
+    /// <summary>
+    /// Applies a mutation to a tracked user plus the LastSeenAtUtc bump and saves, retrying on
+    /// optimistic-concurrency (xmin) conflicts. Concurrent launch requests touch the same user
+    /// row, so a lone field update must not 500 just because another request wrote first; on a
+    /// conflict the row is reloaded and the mutation re-applied against the fresh xmin.
+    /// </summary>
+    private async Task<MiniAppUser> SaveUserWithRetryAsync(MiniAppUser user, Action apply, CancellationToken ct)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            apply();
+            user.LastSeenAtUtc = DateTimeOffset.UtcNow;
+
+            try
+            {
+                await _db.SaveChangesAsync(ct);
+                return user;
+            }
+            catch (DbUpdateConcurrencyException) when (attempt < 5)
+            {
+                await _db.Entry(user).ReloadAsync(ct);
+            }
+        }
     }
 
     private static string? NormalizeDeepLink(string? value)
