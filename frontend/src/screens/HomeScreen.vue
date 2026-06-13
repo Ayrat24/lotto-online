@@ -12,7 +12,7 @@ const props = defineProps({
   texts: { type: Object, required: true }
 })
 
-const emit = defineEmits(['update:sortMode', 'openDraw', 'seeAllPromotions', 'promotionAction'])
+const emit = defineEmits(['update:sortMode', 'openDraw', 'seeAllPromotions', 'promotionAction', 'bannerAction'])
 
 const DRAW_SORTS = {
   closest: 'closest',
@@ -210,15 +210,24 @@ function finishBannerVisualDrag() {
   bannerIsDragging.value = false
   const delta = bannerSwipeDistance.value
   const swipeThreshold = 40
+  const tapThreshold = 8
   if (delta <= -swipeThreshold) {
     showNextBanner()
   } else if (delta >= swipeThreshold) {
     showPreviousBanner()
   } else {
     bannerVisualIndex.value = activeBannerIndex.value + (bannerSlides.value.length > 1 ? 1 : 0)
+    if (Math.abs(delta) < tapThreshold) handleBannerTap()
   }
   bannerSwipeDistance.value = 0
   restartBannerRotation()
+}
+
+function handleBannerTap() {
+  const banner = activeBanner.value
+  if (banner && banner.actionType && banner.actionType !== 'none') {
+    emit('bannerAction', banner)
+  }
 }
 
 function handleBannerPointerDown(event) {
@@ -617,6 +626,7 @@ function handleDrawScrollPointerUp(event) {
   user-select: none;
   -webkit-user-drag: none;
   object-fit: cover;
+  cursor: pointer;
 }
 
 .container {
@@ -673,7 +683,7 @@ function handleDrawScrollPointerUp(event) {
   overflow-y: hidden;
   cursor: grab;
   user-select: none;
-  touch-action: pan-x;
+  touch-action: pan-x pan-y;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
@@ -715,7 +725,7 @@ function handleDrawScrollPointerUp(event) {
   cursor: grab;
   user-select: none;
   background: transparent;
-  touch-action: pan-x;
+  touch-action: pan-x pan-y;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }

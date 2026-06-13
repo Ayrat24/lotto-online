@@ -824,6 +824,7 @@ onBeforeUnmount(() => {
         @open-draw="openTicketSelection"
         @see-all-promotions="openSeeAllPromotions"
         @promotion-action="handlePromotionAction"
+        @banner-action="handlePromotionAction"
       />
 
       <TicketSelectionScreen
