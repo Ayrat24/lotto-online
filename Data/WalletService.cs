@@ -171,6 +171,14 @@ public sealed class WalletService : IWalletService
         {
             await _db.SaveChangesAsync(ct);
         }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Another concurrent purchase/credit changed this user's balance (or the server
+            // wallet) between our read and write. Reject rather than risk overspending.
+            user.Balance = balanceBeforePurchase;
+            serverWallet.Balance = serverBalanceBeforePurchase;
+            return new WalletBatchPurchaseResult(false, balanceBeforePurchase, totalCost, "Your balance was just updated. Please try again.");
+        }
         catch (DbUpdateException ex) when (ex.InnerException?.Message?.Contains("IX_tickets_UserId_DrawId_NumbersSignature", StringComparison.OrdinalIgnoreCase) == true
                                         || ex.Message.Contains("IX_tickets_UserId_DrawId_NumbersSignature", StringComparison.OrdinalIgnoreCase))
         {
@@ -226,7 +234,17 @@ public sealed class WalletService : IWalletService
             CreatedAtUtc = now
         });
 
-        await _db.SaveChangesAsync(ct);
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (Exception ex) when (DbConcurrencyHelpers.IsConcurrencyOrIdempotencyConflict(ex))
+        {
+            // Concurrent claim of the same ticket: the unique (WinningsClaimed, ticket:{id})
+            // index / row-version guard ensures only one claim is paid out.
+            return new WalletClaimResult(false, 0m, 0m, "This ticket has already been claimed.");
+        }
+
         return new WalletClaimResult(true, user.Balance, amount, null);
     }
 
@@ -270,6 +288,7 @@ public sealed class WalletService : IWalletService
 
         var serverWallet = await EnsureServerWalletAsync(ct);
         var now = DateTimeOffset.UtcNow;
+        var balanceBeforeWithdrawal = user.Balance;
         user.Balance = RoundAmount(user.Balance - normalizedAmount);
         if (saveAddress)
             SetSavedPayoutAddress(user, normalizedAssetCode, normalizedNumber);
@@ -297,7 +316,17 @@ public sealed class WalletService : IWalletService
             CreatedAtUtc = now
         });
 
-        await _db.SaveChangesAsync(ct);
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Concurrent balance change (another withdrawal / purchase / credit). Reject so the
+            // user cannot withdraw more than the balance available at write time.
+            return new WalletWithdrawRequestResult(false, balanceBeforeWithdrawal, "Your balance was just updated. Please try again.", SavedAddresses: BuildSavedAddresses(user));
+        }
+
         return new WalletWithdrawRequestResult(true, user.Balance, null, request, BuildSavedAddresses(user));
     }
 
@@ -487,6 +516,14 @@ public sealed class WalletService : IWalletService
         {
             await _db.SaveChangesAsync(ct);
         }
+        catch (DbUpdateConcurrencyException)
+        {
+            return new WalletReviewWithdrawalResult(false, "This withdrawal was just updated by another action. Please reload and try again.");
+        }
+        catch (DbUpdateException ex) when (DbConcurrencyHelpers.IsWalletIdempotencyViolation(ex))
+        {
+            return new WalletReviewWithdrawalResult(false, "This withdrawal has already been confirmed.");
+        }
         catch (DbUpdateException ex) when (IsDuplicateExternalPayoutId(ex))
         {
             return new WalletReviewWithdrawalResult(false, "This payout reference is already attached to another withdrawal request.");
@@ -529,7 +566,15 @@ public sealed class WalletService : IWalletService
             CreatedAtUtc = now
         });
 
-        await _db.SaveChangesAsync(ct);
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return new WalletReviewWithdrawalResult(false, "This withdrawal was just updated by another action. Please reload and try again.");
+        }
+
         return new WalletReviewWithdrawalResult(true, null);
     }
 

@@ -121,7 +121,20 @@ public sealed class PaymentsService : IPaymentsService
             var now = DateTimeOffset.UtcNow;
             await RefreshDepositStatusAsync(deposit, now, ct);
             if (_db.ChangeTracker.HasChanges())
-                await _db.SaveChangesAsync(ct);
+            {
+                try
+                {
+                    await _db.SaveChangesAsync(ct);
+                }
+                catch (Exception ex) when (DbConcurrencyHelpers.IsConcurrencyOrIdempotencyConflict(ex))
+                {
+                    // Another request (or the reconciliation worker) credited this deposit
+                    // concurrently. Our duplicate write was atomically rejected, so discard it
+                    // and reload the authoritative, single-credit state for the response.
+                    _logger.LogInformation("Concurrent credit detected for deposit {DepositId}; reloading state.", deposit.Id);
+                    await ReloadDepositFromDatabaseAsync(deposit, ct);
+                }
+            }
         }
 
         return new CryptoDepositStatusResult(true, null, ToView(deposit));
@@ -161,7 +174,17 @@ public sealed class PaymentsService : IPaymentsService
 
         await RefreshTelegramTonDepositAsync(deposit, now, ct);
         if (_db.ChangeTracker.HasChanges())
-            await _db.SaveChangesAsync(ct);
+        {
+            try
+            {
+                await _db.SaveChangesAsync(ct);
+            }
+            catch (Exception ex) when (DbConcurrencyHelpers.IsConcurrencyOrIdempotencyConflict(ex))
+            {
+                _logger.LogInformation("Concurrent credit detected for deposit {DepositId} during admin reconcile; reloading state.", deposit.Id);
+                await ReloadDepositFromDatabaseAsync(deposit, ct);
+            }
+        }
 
         var changed = deposit.Status != beforeStatus
             || deposit.UpdatedAtUtc != beforeUpdatedAt
@@ -209,7 +232,19 @@ public sealed class PaymentsService : IPaymentsService
         }
 
         if (_db.ChangeTracker.HasChanges())
-            await _db.SaveChangesAsync(ct);
+        {
+            try
+            {
+                await _db.SaveChangesAsync(ct);
+            }
+            catch (Exception ex) when (DbConcurrencyHelpers.IsConcurrencyOrIdempotencyConflict(ex))
+            {
+                // A user status-poll credited one of these deposits concurrently. The atomic
+                // save was rejected; the next reconciliation cycle re-reads fresh state.
+                _logger.LogInformation("Concurrent credit detected during TON deposit reconciliation batch; will retry next cycle.");
+                return 0;
+            }
+        }
 
         return changedCount;
     }
@@ -574,6 +609,13 @@ public sealed class PaymentsService : IPaymentsService
         });
 
         await _referrals.ApplyBonusesForDepositAsync(deposit, now, ct);
+    }
+
+    private async Task ReloadDepositFromDatabaseAsync(CryptoDepositIntent deposit, CancellationToken ct)
+    {
+        // Overwrite the in-memory entity (and discard the rejected change set on it) with the
+        // authoritative committed row, so callers report the single, correctly-credited state.
+        await _db.Entry(deposit).ReloadAsync(ct);
     }
 
     private async Task<bool> ApplyDepositStatusFromWebhookAsync(string providerObjectId, string? eventType, DateTimeOffset now, CancellationToken ct)
