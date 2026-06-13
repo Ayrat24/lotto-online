@@ -110,6 +110,7 @@ const state = reactive({
   banners: [],
   promotions: [],
   winners: [],
+  referral: { inviteCode: '', inviteLink: '', bound: false },
   localizationStrings: {},
   loading: true,
   error: '',
@@ -359,7 +360,8 @@ const profileEditTexts = computed(() => ({
   firstNamePlaceholder: getText('client.profile.edit.firstNamePlaceholder', 'Имя'),
   lastNamePlaceholder: getText('client.profile.edit.lastNamePlaceholder', 'Фамилия'),
   birthDatePlaceholder: getText('client.profile.edit.birthDatePlaceholder', '31.12.2026'),
-  saveButton: getText('client.profile.edit.save', 'Сохранить')
+  saveButton: getText('client.profile.edit.save', 'Сохранить'),
+  changePhoto: getText('client.profile.edit.changePhoto', 'Изменить фото')
 }))
 
 const topUpTexts = computed(() => ({
@@ -375,6 +377,7 @@ const inviteTexts = computed(() => ({
   promoLabel: getText('client.profile.promoTitle', 'Введите промокод'),
   promoPlaceholder: getText('client.profile.promoPlaceholder', 'Промокод'),
   applyButton: getText('client.button.applyPromo', 'Применить промокод'),
+  applyingButton: getText('client.button.applyingPromo', 'Применяем…'),
   inviteLabel: getText('client.invite.friendsLabel', 'Пригласите друзей'),
   rewardTitle: getText('client.invite.rewardTitle', 'Получай $5 за каждого друга'),
   rewardSubtitle: getText('client.invite.rewardSubtitle', 'Когда они пополнят баланс'),
@@ -523,6 +526,11 @@ function handleProfileSave(payload) {
   updateUrl()
 }
 
+function handleAvatarSelected(payload) {
+  // Reflect the chosen photo immediately in the header + profile avatars.
+  if (payload?.dataUrl) state.user.photoUrl = payload.dataUrl
+}
+
 function handleBalanceUpdated(newBalance) {
   state.user.balance = newBalance
 }
@@ -567,6 +575,119 @@ function handleClaimFailed(message) {
     title: getText('client.notify.claimFailedTitle', 'Ошибка'),
     message: message || getText('client.ticket.claimFailed', 'Не удалось получить выигрыш.')
   })
+}
+
+const inviteApplying = ref(false)
+
+async function handleApplyInviteCode(rawCode) {
+  const code = String(rawCode || '').trim()
+  if (!code) {
+    notify({
+      variant: 'error',
+      title: getText('client.notify.inviteFailedTitle', 'Не удалось применить код'),
+      message: getText('client.notify.inviteEmptyMessage', 'Введите код приглашения.')
+    })
+    return
+  }
+  if (inviteApplying.value) return
+  inviteApplying.value = true
+  try {
+    const res = await postJson('/api/referrals/bind', { initData: state.initData, inviteCode: code })
+    state.referral.bound = true
+    const bonus = Number(res?.bonusAmount || 0)
+    const rewardsEnabled = res?.rewardsEnabled !== false
+    let message = getText('client.notify.inviteAppliedMessage', 'Код приглашения применён.')
+    if (rewardsEnabled && bonus > 0) {
+      const minDeposit = Number(res?.minDepositAmount || 0)
+      const bonusText = formatCurrency(bonus, intlLocale.value).replace('.', ',')
+      message = minDeposit > 0
+        ? getText('client.notify.inviteBonusDeposit', 'Получите {0} после первого пополнения.')
+            .replace('{0}', bonusText)
+        : getText('client.notify.inviteBonus', 'Бонус {0} начислен.').replace('{0}', bonusText)
+    }
+    notify({
+      variant: 'success',
+      title: getText('client.notify.inviteAppliedTitle', 'Код применён'),
+      message
+    })
+  } catch (error) {
+    notify({
+      variant: 'error',
+      title: getText('client.notify.inviteFailedTitle', 'Не удалось применить код'),
+      message: error?.message || getText('client.notify.inviteFailedMessage', 'Проверьте код и попробуйте снова.')
+    })
+  } finally {
+    inviteApplying.value = false
+  }
+}
+
+async function copyToClipboard(text) {
+  const value = String(text ?? '')
+  if (!value) return false
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value)
+      return true
+    }
+  } catch {}
+  // Fallback for environments without the async clipboard API (older webviews).
+  try {
+    const textarea = document.createElement('textarea')
+    textarea.value = value
+    textarea.setAttribute('readonly', '')
+    textarea.style.position = 'fixed'
+    textarea.style.opacity = '0'
+    document.body.appendChild(textarea)
+    textarea.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(textarea)
+    return ok
+  } catch {
+    return false
+  }
+}
+
+async function handleCopyInvite(payload) {
+  const kind = payload?.kind === 'link' ? 'link' : 'code'
+  const text = payload?.text ?? ''
+  if (!text) {
+    notify({
+      variant: 'error',
+      title: getText('client.notify.copyFailedTitle', 'Не удалось скопировать'),
+      message: getText('client.notify.copyEmptyMessage', 'Код приглашения недоступен.')
+    })
+    return
+  }
+  const ok = await copyToClipboard(text)
+  if (ok) {
+    notify({
+      variant: 'success',
+      title: getText('client.notify.copiedTitle', 'Скопировано'),
+      message: kind === 'link'
+        ? getText('client.notify.linkCopied', 'Ссылка-приглашение скопирована.')
+        : getText('client.notify.codeCopied', 'Код приглашения скопирован.'),
+      timeout: 3000
+    })
+  } else {
+    notify({
+      variant: 'error',
+      title: getText('client.notify.copyFailedTitle', 'Не удалось скопировать'),
+      message: getText('client.notify.copyFailedMessage', 'Скопируйте код вручную.')
+    })
+  }
+}
+
+async function loadReferral() {
+  try {
+    const res = await postJson('/api/referrals/me', { initData: state.initData })
+    if (res && res.ok && res.profile) {
+      state.referral.inviteCode = res.profile.inviteCode || ''
+      state.referral.inviteLink = res.profile.inviteLink || ''
+      state.referral.bound = !!res.profile.isBound
+    }
+  } catch {
+    // Non-fatal: the invite screen falls back to a placeholder code.
+  }
 }
 
 function handleTicketsPurchased(info) {
@@ -787,7 +908,7 @@ async function loadAll() {
   try {
     await loadLocale()
     await loadAuth()
-    await Promise.all([loadTimeline(), loadBanners(), loadPromotions()])
+    await Promise.all([loadTimeline(), loadBanners(), loadPromotions(), loadReferral()])
   } catch (error) {
     state.error = error && error.message ? error.message : 'Failed to load home screen.'
   } finally {
@@ -929,9 +1050,11 @@ onBeforeUnmount(() => {
         :first-name="state.user.firstName"
         :last-name="state.user.lastName"
         :birth-date="state.user.birthDate"
+        :avatar-url="avatarUrl"
         :texts="profileEditTexts"
         @back="openProfileAction('profile')"
         @save="handleProfileSave"
+        @avatar-selected="handleAvatarSelected"
       />
 
       <TopUpScreen
@@ -946,10 +1069,12 @@ onBeforeUnmount(() => {
       <InviteFriendScreen
         v-else-if="currentScreen === 'invite-friend'"
         :texts="inviteTexts"
-        invite-code="9472C62E21"
+        :invite-code="state.referral.inviteCode"
+        :invite-link="state.referral.inviteLink"
+        :applying="inviteApplying"
         @back="openProfileAction('profile')"
-        @apply="openProfileAction('profile')"
-        @copy="openProfileAction('profile')"
+        @apply="handleApplyInviteCode"
+        @copy="handleCopyInvite"
       />
 
       <TransactionHistoryScreen

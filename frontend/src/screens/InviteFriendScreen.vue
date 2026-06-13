@@ -3,7 +3,9 @@ import { ref } from 'vue'
 
 const props = defineProps({
   texts: { type: Object, required: true },
-  inviteCode: { type: String, default: '' }
+  inviteCode: { type: String, default: '' },
+  inviteLink: { type: String, default: '' },
+  applying: { type: Boolean, default: false }
 })
 
 const emit = defineEmits(['back', 'apply', 'copy'])
@@ -11,11 +13,17 @@ const emit = defineEmits(['back', 'apply', 'copy'])
 const promoValue = ref('')
 
 function handleApply() {
+  if (props.applying) return
   emit('apply', promoValue.value.trim())
 }
 
-function handleCopy() {
-  emit('copy', props.inviteCode)
+function handleCopyCode() {
+  if (!props.inviteCode) return
+  emit('copy', { text: props.inviteCode, kind: 'code' })
+}
+
+function handleCopyLink() {
+  emit('copy', { text: props.inviteLink || props.inviteCode, kind: 'link' })
 }
 </script>
 
@@ -38,8 +46,8 @@ function handleCopy() {
         type="text"
         :placeholder="texts.promoPlaceholder"
       />
-      <button type="button" class="invite-apply" @click="handleApply">
-        {{ texts.applyButton }}
+      <button type="button" class="invite-apply" :disabled="applying" @click="handleApply">
+        {{ applying ? texts.applyingButton : texts.applyButton }}
       </button>
     </div>
 
@@ -53,10 +61,18 @@ function handleCopy() {
         </div>
       </div>
 
-      <div class="invite-code">
+      <div
+        class="invite-code"
+        :class="{ 'invite-code--actionable': inviteCode }"
+        role="button"
+        tabindex="0"
+        @click="handleCopyCode"
+        @keydown.enter.prevent="handleCopyCode"
+        @keydown.space.prevent="handleCopyCode"
+      >
         <div class="invite-code__label">{{ texts.codeLabel }}</div>
         <div class="invite-code__value">{{ inviteCode || texts.codePlaceholder }}</div>
-        <button type="button" class="invite-code__copy" @click="handleCopy">
+        <button type="button" class="invite-code__copy" @click.stop="handleCopyCode">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect x="5" y="5" width="9" height="9" rx="2" stroke="#D97706" stroke-width="1.2" />
             <rect x="2" y="2" width="9" height="9" rx="2" stroke="#D97706" stroke-width="1.2" />
@@ -65,7 +81,7 @@ function handleCopy() {
       </div>
     </div>
 
-    <button type="button" class="invite-copy" @click="handleCopy">
+    <button type="button" class="invite-copy" @click="handleCopyLink">
       {{ texts.copyButton }}
     </button>
   </div>
@@ -148,6 +164,11 @@ function handleCopy() {
   box-shadow: 0 6px 18px rgba(15, 15, 20, 0.05);
 }
 
+.invite-apply:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .invite-reward {
   display: flex;
   align-items: center;
@@ -188,6 +209,14 @@ function handleCopy() {
   border: 1px solid rgba(15, 15, 18, 0.06);
   background: #ffffff;
   box-shadow: 0 1px 2px rgba(15, 15, 20, 0.04), 0 8px 22px rgba(15, 15, 20, 0.05);
+}
+
+.invite-code--actionable {
+  cursor: pointer;
+}
+
+.invite-code--actionable:active {
+  transform: scale(0.99);
 }
 
 .invite-code__label {

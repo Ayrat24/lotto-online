@@ -5,14 +5,20 @@ const props = defineProps({
   firstName: { type: String, default: '' },
   lastName: { type: String, default: '' },
   birthDate: { type: String, default: '' },
+  avatarUrl: { type: String, default: '' },
   texts: { type: Object, required: true }
 })
 
-const emit = defineEmits(['back', 'save'])
+const emit = defineEmits(['back', 'save', 'avatar-selected'])
 
 const firstNameValue = ref(props.firstName)
 const lastNameValue = ref(props.lastName)
 const birthDateValue = ref(props.birthDate || new Date().toISOString().slice(0, 10))
+
+// Shows the user's existing avatar by default; swaps to a local preview once
+// they pick a new photo from their device.
+const avatarPreview = ref(props.avatarUrl || '')
+const fileInput = ref(null)
 
 watch(
   () => props.firstName,
@@ -26,6 +32,28 @@ watch(
   () => props.birthDate,
   (value) => { birthDateValue.value = value || new Date().toISOString().slice(0, 10) }
 )
+watch(
+  () => props.avatarUrl,
+  (value) => { avatarPreview.value = value || '' }
+)
+
+function openFilePicker() {
+  fileInput.value?.click()
+}
+
+function handleFileChange(event) {
+  const file = event.target?.files?.[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = () => {
+    const dataUrl = String(reader.result || '')
+    avatarPreview.value = dataUrl
+    emit('avatar-selected', { dataUrl, file })
+  }
+  reader.readAsDataURL(file)
+  // Reset so picking the same file again still fires a change event.
+  event.target.value = ''
+}
 
 function handleSave() {
   emit('save', {
@@ -48,19 +76,36 @@ function handleSave() {
     </div>
 
     <div class="profile-edit-avatar">
-      <div class="profile-edit-avatar__icon">
-        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path
-            d="M9.6 10.8L11.2 8.8C11.5 8.4 12 8.2 12.5 8.2H19.5C20 8.2 20.5 8.4 20.8 8.8L22.4 10.8"
-            stroke="#FFFFFF"
-            stroke-width="1.8"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-          <rect x="7" y="11" width="18" height="13" rx="4" stroke="#FFFFFF" stroke-width="1.8" />
-          <circle cx="16" cy="17.5" r="3.5" stroke="#FFFFFF" stroke-width="1.8" />
+      <button
+        type="button"
+        class="profile-edit-avatar__icon"
+        :aria-label="texts.changePhoto || 'Change photo'"
+        @click="openFilePicker"
+      >
+        <img
+          v-if="avatarPreview"
+          class="profile-edit-avatar__img"
+          :src="avatarPreview"
+          alt=""
+        />
+        <svg v-else width="64" height="64" viewBox="0 0 66 66" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M22.6875 35.75C22.6875 33.015 23.774 30.3919 25.708 28.458C27.6419 26.524 30.265 25.4375 33 25.4375C35.735 25.4375 38.3581 26.524 40.292 28.458C42.226 30.3919 43.3125 33.015 43.3125 35.75C43.3125 38.485 42.226 41.1081 40.292 43.042C38.3581 44.976 35.735 46.0625 33 46.0625C30.265 46.0625 27.6419 44.976 25.708 43.042C23.774 41.1081 22.6875 38.485 22.6875 35.75ZM33 29.5625C31.359 29.5625 29.7852 30.2144 28.6248 31.3748C27.4644 32.5352 26.8125 34.109 26.8125 35.75C26.8125 37.391 27.4644 38.9648 28.6248 40.1252C29.7852 41.2856 31.359 41.9375 33 41.9375C34.641 41.9375 36.2148 41.2856 37.3752 40.1252C38.5356 38.9648 39.1875 37.391 39.1875 35.75C39.1875 34.109 38.5356 32.5352 37.3752 31.3748C36.2148 30.2144 34.641 29.5625 33 29.5625Z" fill="white"/>
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M29.194 15.8125C28.5105 15.8118 27.8336 15.9459 27.202 16.2071C26.5705 16.4683 25.9966 16.8515 25.5133 17.3348C25.03 17.8181 24.6468 18.392 24.3856 19.0235C24.1244 19.6551 23.9903 20.332 23.991 21.0155C23.9905 21.8988 23.658 22.7495 23.0595 23.399C22.4609 24.0486 21.64 24.4493 20.7597 24.5217L14.6272 25.0168C14.0408 25.064 13.4861 25.3028 13.0488 25.6964C12.6115 26.09 12.3158 26.6165 12.2073 27.1947C10.9731 33.7119 10.8819 40.3941 11.9377 46.9425L12.2045 48.6035C12.4575 50.171 13.7472 51.3672 15.3312 51.4965L20.6745 51.931C28.878 52.5969 37.122 52.5969 45.3255 51.931L50.666 51.4965C51.4362 51.4342 52.1632 51.1153 52.7306 50.5908C53.298 50.0662 53.673 49.3664 53.7955 48.6035L54.0623 46.9425C55.1172 40.3939 55.0251 33.7118 53.79 27.1947C53.6809 26.617 53.385 26.0911 52.9477 25.6981C52.5104 25.305 51.9561 25.0666 51.37 25.0195L45.2402 24.5217C44.36 24.4493 43.5391 24.0486 42.9405 23.399C42.342 22.7495 42.0095 21.8988 42.009 21.0155C42.0097 20.332 41.8756 19.6551 41.6144 19.0235C41.3532 18.392 40.97 17.8181 40.4867 17.3348C40.0034 16.8515 39.4295 16.4683 38.798 16.2071C38.1664 15.9459 37.4895 15.8118 36.806 15.8125H29.194ZM19.8825 20.4545C20.0261 18.0821 21.0696 15.854 22.8 14.2248C24.5304 12.5956 26.8173 11.6881 29.194 11.6875H36.806C41.7697 11.6875 45.826 15.565 46.1175 20.4545L51.7055 20.9083C53.1921 21.0282 54.5981 21.6334 55.7072 22.6307C56.8162 23.6279 57.5668 24.9619 57.8435 26.4275C59.1663 33.4125 59.2652 40.5763 58.135 47.597L57.8682 49.2607C57.5988 50.9344 56.7757 52.4693 55.5309 53.62C54.286 54.7706 52.6912 55.4706 51.0015 55.6077L45.661 56.0422C37.2341 56.7251 28.7659 56.7251 20.339 56.0422L14.9985 55.6077C13.3088 55.4706 11.714 54.7706 10.4691 53.62C9.22425 52.4693 8.40124 50.9344 8.13175 49.2607L7.865 47.597C6.73415 40.577 6.83278 33.4137 8.1565 26.4275C8.43363 24.9621 9.18437 23.6283 10.2933 22.6312C11.4023 21.634 12.808 21.0287 14.2945 20.9083L19.8825 20.4545Z" fill="white"/>
         </svg>
-      </div>
+        <span v-if="avatarPreview" class="profile-edit-avatar__badge" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 66 66" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M22.6875 35.75C22.6875 33.015 23.774 30.3919 25.708 28.458C27.6419 26.524 30.265 25.4375 33 25.4375C35.735 25.4375 38.3581 26.524 40.292 28.458C42.226 30.3919 43.3125 33.015 43.3125 35.75C43.3125 38.485 42.226 41.1081 40.292 43.042C38.3581 44.976 35.735 46.0625 33 46.0625C30.265 46.0625 27.6419 44.976 25.708 43.042C23.774 41.1081 22.6875 38.485 22.6875 35.75ZM33 29.5625C31.359 29.5625 29.7852 30.2144 28.6248 31.3748C27.4644 32.5352 26.8125 34.109 26.8125 35.75C26.8125 37.391 27.4644 38.9648 28.6248 40.1252C29.7852 41.2856 31.359 41.9375 33 41.9375C34.641 41.9375 36.2148 41.2856 37.3752 40.1252C38.5356 38.9648 39.1875 37.391 39.1875 35.75C39.1875 34.109 38.5356 32.5352 37.3752 31.3748C36.2148 30.2144 34.641 29.5625 33 29.5625Z" fill="white"/>
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M29.194 15.8125C28.5105 15.8118 27.8336 15.9459 27.202 16.2071C26.5705 16.4683 25.9966 16.8515 25.5133 17.3348C25.03 17.8181 24.6468 18.392 24.3856 19.0235C24.1244 19.6551 23.9903 20.332 23.991 21.0155C23.9905 21.8988 23.658 22.7495 23.0595 23.399C22.4609 24.0486 21.64 24.4493 20.7597 24.5217L14.6272 25.0168C14.0408 25.064 13.4861 25.3028 13.0488 25.6964C12.6115 26.09 12.3158 26.6165 12.2073 27.1947C10.9731 33.7119 10.8819 40.3941 11.9377 46.9425L12.2045 48.6035C12.4575 50.171 13.7472 51.3672 15.3312 51.4965L20.6745 51.931C28.878 52.5969 37.122 52.5969 45.3255 51.931L50.666 51.4965C51.4362 51.4342 52.1632 51.1153 52.7306 50.5908C53.298 50.0662 53.673 49.3664 53.7955 48.6035L54.0623 46.9425C55.1172 40.3939 55.0251 33.7118 53.79 27.1947C53.6809 26.617 53.385 26.0911 52.9477 25.6981C52.5104 25.305 51.9561 25.0666 51.37 25.0195L45.2402 24.5217C44.36 24.4493 43.5391 24.0486 42.9405 23.399C42.342 22.7495 42.0095 21.8988 42.009 21.0155C42.0097 20.332 41.8756 19.6551 41.6144 19.0235C41.3532 18.392 40.97 17.8181 40.4867 17.3348C40.0034 16.8515 39.4295 16.4683 38.798 16.2071C38.1664 15.9459 37.4895 15.8118 36.806 15.8125H29.194ZM19.8825 20.4545C20.0261 18.0821 21.0696 15.854 22.8 14.2248C24.5304 12.5956 26.8173 11.6881 29.194 11.6875H36.806C41.7697 11.6875 45.826 15.565 46.1175 20.4545L51.7055 20.9083C53.1921 21.0282 54.5981 21.6334 55.7072 22.6307C56.8162 23.6279 57.5668 24.9619 57.8435 26.4275C59.1663 33.4125 59.2652 40.5763 58.135 47.597L57.8682 49.2607C57.5988 50.9344 56.7757 52.4693 55.5309 53.62C54.286 54.7706 52.6912 55.4706 51.0015 55.6077L45.661 56.0422C37.2341 56.7251 28.7659 56.7251 20.339 56.0422L14.9985 55.6077C13.3088 55.4706 11.714 54.7706 10.4691 53.62C9.22425 52.4693 8.40124 50.9344 8.13175 49.2607L7.865 47.597C6.73415 40.577 6.83278 33.4137 8.1565 26.4275C8.43363 24.9621 9.18437 23.6283 10.2933 22.6312C11.4023 21.634 12.808 21.0287 14.2945 20.9083L19.8825 20.4545Z" fill="white"/>
+          </svg>
+        </span>
+      </button>
+      <input
+        ref="fileInput"
+        class="profile-edit-avatar__file"
+        type="file"
+        accept="image/*"
+        @change="handleFileChange"
+      />
     </div>
 
     <div class="profile-edit-section">
@@ -83,6 +128,8 @@ function handleSave() {
           :placeholder="texts.lastNamePlaceholder"
         />
       </label>
+
+      <div class="profile-edit-section__label profile-edit-section__label--spaced">{{ texts.birthDateLabel }}</div>
 
       <label class="profile-edit-field">
         <div class="profile-edit-date">
@@ -152,13 +199,46 @@ function handleSave() {
 }
 
 .profile-edit-avatar__icon {
-  width: 120px;
-  height: 120px;
-  border-radius: 32px;
+  position: relative;
+  width: 132px;
+  height: 132px;
+  border-radius: 36px;
+  border: 0;
+  padding: 0;
   background: linear-gradient(180deg, #f6b93f 0%, #e59a19 100%);
   box-shadow: 0 12px 28px rgba(244, 185, 64, 0.35);
   display: grid;
   place-items: center;
+  cursor: pointer;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.profile-edit-avatar__icon:active {
+  transform: scale(0.97);
+}
+
+.profile-edit-avatar__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-edit-avatar__badge {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(15, 15, 18, 0.55);
+  display: grid;
+  place-items: center;
+  backdrop-filter: blur(2px);
+}
+
+.profile-edit-avatar__file {
+  display: none;
 }
 
 .profile-edit-section {
@@ -174,6 +254,10 @@ function handleSave() {
   color: #8a8a8a;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.profile-edit-section__label--spaced {
+  margin-top: 8px;
 }
 
 .profile-edit-field {
