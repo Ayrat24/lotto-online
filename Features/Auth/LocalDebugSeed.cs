@@ -38,6 +38,7 @@ public static class LocalDebugSeed
 
         await EnsureWinnerEntriesAsync(db, now, ct);
         await EnsureNewsBannersAsync(db, now, ct);
+        await EnsureServerWalletFundedAsync(db, now, ct);
 
         var debugUser = await db.Users
             .Where(x => x.TelegramUserId == debugTelegramUserId)
@@ -216,6 +217,11 @@ public static class LocalDebugSeed
                 continue;
             }
 
+            // Preserve an already-claimed winning ticket so claims don't revert
+            // to "available" on the next seed pass.
+            if (ticket.Status == TicketStatus.WinningsClaimed)
+                continue;
+
             var matchCount = CountMatches(ticket.Numbers, drawForTicket.Numbers);
             ticket.Status = matchCount >= 3
                 ? TicketStatus.WinningsAvailable
@@ -223,6 +229,142 @@ public static class LocalDebugSeed
         }
 
         await db.SaveChangesAsync(ct);
+
+        // Guarantee the debug user always has one ticket in every state so each
+        // can be exercised locally (awaiting / winnable / claimed / expired).
+        await EnsureDebugTicketStatesAsync(db, debugUser.Id, draws, now, ct);
+    }
+
+    private static async Task EnsureServerWalletFundedAsync(AppDbContext db, DateTimeOffset now, CancellationToken ct)
+    {
+        // The house wallet pays out claimed winnings. Keep it topped up in debug
+        // so winning tickets can actually be claimed locally.
+        const decimal debugFloor = 1_000_000m;
+
+        var wallet = await db.ServerWallets.SingleOrDefaultAsync(x => x.Id == 1, ct);
+        if (wallet is null)
+        {
+            db.ServerWallets.Add(new ServerWallet { Id = 1, Balance = debugFloor, UpdatedAtUtc = now });
+            await db.SaveChangesAsync(ct);
+            return;
+        }
+
+        if (wallet.Balance < debugFloor)
+        {
+            wallet.Balance = debugFloor;
+            wallet.UpdatedAtUtc = now;
+            await db.SaveChangesAsync(ct);
+        }
+    }
+
+    private static async Task EnsureDebugTicketStatesAsync(
+        AppDbContext db,
+        long debugUserId,
+        IReadOnlyList<Draw> draws,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        var finished = draws
+            .Where(x => x.State == DrawState.Finished && !string.IsNullOrWhiteSpace(x.Numbers))
+            .OrderByDescending(x => x.Id)
+            .ToList();
+
+        var active = draws
+            .Where(x => x.State == DrawState.Active)
+            .OrderByDescending(x => x.Id)
+            .ToList();
+
+        // Need at least one finished draw (for resolved states) and one active draw
+        // (for the awaiting state) to seed a complete set.
+        if (finished.Count == 0 || active.Count == 0)
+            return;
+
+        var winDraw = finished[0];
+        var claimedDraw = finished.Count > 1 ? finished[1] : finished[0];
+        var expiredDraw = finished[0];
+        var awaitingDraw = active[0];
+
+        var tickets = await db.Tickets
+            .Where(x => x.UserId == debugUserId)
+            .ToListAsync(ct);
+
+        bool HasState(TicketStatus status) => tickets.Any(x => x.Status == status);
+
+        var changed = false;
+
+        // Awaiting draw — a fresh ticket on an active draw.
+        if (!HasState(TicketStatus.AwaitingDraw))
+        {
+            db.Tickets.Add(new Ticket
+            {
+                UserId = debugUserId,
+                DrawId = awaitingDraw.Id,
+                Numbers = DrawManagement.GenerateDrawNumbers(),
+                Status = TicketStatus.AwaitingDraw,
+                PurchasedAtUtc = now.AddMinutes(-15)
+            });
+            changed = true;
+        }
+
+        // Winnings available — the draw's exact winning numbers, not yet claimed.
+        if (!HasState(TicketStatus.WinningsAvailable))
+        {
+            db.Tickets.Add(new Ticket
+            {
+                UserId = debugUserId,
+                DrawId = winDraw.Id,
+                Numbers = winDraw.Numbers!,
+                Status = TicketStatus.WinningsAvailable,
+                PurchasedAtUtc = now.AddHours(-2)
+            });
+            changed = true;
+        }
+
+        // Winnings claimed — winning numbers on a finished draw, already paid out.
+        if (!HasState(TicketStatus.WinningsClaimed))
+        {
+            db.Tickets.Add(new Ticket
+            {
+                UserId = debugUserId,
+                DrawId = claimedDraw.Id,
+                Numbers = claimedDraw.Numbers!,
+                Status = TicketStatus.WinningsClaimed,
+                PurchasedAtUtc = now.AddHours(-3)
+            });
+            changed = true;
+        }
+
+        // Expired (no win) — numbers that intentionally miss the draw result.
+        if (!HasState(TicketStatus.ExpiredNoWin))
+        {
+            db.Tickets.Add(new Ticket
+            {
+                UserId = debugUserId,
+                DrawId = expiredDraw.Id,
+                Numbers = BuildNonMatchingNumbers(expiredDraw.Numbers!),
+                Status = TicketStatus.ExpiredNoWin,
+                PurchasedAtUtc = now.AddHours(-2).AddMinutes(-30)
+            });
+            changed = true;
+        }
+
+        if (changed)
+            await db.SaveChangesAsync(ct);
+    }
+
+    private static string BuildNonMatchingNumbers(string drawNumbers)
+    {
+        var drawSet = drawNumbers
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(int.Parse)
+            .ToHashSet();
+
+        var picked = Enumerable.Range(1, 36)
+            .Where(n => !drawSet.Contains(n))
+            .Take(5)
+            .ToList();
+
+        return string.Join(",", picked);
     }
 
     private static int GetTargetActiveDrawCount()

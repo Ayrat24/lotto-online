@@ -20,7 +20,7 @@ const props = defineProps({
   initData: { type: String, required: true }
 })
 
-const emit = defineEmits(['back', 'balanceUpdated'])
+const emit = defineEmits(['back', 'balanceUpdated', 'purchased'])
 
 const ticketEntries = ref([])
 const purchasing = ref(false)
@@ -141,6 +141,7 @@ async function purchaseSelectedTickets() {
 
     if (res && res.ok) {
       emit('balanceUpdated', Number(res.balance || 0))
+      emit('purchased', { count: tickets.length, drawId: props.draw.id })
       createEmptyTicketEntries()
     }
   } catch (error) {

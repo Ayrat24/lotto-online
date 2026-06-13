@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 const props = defineProps({
   timeline: { type: Object, default: null },
@@ -8,10 +8,13 @@ const props = defineProps({
   locale: { type: String, default: 'en' },
   texts: { type: Object, required: true },
   postJson: { type: Function, required: true },
-  initData: { type: String, required: true }
+  initData: { type: String, required: true },
+  initialFilter: { type: String, default: 'active' }
 })
 
-const emit = defineEmits(['openDraw'])
+const emit = defineEmits(['claimed', 'claimFailed'])
+
+const claimingId = ref(null)
 
 const SORT_MODES = {
   active: 'active',
@@ -19,7 +22,12 @@ const SORT_MODES = {
   won: 'won'
 }
 
-const activeSort = ref(SORT_MODES.active)
+const activeSort = ref(SORT_MODES[props.initialFilter] || SORT_MODES.active)
+
+// Apply filter requested by the host (e.g. when opened from a notification).
+watch(() => props.initialFilter, value => {
+  if (value && SORT_MODES[value]) activeSort.value = SORT_MODES[value]
+})
 
 const sortOptions = computed(() => [
   { value: SORT_MODES.active, label: props.texts.activeSort || 'Активные' },
@@ -28,7 +36,9 @@ const sortOptions = computed(() => [
 ])
 
 function getTicketStatusValue(status) {
-  if (status === 'winnings_available' || status === 'winnings_claimed') return 'won'
+  if (status === 'winnings_available') return 'won'
+  // Claimed winnings are done with — surface them under the "past" tab.
+  if (status === 'winnings_claimed') return 'lost'
   if (status === 'awaiting_draw') return 'active'
   return 'lost'
 }
@@ -217,9 +227,32 @@ const subtitleText = computed(() => {
   return fmt.replace('{0}', a.active).replace('{1}', a.awaiting)
 })
 
-function handleTicketClick(entry) {
-  if (entry.draw) {
-    emit('openDraw', entry.draw)
+function isClaimable(entry) {
+  return entry.ticket.status === 'winnings_available'
+}
+
+async function handleTicketClick(entry) {
+  // Only an unclaimed winning ticket is actionable — clicking it claims the
+  // prize. Active / lost / already-claimed tickets do nothing.
+  if (!isClaimable(entry) || claimingId.value) return
+
+  claimingId.value = entry.ticket.id
+  try {
+    const res = await props.postJson('/api/tickets/claim', {
+      initData: props.initData,
+      ticketId: entry.ticket.id
+    })
+    if (res && res.ok) {
+      // Optimistically reflect the claim so the card updates before the next poll.
+      entry.ticket.status = 'winnings_claimed'
+      emit('claimed', { amount: Number(res.amount || 0), balance: Number(res.balance || 0) })
+    } else if (res) {
+      emit('claimFailed', res.error || '')
+    }
+  } catch (err) {
+    emit('claimFailed', err?.message || '')
+  } finally {
+    claimingId.value = null
   }
 }
 
@@ -257,6 +290,10 @@ const hasActiveTickets = computed(() => {
   return allTicketEntries.value.some(t => getTicketStatusValue(t.status) === 'active')
 })
 
+const hasUnclaimedWins = computed(() => {
+  return allTicketEntries.value.some(t => t.status === 'winnings_available')
+})
+
 const emptyMessage = computed(() => {
   if (activeSort.value === SORT_MODES.active) return props.texts.noActiveTickets || 'Нет активных билетов'
   if (activeSort.value === SORT_MODES.won) return props.texts.noWonTickets || 'Нет выигрышных билетов'
@@ -284,6 +321,7 @@ const emptyMessage = computed(() => {
       >
         {{ opt.label }}
         <span v-if="opt.value === 'active' && hasActiveTickets" class="mt-seg-dot"></span>
+        <span v-if="opt.value === 'won' && hasUnclaimedWins" class="mt-seg-dot"></span>
       </button>
     </div>
 
@@ -306,7 +344,7 @@ const emptyMessage = computed(() => {
       <div
         v-for="(entry, idx) in filteredTickets"
         :key="entry.ticket.id"
-        :class="['mt-card', { 'mt-card--clickable': !!entry.draw }]"
+        :class="['mt-card', { 'mt-card--clickable': isClaimable(entry) }]"
         @click="handleTicketClick(entry)"
       >
         <!-- Colored square with draw number -->
@@ -322,7 +360,12 @@ const emptyMessage = computed(() => {
 
         <!-- Middle: draw name, numbers, win amount -->
         <div class="mt-card-body">
-          <div class="mt-card-name">{{ texts.drawPrefix || 'Тираж #' }}{{ entry.drawId }}</div>
+          <div class="mt-card-name-row">
+            <div class="mt-card-name">{{ texts.drawPrefix || 'Тираж #' }}{{ entry.drawId }}</div>
+            <span class="mt-card-claimed" v-if="entry.ticket.status === 'winnings_claimed'">
+              {{ texts.statusClaimed || 'Claimed' }}
+            </span>
+          </div>
           <div class="mt-card-row">
             <div class="mt-card-nums">
               <span
@@ -339,7 +382,7 @@ const emptyMessage = computed(() => {
         <!-- Right: countdown / status -->
         <div class="mt-card-right">
           <div class="mt-card-time-label" v-if="entry.draw?.state === 'active'">{{ texts.timeIn || 'in' }}</div>
-          <div v-else class="mt-card-time-label">{{ getStatusText(entry.ticket.status) }}</div>
+          <div v-else-if="entry.ticket.status !== 'winnings_claimed'" class="mt-card-time-label">{{ getStatusText(entry.ticket.status) }}</div>
           <div class="mt-card-time-value" v-if="entry.draw?.state === 'active'">
             {{ formatCountdown(entry.draw?.purchaseClosesAtUtc) }}
           </div>
@@ -593,11 +636,33 @@ const emptyMessage = computed(() => {
   flex-shrink: 0;
 }
 
+.mt-card-claimed {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  background: rgba(26, 168, 115, 0.12);
+  color: #1AA873;
+  border-radius: 100px;
+  font-family: 'Manrope', Helvetica, sans-serif;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.mt-card-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .mt-card-name {
   font-family: 'Manrope', Helvetica, sans-serif;
   font-weight: 700;
   font-size: 13px;
   color: #0F0F12;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .mt-card-winup {

@@ -13,6 +13,10 @@ import InviteFriendScreen from './screens/InviteFriendScreen.vue'
 import TransactionHistoryScreen from './screens/TransactionHistoryScreen.vue'
 import WithdrawScreen from './screens/WithdrawScreen.vue'
 import PromotionsScreen from './screens/PromotionsScreen.vue'
+import NotificationCenter from './components/NotificationCenter.vue'
+import { useNotifications } from './composables/useNotifications'
+
+const { notifications, notify, dismiss } = useNotifications()
 
 const DRAW_SORTS = {
   closest: 'closest',
@@ -104,6 +108,12 @@ const state = reactive({
 
 const currentScreen = ref(getInitialScreen())
 const selectedDrawId = ref(getInitialDrawId())
+const ticketsFilter = ref('active')
+
+// Tracks ticket statuses seen on the previous timeline poll so we can detect
+// draw resolutions (win / no win) and surface them as notifications.
+const seenTicketStatuses = new Map()
+let ticketStatusInitialized = false
 
 let timerId = null
 let pollId = null
@@ -490,6 +500,122 @@ function handleBalanceUpdated(newBalance) {
   state.user.balance = newBalance
 }
 
+function navigateTo(screen, filter) {
+  if (screen === 'tickets') {
+    ticketsFilter.value = filter || 'active'
+    currentScreen.value = 'tickets'
+    selectedDrawId.value = null
+  } else if (screen === 'home') {
+    currentScreen.value = 'home'
+    selectedDrawId.value = null
+  } else {
+    currentScreen.value = screen
+  }
+  if (screen === 'winners' && !state.winners.length) loadWinners()
+  updateUrl()
+}
+
+// Routes a clicked notification to its target section, then dismisses it.
+function handleNotificationAction(item) {
+  if (item?.target?.screen) {
+    navigateTo(item.target.screen, item.target.filter)
+  }
+  if (item?.id != null) dismiss(item.id)
+}
+
+function handleTicketClaimed(info) {
+  const balance = Number(info?.balance || 0)
+  if (balance > 0 || info?.balance != null) state.user.balance = balance
+  const amountText = formatCurrency(Number(info?.amount || 0), intlLocale.value).replace('.', ',')
+  notify({
+    variant: 'success',
+    title: getText('client.notify.claimedTitle', 'Выигрыш получен'),
+    message: getText('client.notify.claimedMessage', 'На баланс добавлено {0}').replace('{0}', amountText)
+  })
+}
+
+function handleClaimFailed(message) {
+  notify({
+    variant: 'error',
+    title: getText('client.notify.claimFailedTitle', 'Ошибка'),
+    message: message || getText('client.ticket.claimFailed', 'Не удалось получить выигрыш.')
+  })
+}
+
+function handleTicketsPurchased(info) {
+  const count = Number(info?.count || 0)
+  const purchased = getText('client.notify.purchaseTitle', 'Покупка успешна')
+  const ticketsWord = count === 1
+    ? getText('client.notify.ticketSingular', 'билет в игре')
+    : getText('client.notify.ticketPlural', 'билета в игре')
+  notify({
+    variant: 'success',
+    title: purchased,
+    message: count > 0 ? `${count} ${ticketsWord}` : getText('client.notify.purchaseMessage', 'Билеты в игре'),
+    actionLabel: getText('client.notify.viewTickets', 'Смотреть'),
+    target: { screen: 'tickets', filter: 'active' }
+  })
+}
+
+// Detects tickets that flipped to a resolved state since the last poll and
+// raises a win / no-win notification once per ticket.
+function detectDrawOutcomes() {
+  const tickets = []
+  const groups = Array.isArray(state.timeline?.activeTicketGroups) ? state.timeline.activeTicketGroups : []
+  const history = Array.isArray(state.timeline?.history) ? state.timeline.history : []
+  const current = Array.isArray(state.timeline?.currentTickets) ? state.timeline.currentTickets : []
+  for (const group of [...groups, ...history]) {
+    if (Array.isArray(group?.tickets)) tickets.push(...group.tickets)
+  }
+  tickets.push(...current)
+
+  let newWins = 0
+  let newWinAmount = 0
+  let newLosses = 0
+
+  for (const ticket of tickets) {
+    if (!ticket || ticket.id == null) continue
+    const prev = seenTicketStatuses.get(ticket.id)
+    seenTicketStatuses.set(ticket.id, ticket.status)
+    if (!ticketStatusInitialized) continue
+    if (prev === ticket.status) continue
+    if (ticket.status === 'winnings_available' && prev !== 'winnings_available') {
+      newWins += 1
+      newWinAmount += Number(ticket.winningAmount || 0)
+    } else if (ticket.status === 'expired_no_win' && prev && prev !== 'expired_no_win') {
+      newLosses += 1
+    }
+  }
+
+  if (newWins > 0) {
+    const amountText = newWinAmount > 0
+      ? formatCurrency(newWinAmount, intlLocale.value).replace('.', ',')
+      : ''
+    notify({
+      variant: 'win',
+      dedupeKey: 'draw-win',
+      title: getText('client.notify.winTitle', 'ПОЗДРАВЛЯЕМ'),
+      message: amountText
+        ? `${getText('client.notify.winMessage', 'У вас выигрыш!')} ${amountText}`
+        : getText('client.notify.winMessage', 'У вас выигрыш!'),
+      actionLabel: getText('client.notify.check', 'Проверить'),
+      target: { screen: 'tickets', filter: 'won' },
+      timeout: 0
+    })
+  } else if (newLosses > 0) {
+    notify({
+      variant: 'info',
+      dedupeKey: 'draw-nowin',
+      title: getText('client.notify.noWinTitle', 'Спасибо за участие'),
+      message: getText('client.notify.noWinMessage', 'В этот раз без приза'),
+      actionLabel: getText('client.notify.check', 'Проверить'),
+      target: { screen: 'tickets', filter: 'past' }
+    })
+  }
+
+  ticketStatusInitialized = true
+}
+
 function updateUrl() {
   const url = new URL(window.location.href)
   if (currentScreen.value === 'ticket-selection' && selectedDrawId.value) {
@@ -541,6 +667,7 @@ async function loadTimeline() {
   if (res && res.ok) {
     state.timeline = res.state
     state.user.balance = Number(res.state?.balance || state.user.balance || 0)
+    detectDrawOutcomes()
   }
 }
 
@@ -648,6 +775,11 @@ onMounted(() => {
     }
   } catch {}
   loadAll()
+  // Debug-only hook to preview notifications without a live backend.
+  if (state.isLocalDebug) {
+    window.__miniappNotify = notify
+    window.__miniappState = state
+  }
   timerId = window.setInterval(() => { state.nowTick = Date.now() }, 1000)
   pollId = window.setInterval(() => {
     loadTimeline().catch(() => {})
@@ -706,6 +838,7 @@ onBeforeUnmount(() => {
         :init-data="state.initData"
         @back="handleBack"
         @balance-updated="handleBalanceUpdated"
+        @purchased="handleTicketsPurchased"
       />
 
       <MyTicketsScreen
@@ -717,7 +850,9 @@ onBeforeUnmount(() => {
         :texts="myTicketsTexts"
         :post-json="postJson"
         :init-data="state.initData"
-        @open-draw="openTicketSelection"
+        :initial-filter="ticketsFilter"
+        @claimed="handleTicketClaimed"
+        @claim-failed="handleClaimFailed"
       />
 
       <WinnersScreen
@@ -803,6 +938,13 @@ onBeforeUnmount(() => {
       :active-tab="activeTab"
       :texts="tabTexts"
       @navigate="handleTabNavigate"
+    />
+
+    <!-- Global notification overlay — appears above any screen -->
+    <NotificationCenter
+      :items="notifications.items"
+      @action="handleNotificationAction"
+      @dismiss="dismiss"
     />
   </div>
 </template>
