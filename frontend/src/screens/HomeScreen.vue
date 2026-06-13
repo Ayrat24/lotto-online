@@ -72,15 +72,21 @@ const activeDraws = computed(() => {
   return draws.filter(draw => draw && draw.state === 'active' && draw.canPurchase !== false).sort(compareDraws(props.sortMode))
 })
 
-const formattedDraws = computed(() => activeDraws.value.map((draw, index) => {
-  const color = String(draw?.cardColor || 'gold').toLowerCase()
+const CARD_COLORS = ['gold', 'teal', 'pink', 'blue', 'orange']
+
+const formattedDraws = computed(() => activeDraws.value.map((draw) => {
+  const rawColor = String(draw?.cardColor || 'gold').toLowerCase()
+  const cardColor = CARD_COLORS.includes(rawColor) ? rawColor : 'gold'
+  const jackpot = formatJackpot(draw.prizePoolMatch5, intlLocale.value)
   return {
     id: draw.id,
     title: `${props.texts.drawTitlePrefix || 'Тираж #'}${draw.id}`,
     countdown: formatCountdown(draw.purchaseClosesAtUtc, props.texts.schedulePending),
-    jackpot: formatJackpot(draw.prizePoolMatch5, intlLocale.value),
+    jackpot,
     ticketPrice: formatCurrency(draw.ticketCost, intlLocale.value).replace('.', ','),
-    theme: color === 'blue' || index % 2 === 1 ? 'blue' : 'orange',
+    cardColor,
+    // Long jackpots (e.g. "$2 323 232") need a smaller size to fit the card width.
+    jackpotClass: jackpot.length > 7 ? 'text-wrapper-11' : 'text-wrapper-8',
     raw: draw
   }
 }))
@@ -525,8 +531,8 @@ function handleDrawScrollPointerUp(event) {
             v-for="draw in formattedDraws"
             v-else
             :key="draw.id"
-            class="draw-card-button"
-            :class="draw.theme === 'blue' ? 'background-shadow-2' : 'background-shadow'"
+            class="draw-card-button background-shadow"
+            :class="`draw-card-color-${draw.cardColor}`"
             type="button"
             @click="handleDrawClick(draw)"
           >
@@ -537,7 +543,7 @@ function handleDrawScrollPointerUp(event) {
               </div>
               <div class="container-4">
                 <div class="container-5"><div class="text-wrapper-7">{{ texts.jackpotLabel }}</div></div>
-                <div class="container-5"><div :class="draw.theme === 'blue' ? 'text-wrapper-11' : 'text-wrapper-8'">{{ draw.jackpot }}</div></div>
+                <div class="container-5"><div :class="draw.jackpotClass">{{ draw.jackpot }}</div></div>
               </div>
               <div class="overlay-overlayblur">
                 <div class="container-3"><div class="text-wrapper-9">{{ texts.ticketPriceLabel }}</div></div>
@@ -657,7 +663,8 @@ function handleDrawScrollPointerUp(event) {
   width: 8px;
   height: 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
   transition: all 0.2s ease;
 }
 
@@ -665,7 +672,8 @@ function handleDrawScrollPointerUp(event) {
   width: 24px;
   height: 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 1);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
 }
 
 .banner-indicator-line {
@@ -744,7 +752,7 @@ function handleDrawScrollPointerUp(event) {
   gap: 12px;
   width: max-content;
   min-width: 100%;
-  padding: 4px 20px 10px;
+  padding: 4px 20px 24px;
   box-sizing: border-box;
 }
 </style>
