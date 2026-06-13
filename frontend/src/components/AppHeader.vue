@@ -1,18 +1,33 @@
 <script setup>
-defineProps({
+import { ref, watch } from 'vue'
+
+const props = defineProps({
   avatarLetter: { type: String, default: 'P' },
+  avatarUrl: { type: String, default: '' },
   userName: { type: String, default: 'Player' },
   userSubtitle: { type: String, default: '' },
   balanceLabel: { type: String, default: 'БАЛАНС' },
   balance: { type: String, default: '$0.00' }
 })
+
+// Fall back to the letter avatar if the Telegram photo fails to load.
+const imageFailed = ref(false)
+watch(() => props.avatarUrl, () => { imageFailed.value = false })
 </script>
 
 <template>
   <header class="app-header">
     <div class="app-header__left">
       <div class="app-header__avatar">
-        <div class="app-header__avatar-letter">{{ avatarLetter }}</div>
+        <img
+          v-if="avatarUrl && !imageFailed"
+          class="app-header__avatar-img"
+          :src="avatarUrl"
+          :alt="userName"
+          referrerpolicy="no-referrer"
+          @error="imageFailed = true"
+        />
+        <div v-else class="app-header__avatar-letter">{{ avatarLetter }}</div>
       </div>
       <div class="app-header__info">
         <div class="app-header__name">{{ userName }}</div>
@@ -60,6 +75,13 @@ defineProps({
   height: 42px;
   justify-content: center;
   width: 42px;
+}
+
+.app-header__avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 14.54px;
+  object-fit: cover;
 }
 
 .app-header__avatar-letter {

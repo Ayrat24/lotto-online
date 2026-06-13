@@ -882,7 +882,9 @@ internal static class LocalizationDefaults
 
             // App header subtitles
             ["client.header.ticketSelection"] = ("Choose ticket numbers", "Выберите номера для билета", "Bilet raqamlarini tanlang"),
-            ["client.header.myTickets"] = ("Your purchased tickets", "Ваши приобретённые билеты", "Sotib olingan biletlaringiz")
+            ["client.header.myTickets"] = ("Your purchased tickets", "Ваши приобретённые билеты", "Sotib olingan biletlaringiz"),
+            ["client.header.ticketsSummary"] = ("{0} in play · {1} winning", "{0} в игре · {1} выигрыш", "{0} o'yinda · {1} yutuqli"),
+            ["client.header.noTickets"] = ("No tickets in play yet", "Пока нет билетов в игре", "Hozircha o'yinda bilet yo'q")
         };
 }
 

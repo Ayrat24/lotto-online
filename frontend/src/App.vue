@@ -34,6 +34,17 @@ function getTelegramInitData() {
   }
 }
 
+// The Telegram WebApp exposes the launching user (name + avatar) via
+// initDataUnsafe — handy for the header before/independent of backend auth.
+function getTelegramUser() {
+  try {
+    return (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe
+      && window.Telegram.WebApp.initDataUnsafe.user) || null
+  } catch {
+    return null
+  }
+}
+
 function resolveInitData() {
   const params = new URLSearchParams(window.location.search || '')
   const forceLocalDebug = params.get('debug') === '1' || params.get('mode') === 'local-debug'
@@ -94,7 +105,7 @@ const state = reactive({
   initData: runtime.initData,
   isLocalDebug: runtime.isLocalDebug,
   locale: 'en',
-  user: { firstName: 'Player', lastName: '', username: '', birthDate: '', balance: 0 },
+  user: { firstName: 'Player', lastName: '', username: '', birthDate: '', balance: 0, photoUrl: '' },
   timeline: null,
   banners: [],
   promotions: [],
@@ -168,24 +179,40 @@ const userName = computed(() => {
   return value || state.user.username || 'Player'
 })
 const avatarLetter = computed(() => userName.value.slice(0, 1).toUpperCase())
+const avatarUrl = computed(() => state.user.photoUrl || '')
 const formattedBalance = computed(() => formatCurrency(state.user.balance, intlLocale.value).replace('.', ','))
 const localizedBalanceLabel = computed(() => getText('client.balance.label', texts.balanceLabel))
 
+// Live tally for the header: tickets still in play (awaiting the draw) and
+// tickets that have won and can be claimed.
+const headerTicketCounts = computed(() => {
+  const groups = Array.isArray(state.timeline?.activeTicketGroups) ? state.timeline.activeTicketGroups : []
+  const history = Array.isArray(state.timeline?.history) ? state.timeline.history : []
+  const current = Array.isArray(state.timeline?.currentTickets) ? state.timeline.currentTickets : []
+  let inPlay = 0
+  let winning = 0
+  const tally = ticket => {
+    if (!ticket) return
+    if (ticket.status === 'awaiting_draw') inPlay += 1
+    else if (ticket.status === 'winnings_available') winning += 1
+  }
+  for (const group of [...groups, ...history]) {
+    if (Array.isArray(group?.tickets)) group.tickets.forEach(tally)
+  }
+  current.forEach(tally)
+  return { inPlay, winning }
+})
+
+// The global header is universal across every screen: it always shows the
+// live ticket summary (tickets in play + winning), same as the home screen.
 const userSubtitle = computed(() => {
-  if (currentScreen.value === 'ticket-selection') {
-    return getText('client.header.ticketSelection', 'Выберите номера для билета')
+  const { inPlay, winning } = headerTicketCounts.value
+  if (inPlay === 0 && winning === 0) {
+    return getText('client.header.noTickets', 'Пока нет билетов в игре')
   }
-  if (currentScreen.value === 'tickets') {
-    return getText('client.header.myTickets', 'Ваши приобретённые билеты')
-  }
-  if (currentScreen.value === 'profile') return getText('client.profile.title', 'Профиль')
-  if (currentScreen.value === 'profile-edit') return getText('client.profile.edit.title', 'Профиль')
-  if (currentScreen.value === 'top-up') return getText('client.topup.title', 'Пополнить баланс')
-  if (currentScreen.value === 'invite-friend') return getText('client.invite.title', 'Пригласить друга')
-  if (currentScreen.value === 'transactions') return getText('client.history.title', 'История транзакций')
-  if (currentScreen.value === 'withdraw') return getText('client.profile.withdrawTitle', 'Запрос на вывод')
-  if (currentScreen.value === 'promotions') return getText('client.home.offersTitle', texts.offersTitle)
-  return '3 билета в игре · 1 выигрыш'
+  return getText('client.header.ticketsSummary', '{0} в игре · {1} выигрыш')
+    .replace('{0}', inPlay)
+    .replace('{1}', winning)
 })
 
 const tabTexts = computed(() => ({
@@ -655,9 +682,10 @@ async function loadLocale() {
 async function loadAuth() {
   const res = await postJson('/api/auth/telegram', { initData: state.initData })
   if (res && res.ok) {
-    state.user.firstName = res.firstName || ''
-    state.user.lastName = res.lastName || ''
-    state.user.username = res.username || ''
+    // Keep the Telegram-seeded values if the backend has nothing for a field.
+    state.user.firstName = res.firstName || state.user.firstName || ''
+    state.user.lastName = res.lastName || state.user.lastName || ''
+    state.user.username = res.username || state.user.username || ''
     state.user.balance = Number(res.balance || 0)
   }
 }
@@ -774,6 +802,15 @@ onMounted(() => {
       window.Telegram.WebApp.expand()
     }
   } catch {}
+  // Seed name + avatar from Telegram so the header is populated immediately,
+  // before (and regardless of) the backend auth round-trip.
+  const tgUser = getTelegramUser()
+  if (tgUser) {
+    if (tgUser.first_name) state.user.firstName = tgUser.first_name
+    if (tgUser.last_name) state.user.lastName = tgUser.last_name
+    if (tgUser.username) state.user.username = tgUser.username
+    if (tgUser.photo_url) state.user.photoUrl = tgUser.photo_url
+  }
   loadAll()
   // Debug-only hook to preview notifications without a live backend.
   if (state.isLocalDebug) {
@@ -799,6 +836,7 @@ onBeforeUnmount(() => {
     <!-- Persistent Header (Fixed) -->
     <AppHeader
       :avatar-letter="avatarLetter"
+      :avatar-url="avatarUrl"
       :user-name="userName"
       :user-subtitle="userSubtitle"
       :balance-label="localizedBalanceLabel"
