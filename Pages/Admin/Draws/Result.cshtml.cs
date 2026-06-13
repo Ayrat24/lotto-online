@@ -16,13 +16,15 @@ public sealed class ResultModel : MiniApp.Pages.Admin.LocalizedAdminPageModel
         string? Number,
         DateTimeOffset CreatedAtUtc,
         DateTimeOffset LastSeenAtUtc,
-        int MatchCount);
+        int MatchCount,
+        decimal WinningAmount);
 
     public sealed record TierWinnersSection(
         string TierLabel,
         decimal PrizePool,
         long WinningTicketsCount,
         decimal WinningAmountPerTicket,
+        decimal TotalPaid,
         IReadOnlyList<WinnerUserRow> Winners);
 
     public sealed record WinnerUserRow(
@@ -93,6 +95,7 @@ public sealed class ResultModel : MiniApp.Pages.Admin.LocalizedAdminPageModel
             {
                 x.UserId,
                 x.Numbers,
+                x.WinningAmount,
                 x.User.TelegramUserId,
                 x.User.Number,
                 x.User.CreatedAtUtc,
@@ -107,7 +110,8 @@ public sealed class ResultModel : MiniApp.Pages.Admin.LocalizedAdminPageModel
                 x.Number,
                 x.CreatedAtUtc,
                 x.LastSeenAtUtc,
-                CountMatches(x.Numbers, drawNumbers)))
+                CountMatches(x.Numbers, drawNumbers),
+                x.WinningAmount))
             .ToArray();
 
         Tiers = new[]
@@ -122,30 +126,29 @@ public sealed class ResultModel : MiniApp.Pages.Admin.LocalizedAdminPageModel
     {
         var winnerTickets = tickets.Where(x => x.MatchCount == matchCount).ToArray();
         var winningTicketsCount = winnerTickets.LongLength;
+        // Representative per-ticket share for display; actual per-ticket amounts (summed below)
+        // are the exact values locked onto each ticket at draw time and may differ by a cent.
         var amountPerTicket = winningTicketsCount == 0
             ? 0m
             : decimal.Round(prizePool / winningTicketsCount, 2, MidpointRounding.AwayFromZero);
+        var totalPaid = winnerTickets.Sum(x => x.WinningAmount);
 
         var winners = winnerTickets
             .GroupBy(x => new { x.UserId, x.TelegramUserId, x.Number, x.CreatedAtUtc, x.LastSeenAtUtc })
-            .Select(g =>
-            {
-                var userWinningTickets = g.LongCount();
-                return new WinnerUserRow(
-                    g.Key.UserId,
-                    g.Key.TelegramUserId,
-                    g.Key.Number,
-                    g.Key.CreatedAtUtc,
-                    g.Key.LastSeenAtUtc,
-                    userWinningTickets,
-                    decimal.Round(amountPerTicket * userWinningTickets, 2, MidpointRounding.AwayFromZero));
-            })
+            .Select(g => new WinnerUserRow(
+                g.Key.UserId,
+                g.Key.TelegramUserId,
+                g.Key.Number,
+                g.Key.CreatedAtUtc,
+                g.Key.LastSeenAtUtc,
+                g.LongCount(),
+                g.Sum(x => x.WinningAmount)))
             .OrderByDescending(x => x.WinningAmount)
             .ThenByDescending(x => x.WinningTicketsCount)
             .ThenBy(x => x.UserId)
             .ToArray();
 
-        return new TierWinnersSection(label, prizePool, winningTicketsCount, amountPerTicket, winners);
+        return new TierWinnersSection(label, prizePool, winningTicketsCount, amountPerTicket, totalPaid, winners);
     }
 
     private static HashSet<int> ParseNumbers(string numbers)

@@ -226,6 +226,9 @@ public static class LocalDebugSeed
             ticket.Status = matchCount >= 3
                 ? TicketStatus.WinningsAvailable
                 : TicketStatus.ExpiredNoWin;
+            // Synthetic debug winners are the only winner on their draw, so they take the full
+            // tier pool. WinningAmount must be set explicitly now that claims read it directly.
+            ticket.WinningAmount = matchCount >= 3 ? SeedWinningAmount(matchCount, drawForTicket) : 0m;
         }
 
         await db.SaveChangesAsync(ct);
@@ -315,6 +318,7 @@ public static class LocalDebugSeed
                 DrawId = winDraw.Id,
                 Numbers = winDraw.Numbers!,
                 Status = TicketStatus.WinningsAvailable,
+                WinningAmount = winDraw.PrizePoolMatch5,
                 PurchasedAtUtc = now.AddHours(-2)
             });
             changed = true;
@@ -329,6 +333,7 @@ public static class LocalDebugSeed
                 DrawId = claimedDraw.Id,
                 Numbers = claimedDraw.Numbers!,
                 Status = TicketStatus.WinningsClaimed,
+                WinningAmount = claimedDraw.PrizePoolMatch5,
                 PurchasedAtUtc = now.AddHours(-3)
             });
             changed = true;
@@ -351,6 +356,14 @@ public static class LocalDebugSeed
         if (changed)
             await db.SaveChangesAsync(ct);
     }
+
+    private static decimal SeedWinningAmount(int matchCount, Draw draw) => matchCount switch
+    {
+        3 => draw.PrizePoolMatch3,
+        4 => draw.PrizePoolMatch4,
+        5 => draw.PrizePoolMatch5,
+        _ => 0m
+    };
 
     private static string BuildNonMatchingNumbers(string drawNumbers)
     {

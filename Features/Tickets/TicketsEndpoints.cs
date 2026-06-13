@@ -49,7 +49,7 @@ public static class TicketsEndpoints
             var ticketRows = await db.Tickets
                 .Where(x => x.UserId == u.Id)
                 .OrderByDescending(x => x.PurchasedAtUtc)
-                .Select(x => new { x.Id, x.DrawId, x.Numbers, x.Status, x.PurchasedAtUtc })
+                .Select(x => new { x.Id, x.DrawId, x.Numbers, x.Status, x.PurchasedAtUtc, x.WinningAmount })
                 .AsNoTracking()
                 .ToListAsync(ct);
 
@@ -68,7 +68,7 @@ public static class TicketsEndpoints
                     var winningAmount = draw is null
                         ? 0m
                         : TicketWinnings.GetWinningAmount(
-                            new Ticket { Numbers = x.Numbers, Status = x.Status },
+                            new Ticket { Numbers = x.Numbers, Status = x.Status, WinningAmount = x.WinningAmount },
                             draw);
                     return new TicketDto(x.Id, x.DrawId, x.Numbers, DrawManagement.ToTicketStatusValue(x.Status), x.PurchasedAtUtc, winningAmount);
                 })

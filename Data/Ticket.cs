@@ -27,5 +27,13 @@ public sealed class Ticket
 
     public TicketStatus Status { get; set; } = TicketStatus.AwaitingDraw;
 
+    /// <summary>
+    /// Prize locked in for this ticket when its draw was executed. For winning tickets this is
+    /// the ticket's share of the tier prize pool (pool split across all winners of that tier);
+    /// 0 for non-winning or not-yet-drawn tickets. Persisted so the payout is fixed at draw time
+    /// and read consistently by claim and display paths.
+    /// </summary>
+    public decimal WinningAmount { get; set; }
+
     public DateTimeOffset PurchasedAtUtc { get; set; } = DateTimeOffset.UtcNow;
 }

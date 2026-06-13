@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using MiniApp.Data;
 
@@ -74,7 +75,7 @@ internal static class DrawManagement
         if (draw.State != DrawState.Active)
             throw new InvalidOperationException("Only the active draw can be executed.");
 
-        draw.Numbers = string.IsNullOrWhiteSpace(manualNumbers)
+        var drawNumbers = string.IsNullOrWhiteSpace(manualNumbers)
             ? GenerateDrawNumbers()
             : NormalizeManualDrawNumbers(manualNumbers);
 
@@ -82,16 +83,74 @@ internal static class DrawManagement
             .Where(x => x.DrawId == draw.Id)
             .ToListAsync(ct);
 
+        // Bucket winning tickets by match tier so each tier's prize pool can be shared
+        // (pari-mutuel) across its winners instead of paying the full pool to each.
+        var tierWinners = new Dictionary<int, List<Ticket>> { [3] = new(), [4] = new(), [5] = new() };
+
         foreach (var ticket in tickets)
         {
-            var matchedCount = TicketWinnings.GetMatchCount(ticket.Numbers, draw.Numbers);
-            ticket.Status = matchedCount >= 3
-                ? TicketStatus.WinningsAvailable
-                : TicketStatus.ExpiredNoWin;
+            ticket.WinningAmount = 0m;
+            var matchedCount = TicketWinnings.GetMatchCount(ticket.Numbers, drawNumbers);
+            if (matchedCount >= 3)
+            {
+                ticket.Status = TicketStatus.WinningsAvailable;
+                tierWinners[matchedCount].Add(ticket);
+            }
+            else
+            {
+                ticket.Status = TicketStatus.ExpiredNoWin;
+            }
         }
 
+        DistributeTierPrize(tierWinners[3], draw.PrizePoolMatch3);
+        DistributeTierPrize(tierWinners[4], draw.PrizePoolMatch4);
+        DistributeTierPrize(tierWinners[5], draw.PrizePoolMatch5);
+
+        // Solvency guard: refuse to finish a draw the house wallet cannot fully cover.
+        // Otherwise the first winners to claim would drain the wallet and later winners
+        // would be left unable to claim what they are owed.
+        var totalPayable = tickets.Sum(x => x.WinningAmount);
+        if (totalPayable > 0m)
+        {
+            var serverBalance = await db.ServerWallets
+                .Where(x => x.Id == 1)
+                .Select(x => (decimal?)x.Balance)
+                .SingleOrDefaultAsync(ct) ?? 0m;
+
+            if (serverBalance < totalPayable)
+            {
+                throw new InvalidOperationException(
+                    $"House wallet holds {serverBalance:0.00} but this draw owes {totalPayable:0.00} in prizes. " +
+                    "Top up the house wallet to at least that amount before executing the draw.");
+            }
+        }
+
+        draw.Numbers = drawNumbers;
         draw.State = DrawState.Finished;
         await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Splits a tier prize pool equally across the winning tickets in that tier, working in
+    /// integer cents so the distributed total never exceeds the pool. Any remainder cents are
+    /// handed to the lowest ticket ids (deterministic), so the sum equals the pool exactly.
+    /// </summary>
+    private static void DistributeTierPrize(List<Ticket> winners, decimal prizePool)
+    {
+        if (winners.Count == 0 || prizePool <= 0m)
+            return;
+
+        var totalCents = (long)decimal.Round(prizePool * 100m, 0, MidpointRounding.AwayFromZero);
+        var count = winners.Count;
+        var baseCents = totalCents / count;
+        var remainder = (int)(totalCents % count);
+
+        var ordered = winners.OrderBy(x => x.Id).ToList();
+        for (var i = 0; i < ordered.Count; i++)
+        {
+            var cents = baseCents + (i < remainder ? 1 : 0);
+            ordered[i].WinningAmount = cents / 100m;
+        }
     }
 
     public static DrawDto ToDto(Draw draw, DateTimeOffset? nowUtc = null)
@@ -185,9 +244,11 @@ internal static class DrawManagement
 
     public static string GenerateDrawNumbers()
     {
+        // Use a cryptographically secure RNG: draw numbers decide real-money payouts, so
+        // the sequence must not be predictable the way Random.Shared (a fast PRNG) is.
         var set = new HashSet<int>();
         while (set.Count < NumbersPerDraw)
-            set.Add(Random.Shared.Next(MinNumber, MaxNumber + 1));
+            set.Add(RandomNumberGenerator.GetInt32(MinNumber, MaxNumber + 1));
 
         var arr = set.ToArray();
         Array.Sort(arr);

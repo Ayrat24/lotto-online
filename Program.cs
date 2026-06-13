@@ -22,6 +22,7 @@ using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
 using System.Globalization;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -60,6 +61,63 @@ if (telegramEnabled
 // ===== Services =====
 builder.Services.AddRazorPages();
 builder.Services.AddMemoryCache();
+
+// Per-client-IP throttle on the public JSON API. Razor/admin pages and static assets are
+// untouched; bot and payment-provider webhooks are excluded because they arrive from a small
+// set of trusted server IPs and must not be dropped. Runs after UseForwardedHeaders so the
+// partition key is the real client IP behind the reverse proxy.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+    {
+        var path = context.Request.Path;
+
+        if (!path.StartsWithSegments("/api") || path.StartsWithSegments("/api/webhooks"))
+            return RateLimitPartition.GetNoLimiter("unlimited");
+
+        var clientKey = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+        // Money- and auth-sensitive endpoints get a much tighter budget than read/poll traffic.
+        var sensitive = path.StartsWithSegments("/api/auth/telegram")
+            || path.StartsWithSegments("/api/tickets/purchase")
+            || path.StartsWithSegments("/api/tickets/claim")
+            || path.StartsWithSegments("/api/wallet/withdraw")
+            || path.StartsWithSegments("/api/payments/deposits/create");
+
+        if (sensitive)
+        {
+            return RateLimitPartition.GetFixedWindowLimiter($"sensitive:{clientKey}", _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 12,
+                Window = TimeSpan.FromSeconds(30),
+                QueueLimit = 0
+            });
+        }
+
+        return RateLimitPartition.GetFixedWindowLimiter($"api:{clientKey}", _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 90,
+            Window = TimeSpan.FromSeconds(10),
+            QueueLimit = 0
+        });
+    });
+
+    options.OnRejected = async (context, token) =>
+    {
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+        {
+            context.HttpContext.Response.Headers.RetryAfter =
+                ((int)retryAfter.TotalSeconds).ToString(NumberFormatInfo.InvariantInfo);
+        }
+
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        await context.HttpContext.Response.WriteAsJsonAsync(
+            new { ok = false, error = "Too many requests. Please slow down and try again shortly." },
+            token);
+    };
+});
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor
@@ -302,6 +360,8 @@ if (localDebugEnabled)
 }
 
 app.UseAuthorization();
+
+app.UseRateLimiter();
 
 app.MapRazorPages();
 

@@ -25,17 +25,10 @@ public static class TicketWinnings
         if (draw.State != DrawState.Finished || string.IsNullOrWhiteSpace(draw.Numbers))
             return 0m;
 
-        var matchCount = GetMatchCount(ticket.Numbers, draw.Numbers);
-
-        var amount = matchCount switch
-        {
-            3 => draw.PrizePoolMatch3,
-            4 => draw.PrizePoolMatch4,
-            5 => draw.PrizePoolMatch5,
-            _ => 0m
-        };
-
-        return decimal.Round(amount, 2, MidpointRounding.AwayFromZero);
+        // The shared (pari-mutuel) prize is computed and locked onto the ticket when the draw
+        // is executed (see DrawManagement.ExecuteDrawAsync), so read the persisted amount rather
+        // than recomputing the full tier pool here.
+        return decimal.Round(ticket.WinningAmount, 2, MidpointRounding.AwayFromZero);
     }
 
     private static HashSet<int> ParseNumberSet(string numbers)

@@ -37,8 +37,34 @@ public sealed class WalletService : IWalletService
         };
 
         _db.ServerWallets.Add(wallet);
-        await _db.SaveChangesAsync(ct);
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            // Another request created the singleton wallet row concurrently (duplicate PK).
+            // Drop our pending insert and read the row that won the race.
+            _db.Entry(wallet).State = EntityState.Detached;
+            wallet = await _db.ServerWallets.SingleAsync(x => x.Id == 1, ct);
+        }
+
         return wallet;
+    }
+
+    /// <summary>
+    /// Applies a signed delta to the shared house wallet, enforcing the non-negative-balance
+    /// invariant in one place. Debits that would overdraw the wallet throw rather than silently
+    /// pushing the house balance negative. Callers should still surface a friendly pre-check.
+    /// </summary>
+    private static void ApplyServerWalletDelta(ServerWallet wallet, decimal delta, DateTimeOffset now)
+    {
+        var next = RoundAmount(wallet.Balance + delta);
+        if (next < 0m)
+            throw new InvalidOperationException("Server wallet balance cannot go negative.");
+
+        wallet.Balance = next;
+        wallet.UpdatedAtUtc = now;
     }
 
     public async Task<WalletBatchPurchaseResult> TryPurchaseTicketsAsync(long userId, long drawId, IReadOnlyList<string> numbersByTicket, long? offerId, CancellationToken ct)
@@ -218,8 +244,7 @@ public sealed class WalletService : IWalletService
 
         var now = DateTimeOffset.UtcNow;
         user.Balance = RoundAmount(user.Balance + amount);
-        serverWallet.Balance = RoundAmount(serverWallet.Balance - amount);
-        serverWallet.UpdatedAtUtc = now;
+        ApplyServerWalletDelta(serverWallet, -amount, now);
         ticket.Status = TicketStatus.WinningsClaimed;
 
         _db.WalletTransactions.Add(new WalletTransaction
@@ -491,8 +516,7 @@ public sealed class WalletService : IWalletService
             request.PayoutLastError = null;
         }
 
-        serverWallet.Balance = RoundAmount(serverWallet.Balance - request.Amount);
-        serverWallet.UpdatedAtUtc = now;
+        ApplyServerWalletDelta(serverWallet, -request.Amount, now);
 
         request.Status = WithdrawalRequestStatus.Confirmed;
         request.AssetCode = normalizedAssetCode;

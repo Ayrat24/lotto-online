@@ -254,6 +254,7 @@ public sealed class AppDbContext : DbContext
             b.Property(x => x.DrawId).IsRequired();
             b.Property(x => x.Numbers).HasMaxLength(64).IsRequired();
             b.Property(x => x.NumbersSignature).HasMaxLength(64);
+            b.Property(x => x.WinningAmount).HasPrecision(18, 2).IsRequired().HasDefaultValue(0m);
             b.Property(x => x.Status)
                 .HasConversion<string>()
                 .HasMaxLength(32)
